@@ -6,6 +6,9 @@ import { SvgPreview } from './SvgPreview';
 import { MarkdownPreview } from './MarkdownPreview';
 import { MediaPreview } from './MediaPreview';
 import { FolderPreview } from './FolderPreview';
+import { PdfPreview } from './PdfPreview';
+import { DocxPreview } from './DocxPreview';
+import { XlsxPreview } from './XlsxPreview';
 
 interface Props {
   entry: FileEntry;
@@ -31,6 +34,12 @@ export function PreviewRenderer({ entry }: Props) {
       return <SvgPreview path={entry.path} name={entry.name} />;
     case 'markdown':
       return <MarkdownPreview path={entry.path} />;
+    case 'pdf':
+      return <PdfPreview path={entry.path} />;
+    case 'docx':
+      return <DocxPreview path={entry.path} />;
+    case 'xlsx':
+      return <XlsxPreview path={entry.path} />;
     case 'video':
       return <MediaPreview path={entry.path} name={entry.name} kind="video" mime={fileType.mime} />;
     case 'audio':

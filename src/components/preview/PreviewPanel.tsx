@@ -11,6 +11,9 @@ function getTypeBadge(entry: FileEntry): string {
     case 'image': return 'IMAGE';
     case 'svg': return 'SVG';
     case 'markdown': return 'MARKDOWN';
+    case 'pdf': return 'PDF';
+    case 'docx': return 'DOCX';
+    case 'xlsx': return 'XLSX';
     case 'video': return 'VIDEO';
     case 'audio': return 'AUDIO';
     case 'folder': return 'FOLDER';

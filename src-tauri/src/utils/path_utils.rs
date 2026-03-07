@@ -33,6 +33,7 @@ pub struct DriveInfo {
     pub letter: String,
     pub drive_type: String, // "fixed", "removable", "network", "cdrom", "ramdisk", "unknown"
     pub label: String,
+    pub is_cloud: bool,
 }
 
 #[cfg(windows)]
@@ -80,7 +81,9 @@ fn get_volume_label(root: &str) -> String {
 }
 
 /// Return available Windows drives with type classification.
-pub fn get_drives() -> Vec<DriveInfo> {
+/// `cloud_mount_paths` is an optional list of known cloud mount paths;
+/// drives whose root matches one of these will be flagged as `is_cloud`.
+pub fn get_drives_with_cloud_filter(cloud_paths: &[String]) -> Vec<DriveInfo> {
     let mut drives = Vec::new();
     for letter in b'A'..=b'Z' {
         let root = format!("{}:\\", letter as char);
@@ -107,6 +110,13 @@ pub fn get_drives() -> Vec<DriveInfo> {
         #[cfg(not(windows))]
         let (drive_type, label) = ("fixed".to_string(), String::new());
 
+        // Check if this drive root is a cloud mount (e.g. G:\ for GDFS)
+        let is_cloud = cloud_paths.iter().any(|cp| {
+            let cp_upper = cp.to_uppercase();
+            let root_upper = root.to_uppercase();
+            cp_upper.starts_with(&root_upper) || root_upper.starts_with(&cp_upper)
+        });
+
         let display_label = if label.is_empty() {
             match drive_type.as_str() {
                 "removable" => format!("Removable ({})", &root[..2]),
@@ -122,7 +132,13 @@ pub fn get_drives() -> Vec<DriveInfo> {
             letter: root,
             drive_type,
             label: display_label,
+            is_cloud,
         });
     }
     drives
+}
+
+/// Simple version without cloud filtering (backwards compat).
+pub fn get_drives() -> Vec<DriveInfo> {
+    get_drives_with_cloud_filter(&[])
 }

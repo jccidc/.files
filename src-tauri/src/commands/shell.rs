@@ -126,6 +126,31 @@ pub fn resolve_shortcut(path: String) -> Result<Option<String>, String> {
     Ok(None)
 }
 
+#[tauri::command]
+pub fn eject_drive(letter: String) -> Result<(), String> {
+    // Extract just the drive letter character
+    let drive_char = letter.chars().next().ok_or("Empty drive letter")?;
+    if !drive_char.is_ascii_alphabetic() {
+        return Err("Invalid drive letter".into());
+    }
+
+    let script = format!(
+        "(New-Object -ComObject Shell.Application).Namespace(17).ParseName('{}:').InvokeVerb('Eject')",
+        drive_char.to_uppercase()
+    );
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &script])
+        .output()
+        .map_err(|e| format!("Failed to eject: {}", e))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(format!("Eject failed: {}", stderr.trim()))
+    }
+}
+
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dst).map_err(|e| e.to_string())?;
     for entry in std::fs::read_dir(src).map_err(|e| e.to_string())? {

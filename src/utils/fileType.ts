@@ -5,6 +5,9 @@ export type FilePreviewType =
   | { kind: 'image' }
   | { kind: 'svg' }
   | { kind: 'markdown' }
+  | { kind: 'pdf' }
+  | { kind: 'docx' }
+  | { kind: 'xlsx' }
   | { kind: 'video'; mime: string }
   | { kind: 'audio'; mime: string }
   | { kind: 'folder' }
@@ -57,6 +60,9 @@ export function getFileType(entry: FileEntry): FilePreviewType {
 
   if (ext === 'svg') return { kind: 'svg' };
   if (ext === 'md' || ext === 'mdx' || ext === 'markdown') return { kind: 'markdown' };
+  if (ext === 'pdf') return { kind: 'pdf' };
+  if (ext === 'docx') return { kind: 'docx' };
+  if (ext === 'xlsx' || ext === 'xls') return { kind: 'xlsx' };
   if (imageExts.has(ext)) return { kind: 'image' };
   if (videoExts[ext]) return { kind: 'video', mime: videoExts[ext] };
   if (audioExts[ext]) return { kind: 'audio', mime: audioExts[ext] };

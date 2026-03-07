@@ -24,3 +24,7 @@ export async function dirStats(path: string): Promise<DirStats> {
 export async function getKnownFolderPaths(): Promise<[string, string][]> {
   return invoke('get_known_folder_paths');
 }
+
+export async function readFileBytes(path: string): Promise<string> {
+  return invoke('read_file_bytes', { path });
+}

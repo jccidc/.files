@@ -117,7 +117,10 @@ pub fn stat_file(path: String) -> Result<FileEntry, String> {
 
 #[tauri::command]
 pub fn get_drives() -> Result<Vec<path_utils::DriveInfo>, String> {
-    Ok(path_utils::get_drives())
+    // Detect cloud mount paths so we can flag cloud-mounted drives (e.g. G:\ for GDFS)
+    let cloud_mounts = crate::commands::cloud::detect_cloud_mounts();
+    let cloud_paths: Vec<String> = cloud_mounts.into_iter().map(|m| m.path).collect();
+    Ok(path_utils::get_drives_with_cloud_filter(&cloud_paths))
 }
 
 #[tauri::command]
@@ -174,6 +177,17 @@ pub async fn dir_stats(path: String) -> Result<DirStats, String> {
         total_size,
         truncated,
     })
+}
+
+#[tauri::command]
+pub fn read_file_bytes(path: String) -> Result<String, String> {
+    use base64::Engine;
+    let file_path = Path::new(&path);
+    if !file_path.exists() {
+        return Err(format!("File does not exist: {}", path));
+    }
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
 }
 
 /// Returns the real paths for Desktop, Documents, Downloads --

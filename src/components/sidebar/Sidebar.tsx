@@ -96,7 +96,7 @@ const itemStyle: React.CSSProperties = {
 
 // ---- Expandable Folder Tree Item ----
 
-function FolderTreeItem({ path, label, icon, depth, onNavigate }: {
+export function FolderTreeItem({ path, label, icon, depth, onNavigate }: {
   path: string; label: string; icon: React.ReactNode; depth: number; onNavigate: (path: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -215,10 +215,14 @@ export function Sidebar() {
   const startW = useRef(0);
   const dragStartY = useRef(0);
 
-  useEffect(() => {
+  const refreshDrives = useCallback(() => {
     getDrives()
       .then(setDrives)
-      .catch(() => setDrives([{ letter: 'C:\\', drive_type: 'fixed', label: 'Local Disk (C:)' }]));
+      .catch(() => setDrives([{ letter: 'C:\\', drive_type: 'fixed', label: 'Local Disk (C:)', is_cloud: false }]));
+  }, []);
+
+  useEffect(() => {
+    refreshDrives();
 
     getKnownFolderPaths()
       .then((folders) => {
@@ -232,7 +236,21 @@ export function Sidebar() {
           { label: 'Downloads', path: home + '\\Downloads' },
         ]);
       });
-  }, []);
+
+    // Poll for drive changes every 5 seconds (hot-plug detection)
+    const interval = setInterval(refreshDrives, 5000);
+    return () => clearInterval(interval);
+  }, [refreshDrives]);
+
+  const ejectDrive = useCallback(async (driveLetter: string) => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('eject_drive', { letter: driveLetter });
+      refreshDrives();
+    } catch {
+      // Eject failed silently
+    }
+  }, [refreshDrives]);
 
   // Fix chicken-and-egg: check git repo from Sidebar on path change
   // so the Git section can show even before GitPanel mounts
@@ -349,15 +367,36 @@ export function Sidebar() {
     sources: () => (
       <div key="sources" ref={(el) => { sectionRefs.current['sources'] = el; }}>
         <SectionLabel text="Sources" collapsed={collapsed.sources} onToggle={() => toggleCollapsed('sources')} {...makeDragProps('sources')} />
-        {!collapsed.sources && drives.map((d) => (
-          <FolderTreeItem
-            key={d.letter}
-            path={d.letter}
-            label={d.label}
-            icon={<DriveIcon type={d.drive_type} />}
-            depth={0}
-            onNavigate={navigate}
-          />
+        {!collapsed.sources && drives.filter((d) => !d.is_cloud).map((d) => (
+          <div key={d.letter} style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+            <div style={{ flex: 1 }}>
+              <FolderTreeItem
+                path={d.letter}
+                label={d.label}
+                icon={<DriveIcon type={d.drive_type} />}
+                depth={0}
+                onNavigate={navigate}
+              />
+            </div>
+            {d.drive_type === 'removable' && (
+              <button
+                onClick={(e) => { e.stopPropagation(); ejectDrive(d.letter); }}
+                title="Eject"
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: 'var(--t3)', padding: '2px 8px', display: 'flex', alignItems: 'center',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--yellow)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--t3)'; }}
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3">
+                  <polyline points="3,2 6,8 9,2" />
+                  <line x1="3" y1="10" x2="9" y2="10" />
+                </svg>
+              </button>
+            )}
+          </div>
         ))}
       </div>
     ),

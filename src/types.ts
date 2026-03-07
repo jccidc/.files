@@ -29,6 +29,7 @@ export interface DriveInfo {
   letter: string;
   drive_type: 'fixed' | 'removable' | 'network' | 'cdrom' | 'ramdisk' | 'unknown';
   label: string;
+  is_cloud: boolean;
 }
 
 export interface CloudSource {

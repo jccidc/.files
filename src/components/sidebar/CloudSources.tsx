@@ -3,6 +3,7 @@ import { useSettingsStore } from '../../stores/settings';
 import { useExplorerStore } from '../../stores/explorer';
 import { githubListRepos, detectCloudMounts, findLocalRepo } from '../../api/cloud';
 import { gitClone } from '../../api/git';
+import { FolderTreeItem } from './Sidebar';
 import type { GitHubRepo, CloudMount } from '../../api/cloud';
 
 // ---- Icons ----
@@ -310,40 +311,28 @@ export function CloudSources() {
 
   return (
     <div>
-      {/* Cloud mount points */}
+      {/* Cloud mount points (expandable) */}
       {cloudMounts.map((m) => (
-        <div
+        <FolderTreeItem
           key={m.path}
-          onClick={() => navigate(m.path)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '5px 12px', cursor: 'pointer', fontSize: 12,
-            color: 'var(--t2)', borderRadius: 4, margin: '0 6px',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--t1)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--t2)'; }}
-        >
-          {providerIcon[m.provider] || <IconCloud />}
-          <span>{m.label}</span>
-        </div>
+          path={m.path}
+          label={m.label}
+          icon={providerIcon[m.provider] || <IconCloud />}
+          depth={0}
+          onNavigate={navigate}
+        />
       ))}
 
-      {/* Custom cloud sources from settings */}
+      {/* Custom cloud sources from settings (expandable) */}
       {customSources.filter((cs: { enabled: boolean }) => cs.enabled).map((cs: { provider: string; label: string; path: string }, i: number) => (
-        <div
+        <FolderTreeItem
           key={`custom-${i}`}
-          onClick={() => navigate(cs.path)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '5px 12px', cursor: 'pointer', fontSize: 12,
-            color: 'var(--t2)', borderRadius: 4, margin: '0 6px',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--t1)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--t2)'; }}
-        >
-          {providerIcon[cs.provider] || <IconCloud />}
-          <span>{cs.label}</span>
-        </div>
+          path={cs.path}
+          label={cs.label}
+          icon={providerIcon[cs.provider] || <IconCloud />}
+          depth={0}
+          onNavigate={navigate}
+        />
       ))}
 
       {/* GitHub section */}
