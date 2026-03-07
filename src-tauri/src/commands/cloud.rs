@@ -1,5 +1,13 @@
 use serde::Serialize;
 use std::path::Path;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
+// ---- Cloud Mount Cache ----
+// Avoids spawning PowerShell for .lnk resolution on every 5s drive poll
+
+static CLOUD_CACHE: Mutex<Option<(Instant, Vec<CloudMount>)>> = Mutex::new(None);
+const CLOUD_CACHE_TTL: Duration = Duration::from_secs(60);
 
 // ---- Models ----
 
@@ -86,6 +94,8 @@ pub async fn github_list_repos(pat: String, page: u32) -> Result<Vec<GitHubRepo>
 #[tauri::command]
 pub fn find_local_repo(name: String) -> Option<String> {
     let user_profile = std::env::var("USERPROFILE").unwrap_or_default();
+
+    // 1. Check exact known paths first (fast path)
     let candidates = [
         format!("C:\\Projects\\{}", &name),
         format!("{}\\Projects\\{}", &user_profile, &name),
@@ -100,6 +110,37 @@ pub fn find_local_repo(name: String) -> Option<String> {
             return Some(c.clone());
         }
     }
+
+    // 2. Scan common project parent directories 1 level deep
+    let scan_roots = [
+        "C:\\Projects".to_string(),
+        format!("{}\\Projects", &user_profile),
+        format!("{}\\Documents", &user_profile),
+        format!("{}\\source\\repos", &user_profile),
+        format!("{}\\repos", &user_profile),
+        format!("{}\\OneDrive\\Jimmy CrakCrn\\projects", &user_profile),
+        format!("{}\\Desktop", &user_profile),
+    ];
+    let name_lower = name.to_lowercase();
+    for root in &scan_roots {
+        let root_path = Path::new(root);
+        if !root_path.is_dir() {
+            continue;
+        }
+        if let Ok(entries) = std::fs::read_dir(root_path) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let entry_path = entry.path();
+                if entry_path.is_dir() && entry_path.join(".git").is_dir() {
+                    if let Some(dir_name) = entry_path.file_name().and_then(|n| n.to_str()) {
+                        if dir_name.to_lowercase() == name_lower {
+                            return Some(entry_path.to_string_lossy().to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     None
 }
 
@@ -146,6 +187,26 @@ fn resolve_lnk(path: &Path) -> Option<String> {
 
 #[tauri::command]
 pub fn detect_cloud_mounts() -> Vec<CloudMount> {
+    // Return cached result if fresh
+    if let Ok(guard) = CLOUD_CACHE.lock() {
+        if let Some((ts, ref cached)) = *guard {
+            if ts.elapsed() < CLOUD_CACHE_TTL {
+                return cached.clone();
+            }
+        }
+    }
+
+    let result = detect_cloud_mounts_inner();
+
+    // Store in cache
+    if let Ok(mut guard) = CLOUD_CACHE.lock() {
+        *guard = Some((Instant::now(), result.clone()));
+    }
+
+    result
+}
+
+fn detect_cloud_mounts_inner() -> Vec<CloudMount> {
     let mut mounts = Vec::new();
 
     let user_profile = std::env::var("USERPROFILE").unwrap_or_default();

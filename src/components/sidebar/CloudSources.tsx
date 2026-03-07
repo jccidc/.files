@@ -461,6 +461,20 @@ export function CloudSources() {
                 Cancel
               </button>
               <button
+                onClick={async () => {
+                  const { openUrl } = await import('@tauri-apps/plugin-opener');
+                  openUrl(cloneTarget.repo.html_url);
+                  setCloneTarget(null);
+                }}
+                title="Open in browser"
+                style={{
+                  background: 'var(--raised)', color: 'var(--t2)',
+                  border: '1px solid var(--border)', borderRadius: 4, padding: '6px 16px', fontSize: 12, cursor: 'pointer',
+                }}
+              >
+                Browse on GitHub
+              </button>
+              <button
                 onClick={executeClone}
                 style={{
                   background: 'var(--accent)', color: '#fff',
