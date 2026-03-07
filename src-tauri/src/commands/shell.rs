@@ -98,6 +98,34 @@ pub fn rename_file(path: String, new_name: String) -> Result<String, String> {
     Ok(target.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+pub fn resolve_shortcut(path: String) -> Result<Option<String>, String> {
+    let p = Path::new(&path);
+    if !p.exists() {
+        return Err(format!("Path does not exist: {}", path));
+    }
+    let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
+    if ext.to_lowercase() != "lnk" {
+        return Ok(None);
+    }
+    let escaped = path.replace('\'', "''");
+    let script = format!(
+        "$sh = New-Object -ComObject WScript.Shell; $sc = $sh.CreateShortcut('{}'); $sc.TargetPath",
+        escaped
+    );
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &script])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if output.status.success() {
+        let target = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !target.is_empty() {
+            return Ok(Some(target));
+        }
+    }
+    Ok(None)
+}
+
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dst).map_err(|e| e.to_string())?;
     for entry in std::fs::read_dir(src).map_err(|e| e.to_string())? {

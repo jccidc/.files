@@ -54,11 +54,7 @@ export function StatusBar() {
           <>
             <span style={{ color: 'var(--border)' }}>|</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="var(--t2)" strokeWidth="1.3" style={{ flexShrink: 0 }}>
-                <circle cx="3" cy="3" r="1.5" /><circle cx="3" cy="9" r="1.5" />
-                <circle cx="9" cy="3" r="1.5" /><line x1="3" y1="4.5" x2="3" y2="7.5" />
-                <path d="M9 4.5C9 6 7 6 3 7.5" />
-              </svg>
+              <span style={{ color: 'var(--t3)', fontSize: 10 }}>branch:</span>
               <span style={{ color: 'var(--t1)' }}>{repoInfo.branch}</span>
               {(repoInfo.ahead > 0 || repoInfo.behind > 0) && (
                 <span style={{ fontSize: 10 }}>

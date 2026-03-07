@@ -108,3 +108,11 @@ export function gitPush(path: string): Promise<string> {
 export function gitPull(path: string): Promise<string> {
   return invoke('git_pull', { path });
 }
+
+export function gitCheckout(path: string, branch: string): Promise<string> {
+  return invoke('git_checkout', { path, branch });
+}
+
+export function gitClone(url: string, targetDir: string): Promise<string> {
+  return invoke('git_clone', { url, targetDir });
+}

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 interface Props {
   path: string;
@@ -10,17 +11,18 @@ export function ImagePreview({ path, name }: Props) {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [naturalSize, setNaturalSize] = useState({ w: 0, h: 0 });
+  const [loadError, setLoadError] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const assetUrl = `https://asset.localhost/${path}`;
+  const assetUrl = convertFileSrc(path);
 
   const resetView = useCallback(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
   }, []);
 
-  useEffect(() => { resetView(); }, [path, resetView]);
+  useEffect(() => { resetView(); setLoadError(false); }, [path, resetView]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -96,24 +98,32 @@ export function ImagePreview({ path, name }: Props) {
           `,
         }}
       >
-        <img
-          src={assetUrl}
-          alt={name}
-          draggable={false}
-          onLoad={(e) => {
-            const img = e.target as HTMLImageElement;
-            setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
-          }}
-          style={{
-            maxWidth: zoom === 1 ? '100%' : undefined,
-            maxHeight: zoom === 1 ? '100%' : undefined,
-            objectFit: 'contain',
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transformOrigin: 'center center',
-            transition: dragging ? 'none' : 'transform 0.1s ease-out',
-            imageRendering: zoom > 3 ? 'pixelated' : 'auto',
-          }}
-        />
+        {loadError ? (
+          <div style={{ textAlign: 'center', color: 'var(--t3)', fontSize: 12, padding: 24 }}>
+            <div style={{ marginBottom: 8 }}>Failed to load image</div>
+            <div style={{ fontSize: 10, color: 'var(--t3)', wordBreak: 'break-all', maxWidth: 400 }}>{path}</div>
+          </div>
+        ) : (
+          <img
+            src={assetUrl}
+            alt={name}
+            draggable={false}
+            onLoad={(e) => {
+              const img = e.target as HTMLImageElement;
+              setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+            }}
+            onError={() => setLoadError(true)}
+            style={{
+              maxWidth: zoom === 1 ? '100%' : undefined,
+              maxHeight: zoom === 1 ? '100%' : undefined,
+              objectFit: 'contain',
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: 'center center',
+              transition: dragging ? 'none' : 'transform 0.1s ease-out',
+              imageRendering: zoom > 3 ? 'pixelated' : 'auto',
+            }}
+          />
+        )}
       </div>
     </div>
   );

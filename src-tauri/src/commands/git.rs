@@ -507,3 +507,61 @@ pub async fn git_pull(path: String) -> Result<String, String> {
         Err(format!("git pull failed: {}", stderr.trim()))
     }
 }
+
+fn is_valid_branch_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.contains(|c: char| c.is_whitespace())
+        && !name.contains("..")
+        && !name.contains('~')
+        && !name.contains('^')
+        && !name.contains(':')
+        && !name.contains('\\')
+        && !name.contains('*')
+        && !name.contains('?')
+        && !name.contains('[')
+        && !name.starts_with('-')
+        && !name.ends_with('/')
+        && !name.ends_with(".lock")
+}
+
+#[tauri::command]
+pub async fn git_checkout(path: String, branch: String) -> Result<String, String> {
+    if !is_valid_branch_name(&branch) {
+        return Err("Invalid branch name".to_string());
+    }
+
+    let repo = find_repo(&path)?;
+    let workdir = repo.workdir().ok_or("No workdir")?.to_string_lossy().to_string();
+
+    let output = std::process::Command::new("git")
+        .args(["checkout", &branch])
+        .current_dir(&workdir)
+        .output()
+        .map_err(|e| format!("Failed to run git checkout: {}", e))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Ok(format!("{}{}", stdout, stderr).trim().to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(format!("git checkout failed: {}", stderr.trim()))
+    }
+}
+
+#[tauri::command]
+pub async fn git_clone(url: String, target_dir: String) -> Result<String, String> {
+    let output = std::process::Command::new("git")
+        .args(["clone", &url, &target_dir])
+        .output()
+        .map_err(|e| format!("Failed to run git clone: {}", e))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Ok(format!("{}{}", stdout, stderr).trim().to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(format!("git clone failed: {}", stderr.trim()))
+    }
+}

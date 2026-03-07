@@ -36,11 +36,11 @@ function GridCard({
 }) {
   return (
     <div
-      draggable
+      draggable={selected}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
-      onDragStart={onDragStart}
+      onDragStart={selected ? onDragStart : undefined}
       style={{
         width: 100,
         padding: '10px 6px 8px',

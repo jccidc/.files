@@ -1,3 +1,4 @@
+pub mod cloud;
 pub mod filesystem;
 pub mod git;
 pub mod search;

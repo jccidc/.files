@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useGitStore } from '../../stores/git';
 import { useExplorerStore } from '../../stores/explorer';
 import type { GitFileStatus, GitDiffFile } from '../../api/git';
@@ -236,13 +236,62 @@ function SectionHeader({
 export function GitPanel() {
   const currentPath = useExplorerStore((s) => s.currentPath);
   const {
-    repoInfo, files, diff, loading, error, commitMessage,
-    checkRepo, refreshStatus, loadDiff, stage, unstage, commit, discard,
+    repoInfo, files, diff, loading, error, commitMessage, branches,
+    checkRepo, refreshStatus, refreshBranches, loadDiff, stage, unstage, commit, discard,
     push, pull, setCommitMessage,
   } = useGitStore();
 
   const [showDiff, setShowDiff] = useState(false);
   const [diffStaged, setDiffStaged] = useState(false);
+  const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
+  const [checkingOut, setCheckingOut] = useState(false);
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close branch dropdown on click outside or Escape
+  const handleClickOutside = useCallback((e: MouseEvent) => {
+    if (branchDropdownRef.current && !branchDropdownRef.current.contains(e.target as Node)) {
+      setBranchDropdownOpen(false);
+    }
+  }, []);
+
+  const handleEscape = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') setBranchDropdownOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (branchDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }
+  }, [branchDropdownOpen, handleClickOutside, handleEscape]);
+
+  const handleToggleBranchDropdown = () => {
+    if (!branchDropdownOpen) {
+      refreshBranches(repoInfo?.root || currentPath);
+    }
+    setBranchDropdownOpen((v) => !v);
+  };
+
+  const handleCheckout = async (branchName: string) => {
+    const root = repoInfo?.root || currentPath;
+    setCheckingOut(true);
+    try {
+      const err = await useGitStore.getState().checkout(root, branchName);
+      if (err) {
+        useGitStore.setState({ error: err });
+      } else {
+        setBranchDropdownOpen(false);
+      }
+    } catch (e: any) {
+      useGitStore.setState({ error: e?.message || 'Checkout failed' });
+    } finally {
+      setCheckingOut(false);
+    }
+  };
 
   // Check repo on path change
   useEffect(() => {
@@ -284,40 +333,138 @@ export function GitPanel() {
   return (
     <div style={{ fontSize: 12 }}>
       {/* Branch info */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '6px 12px', borderBottom: '1px solid var(--border)',
-      }}>
-        <IconBranch />
-        <span style={{ color: 'var(--t1)', fontWeight: 500, fontSize: 12 }}>
-          {repoInfo.branch || 'HEAD'}
-        </span>
-        {repoInfo.has_remote && (repoInfo.ahead > 0 || repoInfo.behind > 0) && (
-          <span style={{ fontSize: 10, color: 'var(--t3)' }}>
-            {repoInfo.ahead > 0 && <span style={{ color: 'var(--green)' }}>+{repoInfo.ahead}</span>}
-            {repoInfo.ahead > 0 && repoInfo.behind > 0 && ' '}
-            {repoInfo.behind > 0 && <span style={{ color: 'var(--red)' }}>-{repoInfo.behind}</span>}
-          </span>
-        )}
-        <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
-          {repoInfo.has_remote && (
-            <>
-              <button onClick={() => pull(repoRoot)} title="Pull" style={actionBtnStyle}>
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3">
-                  <line x1="6" y1="2" x2="6" y2="10" /><polyline points="3,7 6,10 9,7" />
-                </svg>
-              </button>
-              <button onClick={() => push(repoRoot)} title="Push" style={actionBtnStyle}>
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3">
-                  <line x1="6" y1="10" x2="6" y2="2" /><polyline points="3,5 6,2 9,5" />
-                </svg>
-              </button>
-            </>
-          )}
-          <button onClick={() => refreshStatus(repoRoot)} title="Refresh" style={actionBtnStyle}>
-            <IconRefresh />
+      <div style={{ position: 'relative' }} ref={branchDropdownRef}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '6px 12px', borderBottom: '1px solid var(--border)',
+        }}>
+          <IconBranch />
+          <button
+            onClick={handleToggleBranchDropdown}
+            title="Switch branch"
+            style={{
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              color: 'var(--t1)', fontWeight: 500, fontSize: 12, padding: '0 2px',
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--t1)'; }}
+          >
+            {repoInfo.branch || 'HEAD'}
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <polyline points="1.5,3 4,5.5 6.5,3" />
+            </svg>
           </button>
+          {repoInfo.has_remote && (repoInfo.ahead > 0 || repoInfo.behind > 0) && (
+            <span style={{ fontSize: 10, color: 'var(--t3)' }}>
+              {repoInfo.ahead > 0 && <span style={{ color: 'var(--green)' }}>+{repoInfo.ahead}</span>}
+              {repoInfo.ahead > 0 && repoInfo.behind > 0 && ' '}
+              {repoInfo.behind > 0 && <span style={{ color: 'var(--red)' }}>-{repoInfo.behind}</span>}
+            </span>
+          )}
+          <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+            {repoInfo.has_remote && (
+              <>
+                <button onClick={() => pull(repoRoot)} title="Pull" style={actionBtnStyle}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3">
+                    <line x1="6" y1="2" x2="6" y2="10" /><polyline points="3,7 6,10 9,7" />
+                  </svg>
+                </button>
+                <button onClick={() => push(repoRoot)} title="Push" style={actionBtnStyle}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3">
+                    <line x1="6" y1="10" x2="6" y2="2" /><polyline points="3,5 6,2 9,5" />
+                  </svg>
+                </button>
+              </>
+            )}
+            <button onClick={() => refreshStatus(repoRoot)} title="Refresh" style={actionBtnStyle}>
+              <IconRefresh />
+            </button>
+          </div>
         </div>
+
+        {/* Branch dropdown */}
+        {branchDropdownOpen && (() => {
+          const localBranches = branches.filter((b) => !b.is_remote);
+          const remoteBranches = branches.filter((b) => b.is_remote);
+          return (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 4, boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              maxHeight: 300, overflowY: 'auto',
+            }}>
+              {checkingOut && (
+                <div style={{ padding: '6px 12px', fontSize: 11, color: 'var(--t3)' }}>
+                  Checking out...
+                </div>
+              )}
+              {localBranches.length > 0 && (
+                <div style={{ padding: '4px 12px 2px', fontSize: 10, color: 'var(--t3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Local
+                </div>
+              )}
+              {localBranches.map((b) => (
+                <div
+                  key={b.name}
+                  onClick={() => !b.is_head && !checkingOut && handleCheckout(b.name)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '4px 12px', fontSize: 12, cursor: b.is_head ? 'default' : 'pointer',
+                    color: b.is_head ? 'var(--accent)' : 'var(--t2)',
+                  }}
+                  onMouseEnter={(e) => { if (!b.is_head) e.currentTarget.style.background = 'var(--hover)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span style={{ width: 14, flexShrink: 0, textAlign: 'center' }}>
+                    {b.is_head && (
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="var(--green)" strokeWidth="1.5">
+                        <polyline points="1.5,5 4,7.5 8.5,2.5" />
+                      </svg>
+                    )}
+                  </span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {b.name}
+                  </span>
+                </div>
+              ))}
+              {localBranches.length > 0 && remoteBranches.length > 0 && (
+                <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+              )}
+              {remoteBranches.length > 0 && (
+                <div style={{ padding: '4px 12px 2px', fontSize: 10, color: 'var(--t3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Remote
+                </div>
+              )}
+              {remoteBranches.map((b) => {
+                const localName = b.name.replace(/^origin\//, '');
+                return (
+                  <div
+                    key={b.name}
+                    onClick={() => !checkingOut && handleCheckout(localName)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '4px 12px', fontSize: 12, cursor: 'pointer',
+                      color: 'var(--t2)',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    <span style={{ width: 14, flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ color: 'var(--t3)' }}>origin/</span>{localName}
+                    </span>
+                  </div>
+                );
+              })}
+              {localBranches.length === 0 && remoteBranches.length === 0 && (
+                <div style={{ padding: '6px 12px', fontSize: 11, color: 'var(--t3)' }}>
+                  No branches found
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {error && (

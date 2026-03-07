@@ -39,9 +39,12 @@ export const usePreviewStore = create<PreviewState>()(
       setOverlayEntry: (entry) => set({ overlayEntry: entry }),
 
       followSelection: (entry) => {
-        const { pinned, panelVisible } = get();
-        if (!pinned && panelVisible && entry) {
-          set({ previewEntry: entry });
+        if (!entry) return;
+        const { pinned } = get();
+        if (pinned) return;
+        // Auto-show preview panel for files
+        if (!entry.is_dir) {
+          set({ previewEntry: entry, panelVisible: true });
         }
       },
     }),

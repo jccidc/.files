@@ -19,3 +19,7 @@ export async function moveFiles(sources: string[], dest: string): Promise<void> 
 export async function renameFile(path: string, newName: string): Promise<string> {
   return invoke('rename_file', { path, newName });
 }
+
+export async function resolveShortcut(path: string): Promise<string | null> {
+  return invoke('resolve_shortcut', { path });
+}
