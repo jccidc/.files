@@ -770,6 +770,17 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           onCopyPath={handleCopyPath}
           onRefresh={refresh}
           onNewTerminal={handleNewTerminal}
+          onPreviewInTab={(entry) => {
+            if (panelId) {
+              panelAddTab(panelId, {
+                id: crypto.randomUUID(),
+                type: 'preview',
+                title: entry.name,
+                previewPath: entry.path,
+                pinned: false,
+              });
+            }
+          }}
         />
       )}
     </div>
