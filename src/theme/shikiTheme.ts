@@ -7,6 +7,7 @@ export function createShikiTheme(): ThemeRegistrationRaw {
   return {
     name: 'dotfiles',
     type: 'dark',
+    settings: [],
     colors: {
       'editor.background': get('--surface') || '#161A21',
       'editor.foreground': get('--t1') || '#D8DEE9',

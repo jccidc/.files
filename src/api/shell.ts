@@ -1,0 +1,21 @@
+import { invoke } from '@tauri-apps/api/core';
+
+export async function deleteToTrash(paths: string[]): Promise<void> {
+  return invoke('delete_to_trash', { paths });
+}
+
+export async function openInExplorer(path: string): Promise<void> {
+  return invoke('open_in_explorer', { path });
+}
+
+export async function copyFiles(sources: string[], dest: string): Promise<void> {
+  return invoke('copy_files', { sources, dest });
+}
+
+export async function moveFiles(sources: string[], dest: string): Promise<void> {
+  return invoke('move_files', { sources, dest });
+}
+
+export async function renameFile(path: string, newName: string): Promise<string> {
+  return invoke('rename_file', { path, newName });
+}

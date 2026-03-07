@@ -1,0 +1,461 @@
+import { useState, useRef } from 'react';
+import { useSettingsStore } from '../../stores/settings';
+import { THEMES, ACCENT_PRESETS } from '../../theme/themes';
+
+type Section = 'appearance' | 'explorer' | 'terminal' | 'keybindings';
+
+const NAV_ITEMS: { id: Section; label: string; icon: React.ReactNode }[] = [
+  {
+    id: 'appearance',
+    label: 'Appearance',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
+        <circle cx="8" cy="8" r="5.5" />
+        <path d="M8 2.5v11M2.5 8h11" />
+      </svg>
+    ),
+  },
+  {
+    id: 'explorer',
+    label: 'Explorer',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
+        <path d="M1.5 3a1 1 0 011-1H6l1.5 1.5H13.5a1 1 0 011 1V13a1 1 0 01-1 1h-12a1 1 0 01-1-1V3z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'terminal',
+    label: 'Terminal',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
+        <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+        <polyline points="4.5,6 7,8.5 4.5,11" />
+        <line x1="9" y1="11" x2="12" y2="11" />
+      </svg>
+    ),
+  },
+  {
+    id: 'keybindings',
+    label: 'Keybindings',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
+        <rect x="1.5" y="4" width="13" height="8" rx="1.5" />
+        <line x1="4" y1="7" x2="5.5" y2="7" />
+        <line x1="7" y1="7" x2="9" y2="7" />
+        <line x1="10.5" y1="7" x2="12" y2="7" />
+        <line x1="4.5" y1="9.5" x2="11.5" y2="9.5" />
+      </svg>
+    ),
+  },
+];
+
+const KEYBINDINGS = [
+  { action: 'New Explorer Tab', keys: 'Ctrl+T' },
+  { action: 'New Terminal Tab', keys: 'Ctrl+Shift+T' },
+  { action: 'Close Tab', keys: 'Ctrl+W' },
+  { action: 'Toggle Sidebar', keys: 'Ctrl+B' },
+  { action: 'Command Palette', keys: 'Ctrl+K' },
+  { action: 'Fuzzy Search', keys: 'Ctrl+P' },
+  { action: 'Address Bar', keys: 'Ctrl+L' },
+  { action: 'Select All', keys: 'Ctrl+A' },
+  { action: 'Rename', keys: 'F2' },
+  { action: 'Delete', keys: 'Delete' },
+  { action: 'Quick Preview', keys: 'Space' },
+  { action: 'Refresh', keys: 'F5' },
+];
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+}
+
+export function SettingsPanel({ open, onClose }: Props) {
+  const settings = useSettingsStore((s) => s.settings);
+  const update = useSettingsStore((s) => s.update);
+  const reset = useSettingsStore((s) => s.reset);
+  const exportSettings = useSettingsStore((s) => s.exportSettings);
+  const importSettings = useSettingsStore((s) => s.importSettings);
+  const [section, setSection] = useState<Section>('appearance');
+  const [kbSearch, setKbSearch] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  if (!open) return null;
+
+  const handleImport = () => {
+    fileRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        importSettings(reader.result).catch(() => {});
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleExport = () => {
+    const json = exportSettings();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'dotfiles-settings.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 12, color: 'var(--t2)', marginBottom: 6, display: 'block',
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 6, padding: '6px 10px', color: 'var(--t1)', fontSize: 12,
+    fontFamily: "'JetBrains Mono', monospace", outline: 'none',
+  };
+
+  const selectStyle: React.CSSProperties = {
+    ...inputStyle, cursor: 'pointer', appearance: 'none',
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%234C5567'/%3E%3C/svg%3E")`,
+    backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center',
+    paddingRight: 28,
+  };
+
+  const toggleStyle = (on: boolean): React.CSSProperties => ({
+    width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer',
+    background: on ? 'var(--accent)' : 'var(--raised)', position: 'relative', transition: 'background 0.15s',
+  });
+
+  const toggleDot = (on: boolean): React.CSSProperties => ({
+    width: 14, height: 14, borderRadius: 7, background: '#fff', position: 'absolute',
+    top: 3, left: on ? 19 : 3, transition: 'left 0.15s',
+  });
+
+  const rowStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '10px 0', borderBottom: '1px solid var(--border)',
+  };
+
+  const sectionTitle = (text: string) => (
+    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 16, marginBottom: 8 }}>
+      {text}
+    </div>
+  );
+
+  const filteredKeybindings = KEYBINDINGS.filter(
+    (kb) => kb.action.toLowerCase().includes(kbSearch.toLowerCase()) || kb.keys.toLowerCase().includes(kbSearch.toLowerCase()),
+  );
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000, display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{
+        width: 720, maxWidth: '90vw', height: 520, maxHeight: '85vh',
+        background: 'var(--base)', border: '1px solid var(--border)',
+        borderRadius: 12, display: 'flex', overflow: 'hidden',
+        boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+      }}>
+        {/* Left nav */}
+        <div style={{
+          width: 180, minWidth: 180, background: 'var(--deepest)',
+          borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column',
+          padding: '16px 0',
+        }}>
+          <div style={{ padding: '0 16px 16px', fontSize: 14, fontWeight: 600, color: 'var(--t1)' }}>
+            Settings
+          </div>
+          {NAV_ITEMS.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setSection(item.id)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 16px', border: 'none', cursor: 'pointer',
+                background: section === item.id ? 'var(--active)' : 'transparent',
+                color: section === item.id ? 'var(--accent)' : 'var(--t2)',
+                fontSize: 12, fontFamily: 'inherit', textAlign: 'left',
+                borderLeft: section === item.id ? '2px solid var(--accent)' : '2px solid transparent',
+              }}
+              onMouseEnter={(e) => { if (section !== item.id) e.currentTarget.style.background = 'var(--hover)'; }}
+              onMouseLeave={(e) => { if (section !== item.id) e.currentTarget.style.background = 'transparent'; }}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+
+          <div style={{ flex: 1 }} />
+
+          {/* Bottom actions */}
+          <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <button onClick={handleExport} style={{ ...smallBtn, color: 'var(--t2)' }}>Export</button>
+            <button onClick={handleImport} style={{ ...smallBtn, color: 'var(--t2)' }}>Import</button>
+            <button onClick={() => { if (confirm('Reset all settings to defaults?')) reset(); }} style={{ ...smallBtn, color: 'var(--red)' }}>Reset</button>
+            <input ref={fileRef} type="file" accept=".json" style={{ display: 'none' }} onChange={handleFileChange} />
+          </div>
+        </div>
+
+        {/* Right content */}
+        <div style={{ flex: 1, padding: '20px 24px', overflowY: 'auto' }}>
+          {/* Close button */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+            <button
+              onClick={onClose}
+              style={{
+                width: 28, height: 28, border: 'none', borderRadius: 6, cursor: 'pointer',
+                background: 'transparent', color: 'var(--t3)', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', fontSize: 16,
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              x
+            </button>
+          </div>
+
+          {section === 'appearance' && (
+            <>
+              {sectionTitle('Theme')}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                {Object.values(THEMES).map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => update({ theme: t.id })}
+                    style={{
+                      flex: 1, padding: '12px 8px', border: settings.theme === t.id ? '2px solid var(--accent)' : '2px solid var(--border)',
+                      borderRadius: 8, cursor: 'pointer', background: t.base, textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginBottom: 6 }}>
+                      <div style={{ width: 16, height: 16, borderRadius: 3, background: t.accent }} />
+                      <div style={{ width: 16, height: 16, borderRadius: 3, background: t.surface }} />
+                      <div style={{ width: 16, height: 16, borderRadius: 3, background: t.t1 }} />
+                    </div>
+                    <div style={{ fontSize: 11, color: t.t1, fontWeight: 500 }}>{t.name}</div>
+                  </button>
+                ))}
+              </div>
+
+              {sectionTitle('Accent Color')}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+                {ACCENT_PRESETS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => update({ accent_color: c })}
+                    style={{
+                      width: 28, height: 28, borderRadius: 14, border: settings.accent_color === c ? '2px solid var(--t1)' : '2px solid transparent',
+                      background: c, cursor: 'pointer', padding: 0,
+                    }}
+                  />
+                ))}
+                <input
+                  type="color"
+                  value={settings.accent_color}
+                  onChange={(e) => update({ accent_color: e.target.value })}
+                  style={{ width: 28, height: 28, border: 'none', cursor: 'pointer', background: 'transparent', padding: 0 }}
+                />
+              </div>
+
+              {sectionTitle('Font')}
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>UI Font Family</label>
+                <select
+                  value={settings.font_family}
+                  onChange={(e) => update({ font_family: e.target.value })}
+                  style={selectStyle}
+                >
+                  <option value="JetBrains Mono">JetBrains Mono</option>
+                  <option value="Fira Code">Fira Code</option>
+                  <option value="Cascadia Code">Cascadia Code</option>
+                  <option value="Consolas">Consolas</option>
+                  <option value="SF Mono">SF Mono</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Font Size: {settings.font_size}px</label>
+                <input
+                  type="range" min="10" max="18" value={settings.font_size}
+                  onChange={(e) => update({ font_size: Number(e.target.value) })}
+                  style={{ width: '100%', accentColor: 'var(--accent)' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>UI Scale: {settings.ui_scale}%</label>
+                <input
+                  type="range" min="80" max="150" step="5" value={settings.ui_scale}
+                  onChange={(e) => update({ ui_scale: Number(e.target.value) })}
+                  style={{ width: '100%', accentColor: 'var(--accent)' }}
+                />
+              </div>
+            </>
+          )}
+
+          {section === 'explorer' && (
+            <>
+              {sectionTitle('View')}
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>Default View Mode</span>
+                <select value={settings.default_view} onChange={(e) => update({ default_view: e.target.value })} style={{ ...selectStyle, width: 120 }}>
+                  <option value="list">List</option>
+                  <option value="grid">Grid</option>
+                </select>
+              </div>
+
+              {sectionTitle('Visibility')}
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>Show Hidden Files</span>
+                <button style={toggleStyle(settings.show_hidden)} onClick={() => update({ show_hidden: !settings.show_hidden })}>
+                  <div style={toggleDot(settings.show_hidden)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>Show File Extensions</span>
+                <button style={toggleStyle(settings.show_extensions)} onClick={() => update({ show_extensions: !settings.show_extensions })}>
+                  <div style={toggleDot(settings.show_extensions)} />
+                </button>
+              </div>
+
+              {sectionTitle('Interactions')}
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>Show Hover Tooltips</span>
+                <button style={toggleStyle(settings.show_tooltips)} onClick={() => update({ show_tooltips: !settings.show_tooltips })}>
+                  <div style={toggleDot(settings.show_tooltips)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Tooltip Delay</span>
+                  <span style={{ fontSize: 11, color: 'var(--t3)', marginLeft: 8 }}>{settings.tooltip_delay}ms</span>
+                </div>
+                <input
+                  type="range" min="200" max="1500" step="100" value={settings.tooltip_delay}
+                  onChange={(e) => update({ tooltip_delay: Number(e.target.value) })}
+                  style={{ width: 140, accentColor: 'var(--accent)' }}
+                />
+              </div>
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>Peek Folders (inline expand)</span>
+                <button style={toggleStyle(settings.peek_enabled)} onClick={() => update({ peek_enabled: !settings.peek_enabled })}>
+                  <div style={toggleDot(settings.peek_enabled)} />
+                </button>
+              </div>
+
+              {sectionTitle('Ignored Patterns')}
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Comma-separated patterns hidden from explorer</label>
+                <input
+                  value={settings.ignored_patterns}
+                  onChange={(e) => update({ ignored_patterns: e.target.value })}
+                  style={inputStyle}
+                  placeholder="node_modules,.git,__pycache__"
+                />
+              </div>
+            </>
+          )}
+
+          {section === 'terminal' && (
+            <>
+              {sectionTitle('Shell')}
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Default Shell</label>
+                <select value={settings.terminal_shell} onChange={(e) => update({ terminal_shell: e.target.value })} style={selectStyle}>
+                  <option value="powershell">PowerShell</option>
+                  <option value="cmd">Command Prompt</option>
+                  <option value="bash">Git Bash</option>
+                  <option value="wsl">WSL</option>
+                </select>
+              </div>
+
+              {sectionTitle('Display')}
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Font Size: {settings.terminal_font_size}px</label>
+                <input
+                  type="range" min="10" max="22" value={settings.terminal_font_size}
+                  onChange={(e) => update({ terminal_font_size: Number(e.target.value) })}
+                  style={{ width: '100%', accentColor: 'var(--accent)' }}
+                />
+              </div>
+
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>Cursor Style</span>
+                <select value={settings.terminal_cursor_style} onChange={(e) => update({ terminal_cursor_style: e.target.value })} style={{ ...selectStyle, width: 120 }}>
+                  <option value="block">Block</option>
+                  <option value="underline">Underline</option>
+                  <option value="bar">Bar</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Scrollback Lines: {settings.terminal_scrollback.toLocaleString()}</label>
+                <input
+                  type="range" min="1000" max="50000" step="1000" value={settings.terminal_scrollback}
+                  onChange={(e) => update({ terminal_scrollback: Number(e.target.value) })}
+                  style={{ width: '100%', accentColor: 'var(--accent)' }}
+                />
+              </div>
+            </>
+          )}
+
+          {section === 'keybindings' && (
+            <>
+              {sectionTitle('Keyboard Shortcuts')}
+              <input
+                value={kbSearch}
+                onChange={(e) => setKbSearch(e.target.value)}
+                placeholder="Search keybindings..."
+                style={{ ...inputStyle, marginBottom: 12 }}
+              />
+              <div style={{ borderRadius: 8, border: '1px solid var(--border)', overflow: 'hidden' }}>
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '1fr 150px',
+                  background: 'var(--deep)', padding: '6px 12px',
+                  fontSize: 11, color: 'var(--t3)', fontWeight: 500,
+                }}>
+                  <span>Action</span>
+                  <span>Shortcut</span>
+                </div>
+                {filteredKeybindings.map((kb, i) => (
+                  <div key={kb.action} style={{
+                    display: 'grid', gridTemplateColumns: '1fr 150px',
+                    padding: '8px 12px', fontSize: 12,
+                    background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)',
+                    borderTop: '1px solid var(--border)',
+                  }}>
+                    <span style={{ color: 'var(--t1)' }}>{kb.action}</span>
+                    <span style={{
+                      color: 'var(--accent)', fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
+                    }}>
+                      {kb.keys}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 12, fontSize: 11, color: 'var(--t3)' }}>
+                Custom keybinding editor coming in v2.
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const smallBtn: React.CSSProperties = {
+  padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 4,
+  background: 'transparent', cursor: 'pointer', fontSize: 11, fontFamily: 'inherit',
+};
