@@ -43,6 +43,8 @@ pub fn run() {
             git::git_diff,
             git::git_branches,
             git::git_discard,
+            git::git_push,
+            git::git_pull,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

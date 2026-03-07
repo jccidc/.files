@@ -9,6 +9,8 @@ import {
   gitDiff,
   gitBranches,
   gitDiscard,
+  gitPush,
+  gitPull,
 } from '../api/git';
 import type {
   GitRepoInfo,
@@ -40,6 +42,8 @@ interface GitState {
   unstage: (path: string, files: string[]) => Promise<void>;
   commit: (path: string) => Promise<string | null>;
   discard: (path: string, files: string[]) => Promise<void>;
+  push: (path: string) => Promise<string | null>;
+  pull: (path: string) => Promise<string | null>;
   setCommitMessage: (msg: string) => void;
 }
 
@@ -154,6 +158,32 @@ export const useGitStore = create<GitState>((set, get) => ({
       get().refreshStatus(path);
     } catch (e) {
       set({ error: String(e) });
+    }
+  },
+
+  push: async (path) => {
+    set({ loading: true, error: null });
+    try {
+      const result = await gitPush(path);
+      get().refreshStatus(path);
+      set({ loading: false });
+      return result;
+    } catch (e) {
+      set({ error: String(e), loading: false });
+      return null;
+    }
+  },
+
+  pull: async (path) => {
+    set({ loading: true, error: null });
+    try {
+      const result = await gitPull(path);
+      get().refreshStatus(path);
+      set({ loading: false });
+      return result;
+    } catch (e) {
+      set({ error: String(e), loading: false });
+      return null;
     }
   },
 

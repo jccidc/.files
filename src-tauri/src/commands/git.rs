@@ -465,3 +465,45 @@ pub fn git_discard(path: String, files: Vec<String>) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[tauri::command]
+pub async fn git_push(path: String) -> Result<String, String> {
+    let repo = find_repo(&path)?;
+    let workdir = repo.workdir().ok_or("No workdir")?.to_string_lossy().to_string();
+
+    let output = std::process::Command::new("git")
+        .args(["push"])
+        .current_dir(&workdir)
+        .output()
+        .map_err(|e| format!("Failed to run git push: {}", e))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Ok(format!("{}{}", stdout, stderr).trim().to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(format!("git push failed: {}", stderr.trim()))
+    }
+}
+
+#[tauri::command]
+pub async fn git_pull(path: String) -> Result<String, String> {
+    let repo = find_repo(&path)?;
+    let workdir = repo.workdir().ok_or("No workdir")?.to_string_lossy().to_string();
+
+    let output = std::process::Command::new("git")
+        .args(["pull"])
+        .current_dir(&workdir)
+        .output()
+        .map_err(|e| format!("Failed to run git pull: {}", e))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Ok(format!("{}{}", stdout, stderr).trim().to_string())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(format!("git pull failed: {}", stderr.trim()))
+    }
+}

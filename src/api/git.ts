@@ -100,3 +100,11 @@ export function gitBranches(path: string): Promise<GitBranch[]> {
 export function gitDiscard(path: string, files: string[]): Promise<void> {
   return invoke('git_discard', { path, files });
 }
+
+export function gitPush(path: string): Promise<string> {
+  return invoke('git_push', { path });
+}
+
+export function gitPull(path: string): Promise<string> {
+  return invoke('git_pull', { path });
+}

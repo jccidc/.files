@@ -238,7 +238,7 @@ export function GitPanel() {
   const {
     repoInfo, files, diff, loading, error, commitMessage,
     checkRepo, refreshStatus, loadDiff, stage, unstage, commit, discard,
-    setCommitMessage,
+    push, pull, setCommitMessage,
   } = useGitStore();
 
   const [showDiff, setShowDiff] = useState(false);
@@ -299,13 +299,25 @@ export function GitPanel() {
             {repoInfo.behind > 0 && <span style={{ color: 'var(--red)' }}>-{repoInfo.behind}</span>}
           </span>
         )}
-        <button
-          onClick={() => refreshStatus(repoRoot)}
-          title="Refresh"
-          style={{ ...actionBtnStyle, marginLeft: 'auto' }}
-        >
-          <IconRefresh />
-        </button>
+        <div style={{ display: 'flex', gap: 4, marginLeft: 'auto' }}>
+          {repoInfo.has_remote && (
+            <>
+              <button onClick={() => pull(repoRoot)} title="Pull" style={actionBtnStyle}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3">
+                  <line x1="6" y1="2" x2="6" y2="10" /><polyline points="3,7 6,10 9,7" />
+                </svg>
+              </button>
+              <button onClick={() => push(repoRoot)} title="Push" style={actionBtnStyle}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3">
+                  <line x1="6" y1="10" x2="6" y2="2" /><polyline points="3,5 6,2 9,5" />
+                </svg>
+              </button>
+            </>
+          )}
+          <button onClick={() => refreshStatus(repoRoot)} title="Refresh" style={actionBtnStyle}>
+            <IconRefresh />
+          </button>
+        </div>
       </div>
 
       {error && (
