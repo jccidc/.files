@@ -309,7 +309,26 @@ export function SettingsPanel({ open, onClose }: Props) {
                 </div>
               </div>
 
-              {sectionTitle('Opacity')}
+              {sectionTitle('Window Transparency')}
+              <div style={{ marginBottom: 8 }}>
+                <label style={labelStyle}>Base Opacity: {Math.round((settings.base_opacity ?? 1) * 100)}%</label>
+                <input
+                  type="range" min="0" max="100" value={Math.round((settings.base_opacity ?? 1) * 100)}
+                  onChange={(e) => update({ base_opacity: Number(e.target.value) / 100 })}
+                  style={{ width: '100%', accentColor: 'var(--accent)' }}
+                />
+                <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 2 }}>Controls how much desktop shows through. Works best with Acrylic effect.</div>
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Blur: {settings.blur_amount ?? 20}px</label>
+                <input
+                  type="range" min="0" max="60" value={settings.blur_amount ?? 20}
+                  onChange={(e) => update({ blur_amount: Number(e.target.value) })}
+                  style={{ width: '100%', accentColor: 'var(--accent)' }}
+                />
+              </div>
+
+              {sectionTitle('Panel Opacity')}
               <div style={{ marginBottom: 8 }}>
                 <label style={labelStyle}>Sidebar: {Math.round((settings.sidebar_opacity ?? 1) * 100)}%</label>
                 <input

@@ -8,6 +8,8 @@ export function useTheme() {
   const accentColor = useSettingsStore((s) => s.settings.accent_color);
   const uiScale = useSettingsStore((s) => s.settings.ui_scale);
   const windowEffect = useSettingsStore((s) => s.settings.window_effect);
+  const baseOpacity = useSettingsStore((s) => s.settings.base_opacity);
+  const blurAmount = useSettingsStore((s) => s.settings.blur_amount);
   const sidebarOpacity = useSettingsStore((s) => s.settings.sidebar_opacity);
   const toolbarOpacity = useSettingsStore((s) => s.settings.toolbar_opacity);
   const terminalOpacity = useSettingsStore((s) => s.settings.terminal_opacity);
@@ -46,6 +48,9 @@ export function useTheme() {
     r.style.setProperty('--sidebar-opacity', String(sidebarOpacity ?? 1));
     r.style.setProperty('--toolbar-opacity', String(toolbarOpacity ?? 1));
     r.style.setProperty('--terminal-opacity', String(terminalOpacity ?? 1));
+    // Base layer: computed background with alpha + blur
+    r.style.setProperty('--base-bg', `color-mix(in srgb, var(--void) ${(baseOpacity ?? 1) * 100}%, transparent)`);
+    r.style.setProperty('--blur-amount', `${blurAmount ?? 20}px`);
     // Compute semi-transparent backgrounds (so only bg fades, not text/icons)
     r.style.setProperty('--sidebar-bg', `color-mix(in srgb, var(--surface) ${(sidebarOpacity ?? 1) * 100}%, transparent)`);
     r.style.setProperty('--toolbar-bg', `color-mix(in srgb, var(--base) ${(toolbarOpacity ?? 1) * 100}%, transparent)`);
@@ -68,7 +73,7 @@ export function useTheme() {
 
     // Glow
     r.classList.toggle('glow-enabled', enableGlow !== false);
-  }, [sidebarOpacity, toolbarOpacity, terminalOpacity, borderRadius, animationSpeed, enableAnimations, density, enableGlow]);
+  }, [sidebarOpacity, toolbarOpacity, terminalOpacity, baseOpacity, blurAmount, borderRadius, animationSpeed, enableAnimations, density, enableGlow]);
 
   // Background pattern
   useEffect(() => {

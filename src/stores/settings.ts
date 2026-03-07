@@ -10,6 +10,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   font_size: 13,
   ui_scale: 100,
   window_effect: 'none',
+  base_opacity: 1.0,
+  blur_amount: 20,
   sidebar_opacity: 1.0,
   toolbar_opacity: 1.0,
   terminal_opacity: 1.0,

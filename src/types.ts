@@ -48,9 +48,11 @@ export interface AppSettings {
   ui_scale: number;
   // Visual Effects
   window_effect: string;       // 'none' | 'mica' | 'mica-alt' | 'acrylic' | 'tabbed'
-  sidebar_opacity: number;     // 0.5-1.0
-  toolbar_opacity: number;     // 0.5-1.0
-  terminal_opacity: number;    // 0.5-1.0
+  base_opacity: number;        // 0-1.0 (void background layer)
+  blur_amount: number;         // 0-60 px (backdrop blur when effect is acrylic)
+  sidebar_opacity: number;     // 0-1.0
+  toolbar_opacity: number;     // 0-1.0
+  terminal_opacity: number;    // 0-1.0
   enable_glow: boolean;
   enable_cursor_trail: boolean;
   enable_animations: boolean;
