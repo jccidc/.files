@@ -191,13 +191,8 @@ function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', position: 'relative' }}>
-      {/* Background base color — opacity and blur controlled by settings */}
-      <div style={{
-        position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
-        background: 'var(--base-bg, var(--void))',
-        backdropFilter: 'blur(var(--blur-amount, 0px))',
-        WebkitBackdropFilter: 'blur(var(--blur-amount, 0px))',
-      } as React.CSSProperties} />
+      {/* Background base color — opacity controlled by settings, blur by DWM effect */}
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, background: 'var(--base-bg, var(--void))' }} />
       {/* Background pattern overlay */}
       <div style={{
         position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,

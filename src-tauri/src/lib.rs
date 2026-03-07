@@ -7,7 +7,7 @@ use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
     Manager, WindowEvent,
-    window::{Effect, EffectsBuilder},
+    window::{Effect, EffectState, EffectsBuilder},
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -131,7 +131,12 @@ fn set_window_effect(window: tauri::WebviewWindow, effect: String) -> Result<(),
             .map_err(|e| e.to_string())
     } else {
         window
-            .set_effects(EffectsBuilder::new().effects(effects).build())
+            .set_effects(
+                EffectsBuilder::new()
+                    .effects(effects)
+                    .state(EffectState::Active) // keep effect when window loses focus
+                    .build(),
+            )
             .map_err(|e| e.to_string())
     }
 }

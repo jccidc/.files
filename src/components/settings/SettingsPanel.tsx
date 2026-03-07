@@ -319,14 +319,6 @@ export function SettingsPanel({ open, onClose }: Props) {
                 />
                 <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 2 }}>Controls how much desktop shows through. Works best with Acrylic effect.</div>
               </div>
-              <div style={{ marginBottom: 16 }}>
-                <label style={labelStyle}>Blur: {settings.blur_amount ?? 20}px</label>
-                <input
-                  type="range" min="0" max="60" value={settings.blur_amount ?? 20}
-                  onChange={(e) => update({ blur_amount: Number(e.target.value) })}
-                  style={{ width: '100%', accentColor: 'var(--accent)' }}
-                />
-              </div>
 
               {sectionTitle('Panel Opacity')}
               <div style={{ marginBottom: 8 }}>
