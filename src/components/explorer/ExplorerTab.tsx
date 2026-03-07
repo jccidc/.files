@@ -427,7 +427,8 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortAsc, setSortAsc] = useState(true);
   const [tooltip, setTooltip] = useState<{ entry: FileEntry; x: number; y: number } | null>(null);
-  const [previewEntry, setPreviewEntry] = useState<FileEntry | null>(null);
+  const previewEntry = usePreviewStore((s) => s.overlayEntry);
+  const setPreviewEntry = usePreviewStore((s) => s.setOverlayEntry);
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [peekPaths, setPeekPaths] = useState<Set<string>>(new Set());
   const [peekChildren, setPeekChildren] = useState<Record<string, FileEntry[]>>({});
