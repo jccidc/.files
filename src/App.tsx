@@ -3,7 +3,6 @@ import './theme/tokens.css';
 import { Titlebar } from './components/titlebar/Titlebar';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { StatusBar } from './components/common/StatusBar';
-import { CommandPalette } from './components/common/CommandPalette';
 import { FuzzySearch } from './components/common/FuzzySearch';
 import { SettingsPanel } from './components/settings/SettingsPanel';
 import { PanelContainer } from './components/layout/PanelContainer';
@@ -21,7 +20,6 @@ function App() {
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar);
   const load = useSettingsStore((s) => s.load);
   const refresh = useExplorerStore((s) => s.refresh);
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -45,11 +43,6 @@ function App() {
 
   const hotkeys = useMemo(
     () => [
-      {
-        key: 'k',
-        ctrl: true,
-        handler: () => setPaletteOpen(true),
-      },
       {
         key: 't',
         ctrl: true,
@@ -142,6 +135,47 @@ function App() {
         shift: true,
         handler: () => togglePreviewPanel(),
       },
+      {
+        key: 'ArrowLeft',
+        alt: true,
+        handler: () => useExplorerStore.getState().goBack(),
+      },
+      {
+        key: 'ArrowRight',
+        alt: true,
+        handler: () => useExplorerStore.getState().goForward(),
+      },
+      {
+        key: 'ArrowUp',
+        alt: true,
+        handler: () => useExplorerStore.getState().goUp(),
+      },
+      {
+        key: 'Home',
+        alt: true,
+        handler: () => useExplorerStore.getState().goHome(),
+      },
+      {
+        key: 'c',
+        ctrl: true,
+        handler: () => {
+          const sel = useExplorerStore.getState().selectedPaths;
+          if (sel.size > 0) useExplorerStore.getState().copyPaths([...sel]);
+        },
+      },
+      {
+        key: 'x',
+        ctrl: true,
+        handler: () => {
+          const sel = useExplorerStore.getState().selectedPaths;
+          if (sel.size > 0) useExplorerStore.getState().cutPaths([...sel]);
+        },
+      },
+      {
+        key: 'v',
+        ctrl: true,
+        handler: () => useExplorerStore.getState().paste(),
+      },
     ],
     [toggleSidebar, refresh, splitPanel, togglePreviewPanel],
   );
@@ -157,7 +191,6 @@ function App() {
         {previewPanelVisible && <PreviewPanel />}
       </div>
       <StatusBar />
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <FuzzySearch open={searchOpen} onClose={() => setSearchOpen(false)} />
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>

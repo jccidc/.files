@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::path::Path;
 
 /// Check if a file is hidden. On Windows, checks the FILE_ATTRIBUTE_HIDDEN flag.
@@ -27,14 +28,101 @@ pub fn get_home_dir() -> Option<String> {
     dirs::home_dir().map(|p| p.to_string_lossy().to_string())
 }
 
-/// Return available Windows drive letters (e.g. "C:\\", "D:\\").
-pub fn get_drives() -> Vec<String> {
+#[derive(Debug, Clone, Serialize)]
+pub struct DriveInfo {
+    pub letter: String,
+    pub drive_type: String, // "fixed", "removable", "network", "cdrom", "ramdisk", "unknown"
+    pub label: String,
+}
+
+#[cfg(windows)]
+extern "system" {
+    fn GetDriveTypeW(lpRootPathName: *const u16) -> u32;
+    fn GetVolumeInformationW(
+        lpRootPathName: *const u16,
+        lpVolumeNameBuffer: *mut u16,
+        nVolumeNameSize: u32,
+        lpVolumeSerialNumber: *mut u32,
+        lpMaximumComponentLength: *mut u32,
+        lpFileSystemFlags: *mut u32,
+        lpFileSystemNameBuffer: *mut u16,
+        nFileSystemNameSize: u32,
+    ) -> i32;
+}
+
+#[cfg(windows)]
+fn to_wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+#[cfg(windows)]
+fn get_volume_label(root: &str) -> String {
+    let wide_root = to_wide(root);
+    let mut name_buf = [0u16; 261];
+    let ok = unsafe {
+        GetVolumeInformationW(
+            wide_root.as_ptr(),
+            name_buf.as_mut_ptr(),
+            name_buf.len() as u32,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if ok != 0 {
+        let len = name_buf.iter().position(|&c| c == 0).unwrap_or(name_buf.len());
+        String::from_utf16_lossy(&name_buf[..len])
+    } else {
+        String::new()
+    }
+}
+
+/// Return available Windows drives with type classification.
+pub fn get_drives() -> Vec<DriveInfo> {
     let mut drives = Vec::new();
     for letter in b'A'..=b'Z' {
-        let drive = format!("{}:\\", letter as char);
-        if Path::new(&drive).exists() {
-            drives.push(drive);
+        let root = format!("{}:\\", letter as char);
+        if !Path::new(&root).exists() {
+            continue;
         }
+
+        #[cfg(windows)]
+        let (drive_type, label) = {
+            let wide = to_wide(&root);
+            let dt = unsafe { GetDriveTypeW(wide.as_ptr()) };
+            let type_str = match dt {
+                2 => "removable",
+                3 => "fixed",
+                4 => "network",
+                5 => "cdrom",
+                6 => "ramdisk",
+                _ => "unknown",
+            };
+            let vol_label = get_volume_label(&root);
+            (type_str.to_string(), vol_label)
+        };
+
+        #[cfg(not(windows))]
+        let (drive_type, label) = ("fixed".to_string(), String::new());
+
+        let display_label = if label.is_empty() {
+            match drive_type.as_str() {
+                "removable" => format!("Removable ({})", &root[..2]),
+                "network" => format!("Network ({})", &root[..2]),
+                "cdrom" => format!("CD-ROM ({})", &root[..2]),
+                _ => format!("Local Disk ({})", &root[..2]),
+            }
+        } else {
+            format!("{} ({})", label, &root[..2])
+        };
+
+        drives.push(DriveInfo {
+            letter: root,
+            drive_type,
+            label: display_label,
+        });
     }
     drives
 }

@@ -1,8 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useSettingsStore } from '../../stores/settings';
 import { THEMES, ACCENT_PRESETS } from '../../theme/themes';
+import { detectCloudMounts } from '../../api/cloud';
+import type { CloudSource } from '../../types';
 
-type Section = 'appearance' | 'explorer' | 'terminal' | 'keybindings';
+type Section = 'appearance' | 'explorer' | 'terminal' | 'keybindings' | 'cloud';
 
 const NAV_ITEMS: { id: Section; label: string; icon: React.ReactNode }[] = [
   {
@@ -36,6 +38,16 @@ const NAV_ITEMS: { id: Section; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    id: 'cloud',
+    label: 'Cloud',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
+        <path d="M4.5 12.5A3.5 3.5 0 013 5.8 4.5 4.5 0 0111.8 4a3 3 0 01.7 5.9" />
+        <path d="M5 12h6a2.5 2.5 0 000-5h-.5" />
+      </svg>
+    ),
+  },
+  {
     id: 'keybindings',
     label: 'Keybindings',
     icon: (
@@ -55,7 +67,6 @@ const KEYBINDINGS = [
   { action: 'New Terminal Tab', keys: 'Ctrl+Shift+T' },
   { action: 'Close Tab', keys: 'Ctrl+W' },
   { action: 'Toggle Sidebar', keys: 'Ctrl+B' },
-  { action: 'Command Palette', keys: 'Ctrl+K' },
   { action: 'Fuzzy Search', keys: 'Ctrl+P' },
   { action: 'Address Bar', keys: 'Ctrl+L' },
   { action: 'Select All', keys: 'Ctrl+A' },
@@ -79,6 +90,14 @@ export function SettingsPanel({ open, onClose }: Props) {
   const [section, setSection] = useState<Section>('appearance');
   const [kbSearch, setKbSearch] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const [detectedMounts, setDetectedMounts] = useState<{ provider: string; label: string; path: string }[]>([]);
+  const [newSource, setNewSource] = useState({ label: '', path: '', provider: 'custom' });
+
+  useEffect(() => {
+    if (section === 'cloud') {
+      detectCloudMounts().then(setDetectedMounts).catch(() => {});
+    }
+  }, [section]);
 
   if (!open) return null;
 
@@ -406,6 +425,129 @@ export function SettingsPanel({ open, onClose }: Props) {
                   onChange={(e) => update({ terminal_scrollback: Number(e.target.value) })}
                   style={{ width: '100%', accentColor: 'var(--accent)' }}
                 />
+              </div>
+            </>
+          )}
+
+          {section === 'cloud' && (
+            <>
+              {sectionTitle('Detected Cloud Providers')}
+              {detectedMounts.length === 0 && (
+                <div style={{ fontSize: 12, color: 'var(--t3)', padding: '8px 0' }}>No cloud providers detected.</div>
+              )}
+              {detectedMounts.map((m) => (
+                <div key={m.path} style={rowStyle}>
+                  <div>
+                    <span style={{ fontSize: 12, color: 'var(--t1)', fontWeight: 500 }}>{m.label}</span>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', fontFamily: "'JetBrains Mono', monospace" }}>{m.path}</div>
+                  </div>
+                  <span style={{
+                    fontSize: 10, color: 'var(--green)', background: 'rgba(74,222,128,0.1)',
+                    padding: '2px 8px', borderRadius: 4, fontWeight: 500,
+                  }}>
+                    Auto
+                  </span>
+                </div>
+              ))}
+
+              {sectionTitle('Custom Cloud Sources')}
+              {(settings.cloud_sources || []).map((cs: CloudSource, idx: number) => (
+                <div key={idx} style={rowStyle}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 12, color: 'var(--t1)', fontWeight: 500 }}>{cs.label}</span>
+                    <div style={{ fontSize: 11, color: 'var(--t3)', fontFamily: "'JetBrains Mono', monospace", overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cs.path}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <button style={toggleStyle(cs.enabled)} onClick={() => {
+                      const sources = [...(settings.cloud_sources || [])];
+                      sources[idx] = { ...sources[idx], enabled: !sources[idx].enabled };
+                      update({ cloud_sources: sources });
+                    }}>
+                      <div style={toggleDot(cs.enabled)} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        const sources = (settings.cloud_sources || []).filter((_: CloudSource, i: number) => i !== idx);
+                        update({ cloud_sources: sources });
+                      }}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--t3)', padding: 4, fontSize: 14 }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--red)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--t3)'; }}
+                    >
+                      x
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {sectionTitle('Add Cloud Source')}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div>
+                  <label style={labelStyle}>Label</label>
+                  <input
+                    value={newSource.label}
+                    onChange={(e) => setNewSource({ ...newSource, label: e.target.value })}
+                    placeholder="e.g. My NAS"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Path</label>
+                  <input
+                    value={newSource.path}
+                    onChange={(e) => setNewSource({ ...newSource, path: e.target.value })}
+                    placeholder="e.g. Z:\Shared or \\server\share"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Provider</label>
+                  <select value={newSource.provider} onChange={(e) => setNewSource({ ...newSource, provider: e.target.value })} style={selectStyle}>
+                    <option value="custom">Custom</option>
+                    <option value="onedrive">OneDrive</option>
+                    <option value="gdrive">Google Drive</option>
+                    <option value="dropbox">Dropbox</option>
+                    <option value="network">Network Share</option>
+                  </select>
+                </div>
+                <button
+                  disabled={!newSource.label.trim() || !newSource.path.trim()}
+                  onClick={() => {
+                    const source: CloudSource = {
+                      label: newSource.label.trim(),
+                      path: newSource.path.trim(),
+                      provider: newSource.provider,
+                      enabled: true,
+                    };
+                    update({ cloud_sources: [...(settings.cloud_sources || []), source] });
+                    setNewSource({ label: '', path: '', provider: 'custom' });
+                  }}
+                  style={{
+                    alignSelf: 'flex-start',
+                    background: newSource.label.trim() && newSource.path.trim() ? 'var(--accent)' : 'var(--raised)',
+                    color: newSource.label.trim() && newSource.path.trim() ? '#fff' : 'var(--t3)',
+                    border: 'none', borderRadius: 6, padding: '6px 16px', fontSize: 12,
+                    cursor: newSource.label.trim() && newSource.path.trim() ? 'pointer' : 'not-allowed',
+                    fontWeight: 500,
+                  }}
+                >
+                  Add Source
+                </button>
+              </div>
+
+              {sectionTitle('GitHub')}
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Personal Access Token</label>
+                <input
+                  type="password"
+                  value={settings.github_pat}
+                  onChange={(e) => update({ github_pat: e.target.value })}
+                  placeholder="ghp_..."
+                  style={inputStyle}
+                />
+                <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 4 }}>
+                  Used to browse and clone your GitHub repos from the sidebar.
+                </div>
               </div>
             </>
           )}

@@ -25,6 +25,19 @@ export interface DirStats {
   truncated: boolean;
 }
 
+export interface DriveInfo {
+  letter: string;
+  drive_type: 'fixed' | 'removable' | 'network' | 'cdrom' | 'ramdisk' | 'unknown';
+  label: string;
+}
+
+export interface CloudSource {
+  provider: string;
+  label: string;
+  path: string;
+  enabled: boolean;
+}
+
 export interface AppSettings {
   // Appearance
   theme: string;
@@ -51,6 +64,9 @@ export interface AppSettings {
   terminal_cursor_style: string;
   terminal_scrollback: number;
   pinned_paths: string[];
+  github_pat: string;
+  sidebar_section_order: string[];
+  cloud_sources: CloudSource[];
 }
 
 export type TabType = 'explorer' | 'terminal' | 'preview';

@@ -1,6 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloudSource {
+    pub provider: String,
+    pub label: String,
+    pub path: String,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     #[serde(default = "default_theme")]
     pub theme: String,
@@ -44,6 +52,12 @@ pub struct AppSettings {
     pub terminal_scrollback: u32,
     #[serde(default)]
     pub pinned_paths: Vec<String>,
+    #[serde(default)]
+    pub github_pat: String,
+    #[serde(default = "default_sidebar_section_order")]
+    pub sidebar_section_order: Vec<String>,
+    #[serde(default)]
+    pub cloud_sources: Vec<CloudSource>,
 }
 
 fn default_theme() -> String { "dotfiles-dark".to_string() }
@@ -61,6 +75,7 @@ fn default_sidebar_width() -> u16 { 220 }
 fn default_shell() -> String { "powershell.exe".to_string() }
 fn default_cursor() -> String { "block".to_string() }
 fn default_scrollback() -> u32 { 5000 }
+fn default_sidebar_section_order() -> Vec<String> { vec!["sources".into(), "cloud".into(), "quick-access".into(), "git".into()] }
 
 impl Default for AppSettings {
     fn default() -> Self {
@@ -86,6 +101,9 @@ impl Default for AppSettings {
             terminal_cursor_style: default_cursor(),
             terminal_scrollback: default_scrollback(),
             pinned_paths: Vec::new(),
+            github_pat: String::new(),
+            sidebar_section_order: default_sidebar_section_order(),
+            cloud_sources: Vec::new(),
         }
     }
 }

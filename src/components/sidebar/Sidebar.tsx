@@ -1,14 +1,17 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useLayoutStore } from '../../stores/layout';
 import { useExplorerStore } from '../../stores/explorer';
-import { usePreviewStore } from '../../stores/preview';
-import { getDrives, readDir } from '../../api/filesystem';
+import { getDrives, getKnownFolderPaths, readDir } from '../../api/filesystem';
 import { useSettingsStore } from '../../stores/settings';
+import { useGitStore } from '../../stores/git';
 import { FileIcon } from '../common/FileIcon';
 import { GitPanel } from './GitPanel';
-import type { FileEntry } from '../../types';
+import { CloudSources } from './CloudSources';
+import type { DriveInfo, FileEntry } from '../../types';
 
-function IconDrive() {
+// ---- Icons ----
+
+function IconDriveFixed() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--cyan)" strokeWidth="1.3">
       <rect x="2" y="4" width="12" height="8" rx="1.5" />
@@ -18,6 +21,45 @@ function IconDrive() {
   );
 }
 
+function IconDriveRemovable() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--green)" strokeWidth="1.3">
+      <rect x="4" y="2" width="8" height="12" rx="1.5" />
+      <line x1="6" y1="5" x2="10" y2="5" />
+      <circle cx="8" cy="10" r="1" fill="var(--green)" />
+    </svg>
+  );
+}
+
+function IconDriveNetwork() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--purple)" strokeWidth="1.3">
+      <rect x="2" y="4" width="12" height="8" rx="1.5" />
+      <circle cx="5" cy="8" r="1" fill="var(--purple)" />
+      <circle cx="11" cy="8" r="1" fill="var(--purple)" />
+      <line x1="6" y1="8" x2="10" y2="8" />
+    </svg>
+  );
+}
+
+function IconDriveCdrom() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--yellow)" strokeWidth="1.3">
+      <circle cx="8" cy="8" r="6" />
+      <circle cx="8" cy="8" r="2" />
+    </svg>
+  );
+}
+
+function DriveIcon({ type }: { type: string }) {
+  switch (type) {
+    case 'removable': return <IconDriveRemovable />;
+    case 'network': return <IconDriveNetwork />;
+    case 'cdrom': return <IconDriveCdrom />;
+    default: return <IconDriveFixed />;
+  }
+}
+
 function IconChevron({ expanded }: { expanded?: boolean }) {
   return (
     <svg
@@ -25,6 +67,17 @@ function IconChevron({ expanded }: { expanded?: boolean }) {
       style={{ transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none', flexShrink: 0 }}
     >
       <polyline points="2,1 6,4 2,7" />
+    </svg>
+  );
+}
+
+function IconDrag() {
+  return (
+    <svg width="8" height="14" viewBox="0 0 8 14" fill="var(--t3)" stroke="none" style={{ flexShrink: 0, opacity: 0.5 }}>
+      <circle cx="2.5" cy="2" r="1" /><circle cx="5.5" cy="2" r="1" />
+      <circle cx="2.5" cy="5.5" r="1" /><circle cx="5.5" cy="5.5" r="1" />
+      <circle cx="2.5" cy="9" r="1" /><circle cx="5.5" cy="9" r="1" />
+      <circle cx="2.5" cy="12.5" r="1" /><circle cx="5.5" cy="12.5" r="1" />
     </svg>
   );
 }
@@ -41,33 +94,74 @@ const itemStyle: React.CSSProperties = {
   margin: '0 6px',
 };
 
-interface SidebarItemProps {
-  icon: React.ReactNode;
-  label: string;
-  onClick: () => void;
-}
+// ---- Expandable Folder Tree Item ----
 
-function SidebarItem({ icon, label, onClick }: SidebarItemProps) {
+function FolderTreeItem({ path, label, icon, depth, onNavigate }: {
+  path: string; label: string; icon: React.ReactNode; depth: number; onNavigate: (path: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [children, setChildren] = useState<FileEntry[] | null>(null);
+  const showHidden = useSettingsStore((s) => s.settings.show_hidden);
+
+  const toggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!expanded && !children) {
+      try {
+        const listing = await readDir(path, showHidden);
+        setChildren(listing.entries.filter((e) => e.is_dir));
+      } catch {
+        setChildren([]);
+      }
+    }
+    setExpanded(!expanded);
+  };
+
   return (
-    <div
-      onClick={onClick}
-      style={itemStyle}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--hover)';
-        e.currentTarget.style.color = 'var(--t1)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent';
-        e.currentTarget.style.color = 'var(--t2)';
-      }}
-    >
-      {icon}
-      <span>{label}</span>
+    <div>
+      <div
+        onClick={() => onNavigate(path)}
+        style={{
+          ...itemStyle,
+          paddingLeft: 12 + depth * 16,
+          gap: 6,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = 'var(--hover)';
+          e.currentTarget.style.color = 'var(--t1)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.color = 'var(--t2)';
+        }}
+      >
+        <span onClick={toggle} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+          <IconChevron expanded={expanded} />
+        </span>
+        {icon}
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      </div>
+      {expanded && children && children.map((child) => (
+        <FolderTreeItem
+          key={child.path}
+          path={child.path}
+          label={child.name}
+          icon={<FileIcon entry={child} size={14} />}
+          depth={depth + 1}
+          onNavigate={onNavigate}
+        />
+      ))}
     </div>
   );
 }
 
-function SectionLabel({ text, collapsed, onToggle }: { text: string; collapsed?: boolean; onToggle?: () => void }) {
+// ---- Section Label (draggable) ----
+
+function SectionLabel({ text, collapsed, onToggle, onPointerDown, dragOver, dragging }: {
+  text: string; collapsed?: boolean; onToggle?: () => void;
+  onPointerDown?: (e: React.PointerEvent) => void;
+  dragOver?: boolean;
+  dragging?: boolean;
+}) {
   return (
     <div
       onClick={onToggle}
@@ -83,102 +177,19 @@ function SectionLabel({ text, collapsed, onToggle }: { text: string; collapsed?:
         alignItems: 'center',
         gap: 6,
         userSelect: 'none',
+        borderTop: dragOver ? '2px solid var(--accent)' : '2px solid transparent',
+        opacity: dragging ? 0.5 : 1,
       }}
     >
+      <span
+        onPointerDown={onPointerDown}
+        style={{ cursor: 'grab', display: 'flex', alignItems: 'center', touchAction: 'none' }}
+      >
+        <IconDrag />
+      </span>
       {onToggle && <IconChevron expanded={!collapsed} />}
       {text}
     </div>
-  );
-}
-
-// ---- File Tree Node ----
-
-function TreeNode({
-  entry,
-  depth,
-  onFileClick,
-}: {
-  entry: FileEntry;
-  depth: number;
-  onFileClick: (entry: FileEntry) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [children, setChildren] = useState<FileEntry[] | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const toggle = async () => {
-    if (!entry.is_dir) {
-      onFileClick(entry);
-      return;
-    }
-    if (expanded) {
-      setExpanded(false);
-      return;
-    }
-    setExpanded(true);
-    if (!children) {
-      setLoading(true);
-      try {
-        const listing = await readDir(entry.path, false);
-        setChildren(listing.entries);
-      } catch {
-        setChildren([]);
-      }
-      setLoading(false);
-    }
-  };
-
-  return (
-    <>
-      <div
-        onClick={toggle}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '3px 8px',
-          paddingLeft: 8 + depth * 16,
-          cursor: 'pointer',
-          fontSize: 12,
-          color: 'var(--t2)',
-          borderRadius: 3,
-          margin: '0 4px',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'var(--hover)';
-          e.currentTarget.style.color = 'var(--t1)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'transparent';
-          e.currentTarget.style.color = 'var(--t2)';
-        }}
-      >
-        {entry.is_dir ? (
-          <IconChevron expanded={expanded} />
-        ) : (
-          <span style={{ width: 8, flexShrink: 0 }} />
-        )}
-        <FileIcon entry={entry} size={14} />
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {entry.name}
-        </span>
-        {entry.is_dir && entry.children_count != null && (
-          <span style={{ color: 'var(--t3)', fontSize: 10, marginLeft: 'auto', flexShrink: 0 }}>
-            {entry.children_count}
-          </span>
-        )}
-      </div>
-      {expanded && loading && (
-        <div style={{ paddingLeft: 8 + (depth + 1) * 16, fontSize: 11, color: 'var(--t3)', padding: '2px 8px' }}>
-          ...
-        </div>
-      )}
-      {expanded && children && children.map((child) => (
-        <TreeNode key={child.path} entry={child} depth={depth + 1} onFileClick={onFileClick} />
-      ))}
-    </>
   );
 }
 
@@ -188,36 +199,48 @@ export function Sidebar() {
   const { sidebarWidth, setSidebarWidth } = useLayoutStore();
   const navigate = useExplorerStore((s) => s.navigate);
   const currentPath = useExplorerStore((s) => s.currentPath);
-  const entries = useExplorerStore((s) => s.entries);
-  const followSelection = usePreviewStore((s) => s.followSelection);
   const pinnedPaths = useSettingsStore((s) => s.settings.pinned_paths) || [];
   const updateSettings = useSettingsStore((s) => s.update);
-  const [drives, setDrives] = useState<string[]>([]);
-  const [sourcesCollapsed, setSourcesCollapsed] = useState(false);
-  const [explorerCollapsed, setExplorerCollapsed] = useState(false);
-  const [quickAccessCollapsed, setQuickAccessCollapsed] = useState(false);
-  const [gitCollapsed, setGitCollapsed] = useState(false);
+  const sectionOrder = useSettingsStore((s) => s.settings.sidebar_section_order) || ['sources', 'cloud', 'quick-access', 'git'];
+  const isGitRepo = useGitStore((s) => s.repoInfo?.is_repo ?? false);
+  const checkRepo = useGitStore((s) => s.checkRepo);
+
+  const [drives, setDrives] = useState<DriveInfo[]>([]);
+  const [quickAccessDefaults, setQuickAccessDefaults] = useState<{ label: string; path: string }[]>([]);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [dragSection, setDragSection] = useState<string | null>(null);
+  const [dragOverSection, setDragOverSection] = useState<string | null>(null);
   const resizing = useRef(false);
   const startX = useRef(0);
   const startW = useRef(0);
+  const dragStartY = useRef(0);
 
   useEffect(() => {
     getDrives()
       .then(setDrives)
-      .catch(() => setDrives(['C:\\']));
+      .catch(() => setDrives([{ letter: 'C:\\', drive_type: 'fixed', label: 'Local Disk (C:)' }]));
+
+    getKnownFolderPaths()
+      .then((folders) => {
+        setQuickAccessDefaults(folders.map(([label, path]) => ({ label, path })));
+      })
+      .catch(() => {
+        const home = 'C:\\Users\\Public';
+        setQuickAccessDefaults([
+          { label: 'Desktop', path: home + '\\Desktop' },
+          { label: 'Documents', path: home + '\\Documents' },
+          { label: 'Downloads', path: home + '\\Downloads' },
+        ]);
+      });
   }, []);
 
-  // Detect user home from currentPath or fall back to common paths
-  const userHome = currentPath.match(/^([A-Z]:\\Users\\[^\\]+)/i)?.[1] || 'C:\\Users\\Public';
-  const defaultQuickAccess = [
-    { label: 'Desktop', path: userHome + '\\Desktop' },
-    { label: 'Documents', path: userHome + '\\Documents' },
-    { label: 'Downloads', path: userHome + '\\Downloads' },
-  ];
+  // Fix chicken-and-egg: check git repo from Sidebar on path change
+  // so the Git section can show even before GitPanel mounts
+  useEffect(() => {
+    checkRepo(currentPath);
+  }, [currentPath, checkRepo]);
 
-  const handleFileClick = (entry: FileEntry) => {
-    followSelection(entry);
-  };
+  const toggleCollapsed = (key: string) => setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const handleUnpin = (path: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -227,6 +250,67 @@ export function Sidebar() {
   const getLabelFromPath = (p: string) => {
     const segs = p.replace(/\\/g, '/').split('/').filter(Boolean);
     return segs[segs.length - 1] || p;
+  };
+
+  // Pointer-event-based drag-to-reorder (replaces unreliable HTML5 DnD)
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const handleSectionPointerDown = (sectionId: string, e: React.PointerEvent) => {
+    // Only start drag on left button on the drag handle area
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDragSection(sectionId);
+    dragStartY.current = e.clientY;
+
+    const onMove = (ev: PointerEvent) => {
+      // Determine which section the pointer is over
+      let overSection: string | null = null;
+      for (const id of sectionOrder) {
+        const el = sectionRefs.current[id];
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (ev.clientY >= rect.top && ev.clientY < rect.bottom) {
+          overSection = id;
+          break;
+        }
+      }
+      setDragOverSection(overSection !== sectionId ? overSection : null);
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+
+      // Find drop target
+      let targetId: string | null = null;
+      for (const id of sectionOrder) {
+        const el = sectionRefs.current[id];
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (ev.clientY >= rect.top && ev.clientY < rect.bottom) {
+          targetId = id;
+          break;
+        }
+      }
+
+      if (targetId && targetId !== sectionId) {
+        const order = [...sectionOrder];
+        const fromIdx = order.indexOf(sectionId);
+        const toIdx = order.indexOf(targetId);
+        if (fromIdx !== -1 && toIdx !== -1) {
+          order.splice(fromIdx, 1);
+          order.splice(toIdx, 0, sectionId);
+          updateSettings({ sidebar_section_order: order });
+        }
+      }
+
+      setDragSection(null);
+      setDragOverSection(null);
+    };
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   };
 
   const onMouseDown = useCallback(
@@ -254,61 +338,50 @@ export function Sidebar() {
     [sidebarWidth, setSidebarWidth]
   );
 
-  // Get folder name for Explorer section header
-  const pathSegments = currentPath.replace(/\\/g, '/').split('/').filter(Boolean);
-  const folderName = pathSegments[pathSegments.length - 1] || currentPath;
+  // Section renderers
+  const makeDragProps = (id: string) => ({
+    onPointerDown: (e: React.PointerEvent) => handleSectionPointerDown(id, e),
+    dragOver: dragOverSection === id,
+    dragging: dragSection === id,
+  });
 
-  return (
-    <div
-      style={{
-        width: sidebarWidth,
-        minWidth: sidebarWidth,
-        background: 'var(--surface)',
-        borderRight: '1px solid var(--border)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        position: 'relative',
-        userSelect: 'none',
-      }}
-    >
-      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 8 }}>
-        {/* EXPLORER section - file tree for current directory */}
-        <SectionLabel text={`Explorer - ${folderName}`} collapsed={explorerCollapsed} onToggle={() => setExplorerCollapsed(!explorerCollapsed)} />
-        {!explorerCollapsed && (
-          <div style={{ marginBottom: 4 }}>
-            {entries.map((entry) => (
-              <TreeNode key={entry.path} entry={entry} depth={0} onFileClick={handleFileClick} />
-            ))}
-            {entries.length === 0 && (
-              <div style={{ padding: '4px 12px', fontSize: 11, color: 'var(--t3)' }}>Empty</div>
-            )}
-          </div>
-        )}
-
-        {/* SOURCES section */}
-        <SectionLabel text="Sources" collapsed={sourcesCollapsed} onToggle={() => setSourcesCollapsed(!sourcesCollapsed)} />
-        {!sourcesCollapsed && (
+  const sections: Record<string, () => React.ReactNode> = {
+    sources: () => (
+      <div key="sources" ref={(el) => { sectionRefs.current['sources'] = el; }}>
+        <SectionLabel text="Sources" collapsed={collapsed.sources} onToggle={() => toggleCollapsed('sources')} {...makeDragProps('sources')} />
+        {!collapsed.sources && drives.map((d) => (
+          <FolderTreeItem
+            key={d.letter}
+            path={d.letter}
+            label={d.label}
+            icon={<DriveIcon type={d.drive_type} />}
+            depth={0}
+            onNavigate={navigate}
+          />
+        ))}
+      </div>
+    ),
+    cloud: () => (
+      <div key="cloud" ref={(el) => { sectionRefs.current['cloud'] = el; }}>
+        <SectionLabel text="Cloud" collapsed={collapsed.cloud} onToggle={() => toggleCollapsed('cloud')} {...makeDragProps('cloud')} />
+        {!collapsed.cloud && <CloudSources />}
+      </div>
+    ),
+    'quick-access': () => (
+      <div key="quick-access" ref={(el) => { sectionRefs.current['quick-access'] = el; }}>
+        <SectionLabel text="Quick Access" collapsed={collapsed['quick-access']} onToggle={() => toggleCollapsed('quick-access')} {...makeDragProps('quick-access')} />
+        {!collapsed['quick-access'] && (
           <>
-            {drives.map((d) => (
-              <SidebarItem key={d} icon={<IconDrive />} label={d} onClick={() => navigate(d)} />
-            ))}
-          </>
-        )}
-
-        <SectionLabel text="Quick Access" collapsed={quickAccessCollapsed} onToggle={() => setQuickAccessCollapsed(!quickAccessCollapsed)} />
-        {!quickAccessCollapsed && (
-          <>
-            {/* Default items */}
-            {defaultQuickAccess.map((qa) => (
-              <SidebarItem
+            {quickAccessDefaults.map((qa) => (
+              <FolderTreeItem
                 key={qa.path}
-                icon={<FileIcon entry={{ name: qa.label, path: qa.path, is_dir: true, is_hidden: false, is_symlink: false, size: 0, modified: '', created: '', extension: null, readonly: false, children_count: null }} size={14} />}
+                path={qa.path}
                 label={qa.label}
-                onClick={() => navigate(qa.path)}
+                icon={<FileIcon entry={{ name: qa.label, path: qa.path, is_dir: true, is_hidden: false, is_symlink: false, size: 0, modified: '', created: '', extension: null, readonly: false, children_count: null }} size={14} />}
+                depth={0}
+                onNavigate={navigate}
               />
             ))}
-            {/* Pinned items */}
             {pinnedPaths.map((p) => (
               <div
                 key={p}
@@ -350,10 +423,37 @@ export function Sidebar() {
             ))}
           </>
         )}
+      </div>
+    ),
+    git: () => (
+      <div key="git" ref={(el) => { sectionRefs.current['git'] = el; }}>
+        <SectionLabel
+          text={isGitRepo ? 'Git' : 'Git (no repo)'}
+          collapsed={!isGitRepo || collapsed.git}
+          onToggle={isGitRepo ? () => toggleCollapsed('git') : undefined}
+          {...makeDragProps('git')}
+        />
+        {isGitRepo && !collapsed.git && <GitPanel />}
+      </div>
+    ),
+  };
 
-        {/* GIT section */}
-        <SectionLabel text="Git" collapsed={gitCollapsed} onToggle={() => setGitCollapsed(!gitCollapsed)} />
-        {!gitCollapsed && <GitPanel />}
+  return (
+    <div
+      style={{
+        width: sidebarWidth,
+        minWidth: sidebarWidth,
+        background: 'var(--surface)',
+        borderRight: '1px solid var(--border)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        position: 'relative',
+        userSelect: 'none',
+      }}
+    >
+      <div style={{ flex: 1, overflowY: 'auto', paddingBottom: 8 }}>
+        {sectionOrder.map((id) => sections[id]?.())}
       </div>
 
       {/* Resize handle */}

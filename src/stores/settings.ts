@@ -25,6 +25,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   terminal_cursor_style: 'block',
   terminal_scrollback: 5000,
   pinned_paths: [],
+  github_pat: '',
+  sidebar_section_order: ['sources', 'cloud', 'quick-access', 'git'],
+  cloud_sources: [],
 };
 
 interface SettingsState {

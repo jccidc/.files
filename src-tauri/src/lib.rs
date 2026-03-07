@@ -2,7 +2,7 @@ mod commands;
 mod models;
 mod utils;
 
-use commands::{filesystem, git, search, settings, shell, terminal, watcher};
+use commands::{cloud, filesystem, git, search, settings, shell, terminal, watcher};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,6 +20,7 @@ pub fn run() {
             filesystem::get_drives,
             filesystem::read_text_file,
             filesystem::dir_stats,
+            filesystem::get_known_folder_paths,
             terminal::spawn_pty,
             terminal::write_pty,
             terminal::resize_pty,
@@ -34,6 +35,7 @@ pub fn run() {
             shell::copy_files,
             shell::move_files,
             shell::rename_file,
+            shell::resolve_shortcut,
             git::git_repo_info,
             git::git_status,
             git::git_stage,
@@ -45,6 +47,11 @@ pub fn run() {
             git::git_discard,
             git::git_push,
             git::git_pull,
+            git::git_checkout,
+            git::git_clone,
+            cloud::github_list_repos,
+            cloud::detect_cloud_mounts,
+            cloud::find_local_repo,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

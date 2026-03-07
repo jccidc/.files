@@ -77,7 +77,7 @@ pub fn read_dir(path: String, show_hidden: bool) -> Result<DirListing, String> {
     let mut entries: Vec<FileEntry> = Vec::new();
 
     for entry in WalkDir::new(&path).min_depth(1).max_depth(1) {
-        let entry = entry.map_err(|e| e.to_string())?;
+        let Ok(entry) = entry else { continue }; // skip inaccessible entries
         let entry_path = entry.path();
 
         match build_file_entry(entry_path) {
@@ -116,7 +116,7 @@ pub fn stat_file(path: String) -> Result<FileEntry, String> {
 }
 
 #[tauri::command]
-pub fn get_drives() -> Result<Vec<String>, String> {
+pub fn get_drives() -> Result<Vec<path_utils::DriveInfo>, String> {
     Ok(path_utils::get_drives())
 }
 
@@ -174,4 +174,38 @@ pub async fn dir_stats(path: String) -> Result<DirStats, String> {
         total_size,
         truncated,
     })
+}
+
+/// Returns the real paths for Desktop, Documents, Downloads --
+/// accounting for OneDrive folder backup redirects.
+#[tauri::command]
+pub fn get_known_folder_paths() -> Result<Vec<(String, String)>, String> {
+    let user_profile = std::env::var("USERPROFILE").unwrap_or_default();
+    if user_profile.is_empty() {
+        return Err("USERPROFILE not set".into());
+    }
+
+    let onedrive = std::env::var("OneDrive")
+        .or_else(|_| std::env::var("OneDriveConsumer"))
+        .or_else(|_| std::env::var("OneDriveCommercial"))
+        .ok();
+
+    let mut results = Vec::new();
+
+    for folder in &["Desktop", "Documents", "Downloads"] {
+        // Check OneDrive-backed path first
+        let path = if let Some(ref od) = onedrive {
+            let od_path = format!("{}\\{}", od.trim_end_matches('\\'), folder);
+            if Path::new(&od_path).is_dir() {
+                od_path
+            } else {
+                format!("{}\\{}", &user_profile, folder)
+            }
+        } else {
+            format!("{}\\{}", &user_profile, folder)
+        };
+        results.push((folder.to_string(), path));
+    }
+
+    Ok(results)
 }

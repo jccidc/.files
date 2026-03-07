@@ -2,13 +2,13 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useExplorerStore } from '../../stores/explorer';
 import { useSettingsStore } from '../../stores/settings';
 import { usePanelsStore } from '../../stores/panels';
-import { useVirtualScroll } from '../../hooks/useVirtualScroll';
 import { watchDir, unwatchDir, onFsChange } from '../../api/watcher';
-import { deleteToTrash, renameFile } from '../../api/shell';
+import { deleteToTrash, renameFile, resolveShortcut } from '../../api/shell';
 import { readDir } from '../../api/filesystem';
 import { ContextMenu } from './ContextMenu';
 import { FileGrid } from './FileGrid';
 import { BatchRename } from './BatchRename';
+import { Toolbar, type GroupBy } from './Toolbar';
 import { QuickPreview } from '../preview/QuickPreview';
 import { usePreviewStore } from '../../stores/preview';
 import { FileIcon } from '../common/FileIcon';
@@ -72,85 +72,6 @@ function formatDateFull(iso: string): string {
   }
 }
 
-// ---- Breadcrumb ----
-
-interface BreadcrumbProps {
-  path: string;
-  onNavigate: (path: string) => void;
-}
-
-function Breadcrumb({ path, onNavigate }: BreadcrumbProps) {
-  const [editing, setEditing] = useState(false);
-  const [editValue, setEditValue] = useState(path);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { setEditValue(path); }, [path]);
-  useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editing]);
-
-  const segments = path.replace(/\\/g, '/').split('/').filter(Boolean);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') { setEditing(false); onNavigate(editValue); }
-    else if (e.key === 'Escape') { setEditing(false); setEditValue(path); }
-  };
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'l') { e.preventDefault(); setEditing(true); }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
-
-  if (editing) {
-    return (
-      <div style={{ padding: '6px 12px', background: 'var(--deep)', borderBottom: '1px solid var(--border)' }}>
-        <input
-          ref={inputRef} value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={() => { setEditing(false); setEditValue(path); }}
-          style={{
-            width: '100%', background: 'var(--surface)', border: '1px solid var(--accent)',
-            borderRadius: 4, padding: '4px 8px', color: 'var(--t1)', fontSize: 12,
-            fontFamily: "'JetBrains Mono', monospace", outline: 'none',
-          }}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 2, padding: '6px 12px',
-      background: 'var(--deep)', borderBottom: '1px solid var(--border)', fontSize: 12, overflow: 'hidden',
-    }}>
-      {segments.map((seg, i) => {
-        const partial = segments.slice(0, i + 1).join('\\');
-        const fullPath = i === 0 ? partial + '\\' : partial;
-        return (
-          <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {i > 0 && <IconChevron />}
-            <span
-              onClick={() => onNavigate(fullPath)}
-              style={{ cursor: 'pointer', color: 'var(--t2)', padding: '2px 4px', borderRadius: 3 }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--t1)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--t2)'; }}
-            >
-              {seg}
-            </span>
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 // ---- Hover Tooltip ----
 
 function HoverTooltip({ entry, x, y }: { entry: FileEntry; x: number; y: number }) {
@@ -202,7 +123,8 @@ function InlineRename({ entry, onDone }: { entry: FileEntry; onDone: (newName: s
       style={{
         background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 3,
         padding: '1px 4px', color: 'var(--t1)', fontSize: 12,
-        fontFamily: "'JetBrains Mono', monospace", outline: 'none', width: '100%',
+        fontFamily: "'JetBrains Mono', monospace", outline: 'none',
+        flex: 1, minWidth: 0, height: 22, boxSizing: 'border-box',
       }}
     />
   );
@@ -210,20 +132,24 @@ function InlineRename({ entry, onDone }: { entry: FileEntry; onDone: (newName: s
 
 // ---- Peek Row (inline folder expand) ----
 
-function PeekRow({ entry, depth, onNavigate }: { entry: FileEntry; depth: number; onNavigate: (path: string) => void }) {
+function PeekRow({ entry, selected, colWidths, onClick, onDoubleClick }: {
+  entry: FileEntry; selected: boolean; colWidths: string;
+  onClick: (e: React.MouseEvent) => void;
+  onDoubleClick: () => void;
+}) {
   return (
     <div
-      onDoubleClick={() => { if (entry.is_dir) onNavigate(entry.path); }}
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
       style={{
-        display: 'grid', gridTemplateColumns: '1fr 100px 140px', alignItems: 'center',
+        display: 'grid', gridTemplateColumns: colWidths, alignItems: 'center',
         height: ROW_HEIGHT, cursor: 'pointer', borderRadius: 2,
-        background: 'transparent',
-        borderLeft: '2px solid var(--accent)',
+        background: selected ? 'var(--active)' : 'transparent',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = 'var(--hover)'; }}
+      onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = selected ? 'var(--active)' : 'transparent'; }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', paddingLeft: 12 + depth * 20, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', paddingLeft: 28, overflow: 'hidden' }}>
         <FileIcon entry={entry} />
         <span style={{
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -274,8 +200,8 @@ const gitStatusLetters: Record<string, string> = {
 function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWidths, gitStatus: gs, onClick, onDoubleClick, onContextMenu, onRenameDone, onHover, onHoverEnd, onPeekToggle, onDragStart }: FileRowProps) {
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
+      draggable={selected}
+      onDragStart={selected ? onDragStart : undefined}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
@@ -298,7 +224,7 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
         {entry.is_dir && peekEnabled && (
           <span
             onClick={(e) => { e.stopPropagation(); onPeekToggle(); }}
-            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0, padding: '4px 2px', margin: '-4px -2px' }}
           >
             <IconChevron expanded={peekOpen} />
           </span>
@@ -441,8 +367,12 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const [peekPaths, setPeekPaths] = useState<Set<string>>(new Set());
   const [peekChildren, setPeekChildren] = useState<Record<string, FileEntry[]>>({});
   const [dropHighlight, setDropHighlight] = useState(false);
+  const [filterText, setFilterText] = useState('');
+  const [groupBy, setGroupBy] = useState<GroupBy>('none');
   const tooltipTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const lastClickedIndex = useRef<number>(-1);
+  const slowClickTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const slowClickPath = useRef<string | null>(null);
   const watcherIdRef = useRef(tab.id);
 
   // Column widths: [name(flex), size(px), modified(px)]
@@ -469,22 +399,70 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     }
   }
 
-  const sortedEntries = sortEntries(entries, sortField, sortAsc);
+  const sortedEntriesRaw = sortEntries(entries, sortField, sortAsc);
+  const sortedEntries = filterText
+    ? sortedEntriesRaw.filter((e) => e.name.toLowerCase().includes(filterText.toLowerCase()))
+    : sortedEntriesRaw;
 
-  // Build flat list with peek children for virtual scroll
-  const flatList: { entry: FileEntry; depth: number; isPeek: boolean }[] = [];
+  // Group-by logic
+  function getGroupKey(entry: FileEntry): string {
+    switch (groupBy) {
+      case 'type':
+        if (entry.is_dir) return 'Folders';
+        return (entry.extension || 'No extension').toUpperCase();
+      case 'date': {
+        if (!entry.modified) return 'Unknown';
+        const d = new Date(entry.modified);
+        const now = new Date();
+        const diff = now.getTime() - d.getTime();
+        const days = diff / (1000 * 60 * 60 * 24);
+        if (days < 1) return 'Today';
+        if (days < 2) return 'Yesterday';
+        if (days < 7) return 'This Week';
+        if (days < 30) return 'This Month';
+        if (days < 365) return 'This Year';
+        return 'Older';
+      }
+      case 'size': {
+        if (entry.is_dir) return 'Folders';
+        if (entry.size === 0) return 'Empty';
+        if (entry.size < 1024) return 'Tiny (< 1 KB)';
+        if (entry.size < 1024 * 1024) return 'Small (< 1 MB)';
+        if (entry.size < 100 * 1024 * 1024) return 'Medium (< 100 MB)';
+        return 'Large (100 MB+)';
+      }
+      case 'letter': {
+        const first = entry.name[0]?.toUpperCase() || '#';
+        return /[A-Z]/.test(first) ? first : '#';
+      }
+      default:
+        return '';
+    }
+  }
+
+  // Build flat list with peek children and group headers
+  const PEEK_VISIBLE = 5;
+  type FlatItem = { entry: FileEntry; depth: number; isPeek: boolean; peekParent?: string; groupHeader?: string };
+  const flatList: FlatItem[] = [];
+  let lastGroup = '';
   for (const entry of sortedEntries) {
+    if (groupBy !== 'none') {
+      const gk = getGroupKey(entry);
+      if (gk !== lastGroup) {
+        flatList.push({ entry, depth: 0, isPeek: false, groupHeader: gk });
+        lastGroup = gk;
+      }
+    }
     flatList.push({ entry, depth: 0, isPeek: false });
     if (peekPaths.has(entry.path) && peekChildren[entry.path]) {
-      for (const child of peekChildren[entry.path]) {
-        flatList.push({ entry: child, depth: 1, isPeek: true });
+      const children = peekChildren[entry.path];
+      for (const child of children) {
+        flatList.push({ entry: child, depth: 1, isPeek: true, peekParent: entry.path });
       }
     }
   }
 
-  // Virtual scroll
-  const { startIndex, endIndex, totalHeight, offsetY, containerRef, onScroll } =
-    useVirtualScroll(flatList.length, ROW_HEIGHT, 8);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Navigate on mount
   useEffect(() => {
@@ -504,13 +482,18 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     }
   }, [currentPath]);
 
-  // File watcher
+  // File watcher (debounced to avoid OneDrive/cloud sync spam)
+  const watcherDebounce = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => {
     const id = watcherIdRef.current;
     let unlisten: (() => void) | undefined;
     watchDir(id, currentPath).catch(() => {});
-    onFsChange(id, () => refresh()).then((fn) => { unlisten = fn; });
+    onFsChange(id, () => {
+      clearTimeout(watcherDebounce.current);
+      watcherDebounce.current = setTimeout(() => refresh(), 500);
+    }).then((fn) => { unlisten = fn; });
     return () => {
+      clearTimeout(watcherDebounce.current);
       unwatchDir(id).catch(() => {});
       if (unlisten) unlisten();
     };
@@ -574,16 +557,42 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         toggleSelected(entry.path);
         lastClickedIndex.current = index;
       } else {
-        clearSelection();
-        toggleSelected(entry.path);
-        lastClickedIndex.current = index;
+        // Plain click
+        if (selectedPaths.size === 1 && selectedPaths.has(entry.path) && !entry.is_dir) {
+          // Already selected - start slow-click rename timer
+          slowClickPath.current = entry.path;
+          clearTimeout(slowClickTimer.current);
+          slowClickTimer.current = setTimeout(() => {
+            if (slowClickPath.current === entry.path) {
+              setRenamingPath(entry.path);
+            }
+            slowClickPath.current = null;
+          }, 600);
+        } else {
+          // Normal select
+          clearTimeout(slowClickTimer.current);
+          slowClickPath.current = null;
+          clearSelection();
+          toggleSelected(entry.path);
+          lastClickedIndex.current = index;
+        }
       }
     },
     [sortedEntries, selectedPaths, setSelected, toggleSelected, clearSelection],
   );
 
-  const handleDoubleClick = (entry: FileEntry) => {
-    if (entry.is_dir) navigate(entry.path);
+  const handleDoubleClick = async (entry: FileEntry) => {
+    clearTimeout(slowClickTimer.current);
+    slowClickPath.current = null;
+    if (entry.is_dir) {
+      navigate(entry.path);
+    } else if (entry.extension?.toLowerCase() === 'lnk') {
+      // Resolve Windows shortcut and navigate to target
+      try {
+        const target = await resolveShortcut(entry.path);
+        if (target) navigate(target);
+      } catch {}
+    }
   };
 
   const handleSort = (field: SortField) => {
@@ -653,7 +662,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       if (!peekChildren[entry.path]) {
         try {
           const listing = await readDir(entry.path, showHidden);
-          setPeekChildren((prev) => ({ ...prev, [entry.path]: listing.entries.slice(0, 20) }));
+          setPeekChildren((prev) => ({ ...prev, [entry.path]: listing.entries }));
         } catch {}
       }
     }
@@ -694,7 +703,21 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <Breadcrumb path={currentPath} onNavigate={navigate} />
+      <Toolbar
+        onRename={() => { if (selectedPaths.size === 1) setRenamingPath([...selectedPaths][0]); }}
+        onDelete={() => {
+          if (selectedPaths.size > 0) {
+            deleteToTrash([...selectedPaths]).then(() => refresh()).catch(() => {});
+          }
+        }}
+        sortField={sortField}
+        sortAsc={sortAsc}
+        onSort={(field) => handleSort(field as SortField)}
+        filterText={filterText}
+        onFilterChange={setFilterText}
+        groupBy={groupBy}
+        onGroupByChange={setGroupBy}
+      />
 
       {/* Column headers with resize handles */}
       <div style={{
@@ -720,41 +743,47 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         </div>
       </div>
 
-      {/* File list with virtual scroll */}
+      {/* File list */}
       {loading && <div style={{ padding: 24, color: 'var(--t3)', textAlign: 'center', flex: 1 }}>Loading...</div>}
       {error && <div style={{ padding: 24, color: 'var(--red)', textAlign: 'center', flex: 1 }}>{error}</div>}
       {!loading && !error && viewMode === 'list' && (
         <div
           ref={containerRef}
-          onScroll={onScroll}
           style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
         >
-          <div style={{ height: totalHeight, position: 'relative' }}>
-            <div style={{ position: 'absolute', top: offsetY, left: 0, right: 0 }}>
-              {flatList.slice(startIndex, endIndex).map((item, i) => {
-                const globalIdx = startIndex + i;
-                if (item.isPeek) {
-                  return (
-                    <PeekRow
-                      key={`peek-${item.entry.path}`}
-                      entry={item.entry}
-                      depth={item.depth}
-                      onNavigate={navigate}
-                    />
-                  );
-                }
-                return (
+          {(() => {
+            const elements: React.ReactNode[] = [];
+            let i = 0;
+            while (i < flatList.length) {
+              const item = flatList[i];
+              // Group header
+              if (item.groupHeader) {
+                elements.push(
+                  <div key={`group-${i}-${item.groupHeader}`} style={{
+                    padding: '8px 12px 4px', fontSize: 11, fontWeight: 600,
+                    color: 'var(--accent)', textTransform: 'uppercase',
+                    letterSpacing: '0.05em', borderBottom: '1px solid var(--border)',
+                    background: 'var(--deep)', position: 'sticky', top: 0, zIndex: 5,
+                  }}>
+                    {item.groupHeader}
+                  </div>
+                );
+                i++;
+                continue;
+              }
+              if (!item.isPeek) {
+                elements.push(
                   <FileRow
                     key={item.entry.path}
                     entry={item.entry}
                     selected={selectedPaths.has(item.entry.path)}
-                    even={globalIdx % 2 === 0}
+                    even={i % 2 === 0}
                     renaming={renamingPath === item.entry.path}
                     peekOpen={peekPaths.has(item.entry.path)}
                     peekEnabled={peekEnabled && item.entry.is_dir}
                     colWidths={colWidths}
                     gitStatus={gitStatusMap.get(item.entry.name)}
-                    onClick={(e) => handleRowClick(item.entry, globalIdx, e)}
+                    onClick={(e) => handleRowClick(item.entry, i, e)}
                     onDoubleClick={() => handleDoubleClick(item.entry)}
                     onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, entry: item.entry }); }}
                     onRenameDone={handleRenameDone}
@@ -764,9 +793,51 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
                     onDragStart={(e) => handleDragStart(e, item.entry)}
                   />
                 );
-              })}
-            </div>
-          </div>
+                i++;
+              } else {
+                // Collect consecutive peek rows for this parent into a container
+                const parentPath = item.peekParent;
+                const peekItems: typeof flatList = [];
+                while (i < flatList.length && flatList[i].isPeek && flatList[i].peekParent === parentPath) {
+                  peekItems.push(flatList[i]);
+                  i++;
+                }
+                elements.push(
+                  <div key={`peek-group-${parentPath}`} style={{
+                    borderLeft: '2px solid var(--accent)',
+                    marginLeft: 20,
+                    marginBottom: 2,
+                    background: 'var(--deep)',
+                    borderRadius: '0 4px 4px 0',
+                    maxHeight: PEEK_VISIBLE * ROW_HEIGHT,
+                    overflowY: peekItems.length > PEEK_VISIBLE ? 'auto' : 'hidden',
+                    overscrollBehavior: 'contain',
+                  }}>
+                    {peekItems.map((pi) => {
+                      return (
+                        <PeekRow
+                          key={`peek-${pi.entry.path}`}
+                          entry={pi.entry}
+                          colWidths={colWidths}
+                          selected={selectedPaths.has(pi.entry.path)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearSelection();
+                            toggleSelected(pi.entry.path);
+                            followSelection(pi.entry);
+                          }}
+                          onDoubleClick={() => {
+                            if (pi.entry.is_dir) navigate(pi.entry.path);
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                );
+              }
+            }
+            return elements;
+          })()}
           {entries.length === 0 && (
             <div style={{ padding: 24, color: 'var(--t3)', textAlign: 'center' }}>Empty directory</div>
           )}
@@ -820,6 +891,28 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           }}
           onPinToQuickAccess={handlePinToggle}
           isPinned={isPathPinned}
+          onCut={(paths) => useExplorerStore.getState().cutPaths(paths)}
+          onCopy={(paths) => useExplorerStore.getState().copyPaths(paths)}
+          onPaste={() => useExplorerStore.getState().paste()}
+          canPaste={useExplorerStore.getState().clipboardPaths.length > 0}
+          selectedCount={selectedPaths.size}
+          gitFileStatus={ctxMenu.entry ? gitStatusMap.get(ctxMenu.entry.name) || null : null}
+          onGitStage={gitRepoInfo?.is_repo && gitRepoInfo.root ? (filePath: string) => {
+            const getGitRelPath = (p: string, root: string) => {
+              const norm = (s: string) => s.replace(/\\/g, '/').replace(/\/$/, '');
+              return norm(p).replace(norm(root) + '/', '');
+            };
+            const relPath = getGitRelPath(filePath, gitRepoInfo.root!);
+            useGitStore.getState().stage(gitRepoInfo.root!, [relPath]);
+          } : undefined}
+          onGitDiscard={gitRepoInfo?.is_repo && gitRepoInfo.root ? (filePath: string) => {
+            const getGitRelPath = (p: string, root: string) => {
+              const norm = (s: string) => s.replace(/\\/g, '/').replace(/\/$/, '');
+              return norm(p).replace(norm(root) + '/', '');
+            };
+            const relPath = getGitRelPath(filePath, gitRepoInfo.root!);
+            useGitStore.getState().discard(gitRepoInfo.root!, [relPath]);
+          } : undefined}
         />
       )}
     </div>
