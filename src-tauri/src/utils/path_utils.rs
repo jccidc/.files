@@ -110,11 +110,19 @@ pub fn get_drives_with_cloud_filter(cloud_paths: &[String]) -> Vec<DriveInfo> {
         #[cfg(not(windows))]
         let (drive_type, label) = ("fixed".to_string(), String::new());
 
-        // Check if this drive root is a cloud mount (e.g. G:\ for GDFS)
+        // Check if this drive root IS a cloud filesystem (e.g. G:\ for GDFS).
+        // Only flag if the cloud mount is at the drive root level (depth 0-1),
+        // NOT if a cloud folder just lives deep inside the drive (e.g. C:\Users\...\OneDrive).
         let is_cloud = cloud_paths.iter().any(|cp| {
-            let cp_upper = cp.to_uppercase();
+            let cp_norm = cp.to_uppercase().replace('/', "\\");
             let root_upper = root.to_uppercase();
-            cp_upper.starts_with(&root_upper) || root_upper.starts_with(&cp_upper)
+            if !cp_norm.starts_with(&root_upper) {
+                return false;
+            }
+            // Count path components after the drive root — only shallow mounts count
+            let remainder = &cp_norm[root_upper.len()..];
+            let depth = remainder.trim_end_matches('\\').split('\\').filter(|s| !s.is_empty()).count();
+            depth <= 1
         });
 
         let display_label = if label.is_empty() {
