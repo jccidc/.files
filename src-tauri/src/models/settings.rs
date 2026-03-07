@@ -20,6 +20,37 @@ pub struct AppSettings {
     pub font_size: u8,
     #[serde(default = "default_ui_scale")]
     pub ui_scale: u8,
+    // Visual Effects
+    #[serde(default = "default_window_effect")]
+    pub window_effect: String,
+    #[serde(default = "default_opacity")]
+    pub sidebar_opacity: f32,
+    #[serde(default = "default_opacity")]
+    pub toolbar_opacity: f32,
+    #[serde(default = "default_opacity")]
+    pub terminal_opacity: f32,
+    #[serde(default = "default_true")]
+    pub enable_glow: bool,
+    #[serde(default)]
+    pub enable_cursor_trail: bool,
+    #[serde(default = "default_true")]
+    pub enable_animations: bool,
+    #[serde(default = "default_animation_speed")]
+    pub animation_speed: f32,
+    #[serde(default = "default_border_radius")]
+    pub border_radius: u8,
+    #[serde(default = "default_density")]
+    pub density: String,
+    #[serde(default = "default_icon_theme")]
+    pub icon_theme: String,
+    #[serde(default = "default_bg_pattern")]
+    pub bg_pattern: String,
+    #[serde(default)]
+    pub bg_custom_url: String,
+    #[serde(default = "default_bg_opacity")]
+    pub bg_opacity: f32,
+    #[serde(default)]
+    pub custom_css: String,
     #[serde(default)]
     pub show_hidden: bool,
     #[serde(default = "default_true")]
@@ -76,6 +107,14 @@ fn default_shell() -> String { "powershell.exe".to_string() }
 fn default_cursor() -> String { "block".to_string() }
 fn default_scrollback() -> u32 { 5000 }
 fn default_sidebar_section_order() -> Vec<String> { vec!["sources".into(), "cloud".into(), "quick-access".into(), "git".into()] }
+fn default_window_effect() -> String { "none".to_string() }
+fn default_opacity() -> f32 { 1.0 }
+fn default_animation_speed() -> f32 { 1.0 }
+fn default_border_radius() -> u8 { 8 }
+fn default_density() -> String { "comfortable".to_string() }
+fn default_icon_theme() -> String { "minimal".to_string() }
+fn default_bg_pattern() -> String { "none".to_string() }
+fn default_bg_opacity() -> f32 { 0.05 }
 
 impl Default for AppSettings {
     fn default() -> Self {
@@ -85,6 +124,21 @@ impl Default for AppSettings {
             font_family: default_font(),
             font_size: default_font_size(),
             ui_scale: default_ui_scale(),
+            window_effect: default_window_effect(),
+            sidebar_opacity: default_opacity(),
+            toolbar_opacity: default_opacity(),
+            terminal_opacity: default_opacity(),
+            enable_glow: true,
+            enable_cursor_trail: false,
+            enable_animations: true,
+            animation_speed: default_animation_speed(),
+            border_radius: default_border_radius(),
+            density: default_density(),
+            icon_theme: default_icon_theme(),
+            bg_pattern: default_bg_pattern(),
+            bg_custom_url: String::new(),
+            bg_opacity: default_bg_opacity(),
+            custom_css: String::new(),
             show_hidden: false,
             show_extensions: true,
             sort_by: default_sort_by(),

@@ -21,6 +21,20 @@
   --yellow: #FBBF24;
   --purple: #C084FC;
   --cyan: #22D3EE;
+  /* Visual effects defaults */
+  --sidebar-opacity: 1;
+  --toolbar-opacity: 1;
+  --terminal-opacity: 1;
+  --border-radius: 8px;
+  --anim-speed: 1;
+  --anim-duration: 0.15s;
+  --row-height: 30px;
+  --density-pad-y: 5px;
+  --density-pad-x: 12px;
+  --density-gap: 8px;
+  --bg-pattern: none;
+  --bg-pattern-size: auto;
+  --bg-opacity: 0.05;
 }
 
 *,
@@ -42,9 +56,37 @@ body,
   font-size: 13px;
 }
 
+/* Background pattern overlay */
+#root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: var(--bg-pattern);
+  background-size: var(--bg-pattern-size);
+  opacity: var(--bg-opacity);
+  pointer-events: none;
+  z-index: 0;
+}
+
 ::selection {
   background: var(--accent);
   color: #fff;
+}
+
+/* Glow effect on active/focused elements */
+.glow-enabled *:focus-visible {
+  box-shadow: 0 0 0 2px var(--aglow), 0 0 12px var(--aglow);
+  outline: none;
+}
+
+/* Animated glow pulse for active sidebar items */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 4px var(--aglow); }
+  50% { box-shadow: 0 0 12px var(--aglow), 0 0 20px var(--aglow); }
+}
+
+.glow-enabled .glow-active {
+  animation: glowPulse 2.5s ease-in-out infinite;
 }
 
 ::-webkit-scrollbar {

@@ -7,6 +7,7 @@ use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
     Manager, WindowEvent,
+    window::{Effect, EffectsBuilder},
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -69,6 +70,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            set_window_effect,
             filesystem::read_dir,
             filesystem::stat_file,
             filesystem::get_drives,
@@ -111,4 +113,25 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[tauri::command]
+fn set_window_effect(window: tauri::WebviewWindow, effect: String) -> Result<(), String> {
+    let effects: Vec<Effect> = match effect.as_str() {
+        "mica" => vec![Effect::Mica],
+        "mica-alt" => vec![Effect::MicaDark],
+        "acrylic" => vec![Effect::Acrylic],
+        "tabbed" => vec![Effect::Tabbed],
+        _ => vec![],
+    };
+
+    if effects.is_empty() {
+        window
+            .set_effects(EffectsBuilder::new().build())
+            .map_err(|e| e.to_string())
+    } else {
+        window
+            .set_effects(EffectsBuilder::new().effects(effects).build())
+            .map_err(|e| e.to_string())
+    }
 }

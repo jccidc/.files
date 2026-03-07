@@ -181,7 +181,7 @@ export function SettingsPanel({ open, onClose }: Props) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div style={{
-        width: 720, maxWidth: '90vw', height: 520, maxHeight: '85vh',
+        width: 780, maxWidth: '92vw', height: 600, maxHeight: '90vh',
         background: 'var(--base)', border: '1px solid var(--border)',
         borderRadius: 12, display: 'flex', overflow: 'hidden',
         boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
@@ -247,22 +247,22 @@ export function SettingsPanel({ open, onClose }: Props) {
           {section === 'appearance' && (
             <>
               {sectionTitle('Theme')}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8, marginBottom: 16 }}>
                 {Object.values(THEMES).map((t) => (
                   <button
                     key={t.id}
                     onClick={() => update({ theme: t.id })}
                     style={{
-                      flex: 1, padding: '12px 8px', border: settings.theme === t.id ? '2px solid var(--accent)' : '2px solid var(--border)',
+                      padding: '10px 6px', border: settings.theme === t.id ? '2px solid var(--accent)' : '2px solid var(--border)',
                       borderRadius: 8, cursor: 'pointer', background: t.base, textAlign: 'center',
                     }}
                   >
-                    <div style={{ display: 'flex', gap: 3, justifyContent: 'center', marginBottom: 6 }}>
-                      <div style={{ width: 16, height: 16, borderRadius: 3, background: t.accent }} />
-                      <div style={{ width: 16, height: 16, borderRadius: 3, background: t.surface }} />
-                      <div style={{ width: 16, height: 16, borderRadius: 3, background: t.t1 }} />
+                    <div style={{ display: 'flex', gap: 2, justifyContent: 'center', marginBottom: 5 }}>
+                      <div style={{ width: 12, height: 12, borderRadius: 2, background: t.accent }} />
+                      <div style={{ width: 12, height: 12, borderRadius: 2, background: t.surface }} />
+                      <div style={{ width: 12, height: 12, borderRadius: 2, background: t.t1 }} />
                     </div>
-                    <div style={{ fontSize: 11, color: t.t1, fontWeight: 500 }}>{t.name}</div>
+                    <div style={{ fontSize: 10, color: t.t1, fontWeight: 500 }}>{t.name}</div>
                   </button>
                 ))}
               </div>
@@ -287,6 +287,188 @@ export function SettingsPanel({ open, onClose }: Props) {
                 />
               </div>
 
+              {sectionTitle('Window Effect')}
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Native window vibrancy (Windows 11)</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {(['none', 'mica', 'mica-alt', 'acrylic', 'tabbed'] as const).map((fx) => (
+                    <button
+                      key={fx}
+                      onClick={() => update({ window_effect: fx })}
+                      style={{
+                        padding: '6px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                        border: settings.window_effect === fx ? '1px solid var(--accent)' : '1px solid var(--border)',
+                        background: settings.window_effect === fx ? 'var(--aglow)' : 'var(--raised)',
+                        color: settings.window_effect === fx ? 'var(--accent)' : 'var(--t2)',
+                        fontWeight: settings.window_effect === fx ? 600 : 400,
+                      }}
+                    >
+                      {fx === 'none' ? 'None' : fx === 'mica-alt' ? 'Mica Alt' : fx.charAt(0).toUpperCase() + fx.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {sectionTitle('Opacity')}
+              <div style={{ marginBottom: 8 }}>
+                <label style={labelStyle}>Sidebar: {Math.round((settings.sidebar_opacity ?? 1) * 100)}%</label>
+                <input
+                  type="range" min="50" max="100" value={Math.round((settings.sidebar_opacity ?? 1) * 100)}
+                  onChange={(e) => update({ sidebar_opacity: Number(e.target.value) / 100 })}
+                  style={{ width: '100%', accentColor: 'var(--accent)' }}
+                />
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <label style={labelStyle}>Toolbar: {Math.round((settings.toolbar_opacity ?? 1) * 100)}%</label>
+                <input
+                  type="range" min="50" max="100" value={Math.round((settings.toolbar_opacity ?? 1) * 100)}
+                  onChange={(e) => update({ toolbar_opacity: Number(e.target.value) / 100 })}
+                  style={{ width: '100%', accentColor: 'var(--accent)' }}
+                />
+              </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Terminal: {Math.round((settings.terminal_opacity ?? 1) * 100)}%</label>
+                <input
+                  type="range" min="50" max="100" value={Math.round((settings.terminal_opacity ?? 1) * 100)}
+                  onChange={(e) => update({ terminal_opacity: Number(e.target.value) / 100 })}
+                  style={{ width: '100%', accentColor: 'var(--accent)' }}
+                />
+              </div>
+
+              {sectionTitle('Effects')}
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Accent Glow</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>Pulsing glow on active elements and focus rings</div>
+                </div>
+                <button style={toggleStyle(settings.enable_glow !== false)} onClick={() => update({ enable_glow: !(settings.enable_glow !== false) })}>
+                  <div style={toggleDot(settings.enable_glow !== false)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Cursor Trail</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>Subtle accent-colored particles following mouse</div>
+                </div>
+                <button style={toggleStyle(!!settings.enable_cursor_trail)} onClick={() => update({ enable_cursor_trail: !settings.enable_cursor_trail })}>
+                  <div style={toggleDot(!!settings.enable_cursor_trail)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Animations</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>Transition effects on hover, expand, context menus</div>
+                </div>
+                <button style={toggleStyle(settings.enable_animations !== false)} onClick={() => update({ enable_animations: !(settings.enable_animations !== false) })}>
+                  <div style={toggleDot(settings.enable_animations !== false)} />
+                </button>
+              </div>
+              {settings.enable_animations !== false && (
+                <div style={{ marginBottom: 16, marginTop: 8 }}>
+                  <label style={labelStyle}>Animation Speed: {settings.animation_speed ?? 1}x</label>
+                  <input
+                    type="range" min="0.5" max="2" step="0.1" value={settings.animation_speed ?? 1}
+                    onChange={(e) => update({ animation_speed: Number(e.target.value) })}
+                    style={{ width: '100%', accentColor: 'var(--accent)' }}
+                  />
+                </div>
+              )}
+
+              {sectionTitle('Layout & Shape')}
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Border Radius: {settings.border_radius ?? 8}px</label>
+                <input
+                  type="range" min="0" max="16" value={settings.border_radius ?? 8}
+                  onChange={(e) => update({ border_radius: Number(e.target.value) })}
+                  style={{ width: '100%', accentColor: 'var(--accent)' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--t3)', marginTop: 2 }}>
+                  <span>Sharp</span><span>Rounded</span>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Density</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {(['compact', 'comfortable', 'spacious'] as const).map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => update({ density: d })}
+                      style={{
+                        flex: 1, padding: '8px 0', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                        border: (settings.density || 'comfortable') === d ? '1px solid var(--accent)' : '1px solid var(--border)',
+                        background: (settings.density || 'comfortable') === d ? 'var(--aglow)' : 'var(--raised)',
+                        color: (settings.density || 'comfortable') === d ? 'var(--accent)' : 'var(--t2)',
+                        fontWeight: (settings.density || 'comfortable') === d ? 600 : 400,
+                      }}
+                    >
+                      {d.charAt(0).toUpperCase() + d.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Icon Theme</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {(['minimal', 'colorful', 'monochrome'] as const).map((it) => (
+                    <button
+                      key={it}
+                      onClick={() => update({ icon_theme: it })}
+                      style={{
+                        flex: 1, padding: '8px 0', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                        border: (settings.icon_theme || 'minimal') === it ? '1px solid var(--accent)' : '1px solid var(--border)',
+                        background: (settings.icon_theme || 'minimal') === it ? 'var(--aglow)' : 'var(--raised)',
+                        color: (settings.icon_theme || 'minimal') === it ? 'var(--accent)' : 'var(--t2)',
+                        fontWeight: (settings.icon_theme || 'minimal') === it ? 600 : 400,
+                      }}
+                    >
+                      {it.charAt(0).toUpperCase() + it.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {sectionTitle('Background Pattern')}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+                {(['none', 'dots', 'grid', 'noise', 'gradient', 'custom'] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => update({ bg_pattern: p })}
+                    style={{
+                      padding: '6px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                      border: (settings.bg_pattern || 'none') === p ? '1px solid var(--accent)' : '1px solid var(--border)',
+                      background: (settings.bg_pattern || 'none') === p ? 'var(--aglow)' : 'var(--raised)',
+                      color: (settings.bg_pattern || 'none') === p ? 'var(--accent)' : 'var(--t2)',
+                      fontWeight: (settings.bg_pattern || 'none') === p ? 600 : 400,
+                    }}
+                  >
+                    {p === 'none' ? 'None' : p.charAt(0).toUpperCase() + p.slice(1)}
+                  </button>
+                ))}
+              </div>
+              {settings.bg_pattern === 'custom' && (
+                <div style={{ marginBottom: 8 }}>
+                  <label style={labelStyle}>Image URL</label>
+                  <input
+                    value={settings.bg_custom_url || ''}
+                    onChange={(e) => update({ bg_custom_url: e.target.value })}
+                    placeholder="https://... or local path"
+                    style={inputStyle}
+                  />
+                </div>
+              )}
+              {settings.bg_pattern && settings.bg_pattern !== 'none' && (
+                <div style={{ marginBottom: 16 }}>
+                  <label style={labelStyle}>Pattern Opacity: {Math.round((settings.bg_opacity ?? 0.05) * 100)}%</label>
+                  <input
+                    type="range" min="2" max="30" value={Math.round((settings.bg_opacity ?? 0.05) * 100)}
+                    onChange={(e) => update({ bg_opacity: Number(e.target.value) / 100 })}
+                    style={{ width: '100%', accentColor: 'var(--accent)' }}
+                  />
+                </div>
+              )}
+
               {sectionTitle('Font')}
               <div style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>UI Font Family</label>
@@ -300,6 +482,9 @@ export function SettingsPanel({ open, onClose }: Props) {
                   <option value="Cascadia Code">Cascadia Code</option>
                   <option value="Consolas">Consolas</option>
                   <option value="SF Mono">SF Mono</option>
+                  <option value="Outfit">Outfit</option>
+                  <option value="Inter">Inter</option>
+                  <option value="Segoe UI">Segoe UI</option>
                 </select>
               </div>
 
@@ -318,6 +503,23 @@ export function SettingsPanel({ open, onClose }: Props) {
                   type="range" min="80" max="150" step="5" value={settings.ui_scale}
                   onChange={(e) => update({ ui_scale: Number(e.target.value) })}
                   style={{ width: '100%', accentColor: 'var(--accent)' }}
+                />
+              </div>
+
+              {sectionTitle('Custom CSS')}
+              <div style={{ marginBottom: 16 }}>
+                <label style={labelStyle}>Advanced: inject raw CSS (power users)</label>
+                <textarea
+                  value={settings.custom_css || ''}
+                  onChange={(e) => update({ custom_css: e.target.value })}
+                  placeholder={`/* Example: */\n.sidebar { backdrop-filter: blur(20px); }`}
+                  rows={5}
+                  style={{
+                    ...inputStyle,
+                    resize: 'vertical',
+                    minHeight: 80,
+                    lineHeight: 1.5,
+                  }}
                 />
               </div>
             </>

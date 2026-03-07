@@ -483,6 +483,7 @@ export function Sidebar() {
         width: sidebarWidth,
         minWidth: sidebarWidth,
         background: 'var(--surface)',
+        opacity: 'var(--sidebar-opacity)' as any,
         borderRight: '1px solid var(--border)',
         display: 'flex',
         flexDirection: 'column',

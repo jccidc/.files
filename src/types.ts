@@ -46,6 +46,22 @@ export interface AppSettings {
   font_family: string;
   font_size: number;
   ui_scale: number;
+  // Visual Effects
+  window_effect: string;       // 'none' | 'mica' | 'mica-alt' | 'acrylic' | 'tabbed'
+  sidebar_opacity: number;     // 0.5-1.0
+  toolbar_opacity: number;     // 0.5-1.0
+  terminal_opacity: number;    // 0.5-1.0
+  enable_glow: boolean;
+  enable_cursor_trail: boolean;
+  enable_animations: boolean;
+  animation_speed: number;     // 0.5-2.0
+  border_radius: number;       // 0-12
+  density: string;             // 'compact' | 'comfortable' | 'spacious'
+  icon_theme: string;          // 'minimal' | 'colorful' | 'monochrome'
+  bg_pattern: string;          // 'none' | 'dots' | 'grid' | 'noise' | 'gradient' | 'custom'
+  bg_custom_url: string;
+  bg_opacity: number;          // 0.02-0.2
+  custom_css: string;
   // Explorer
   show_hidden: boolean;
   show_extensions: boolean;

@@ -109,6 +109,7 @@ export function TerminalTab({ tab }: { tab: Tab }) {
       style={{
         flex: 1,
         background: 'var(--void)',
+        opacity: 'var(--terminal-opacity)' as any,
         padding: 4,
         overflow: 'hidden',
       }}
