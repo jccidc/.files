@@ -46,6 +46,10 @@ export function useTheme() {
     r.style.setProperty('--sidebar-opacity', String(sidebarOpacity ?? 1));
     r.style.setProperty('--toolbar-opacity', String(toolbarOpacity ?? 1));
     r.style.setProperty('--terminal-opacity', String(terminalOpacity ?? 1));
+    // Compute semi-transparent backgrounds (so only bg fades, not text/icons)
+    r.style.setProperty('--sidebar-bg', `color-mix(in srgb, var(--surface) ${(sidebarOpacity ?? 1) * 100}%, transparent)`);
+    r.style.setProperty('--toolbar-bg', `color-mix(in srgb, var(--base) ${(toolbarOpacity ?? 1) * 100}%, transparent)`);
+    r.style.setProperty('--terminal-bg', `color-mix(in srgb, var(--void) ${(terminalOpacity ?? 1) * 100}%, transparent)`);
     r.style.setProperty('--border-radius', `${borderRadius ?? 8}px`);
     r.style.setProperty('--anim-speed', `${animationSpeed ?? 1}`);
     r.style.setProperty('--anim-duration', enableAnimations ? `${0.15 / (animationSpeed || 1)}s` : '0s');
@@ -73,8 +77,8 @@ export function useTheme() {
 
     const patterns: Record<string, string> = {
       none: 'none',
-      dots: `radial-gradient(circle, var(--t3) 0.5px, transparent 0.5px)`,
-      grid: `linear-gradient(var(--t3) 0.5px, transparent 0.5px), linear-gradient(90deg, var(--t3) 0.5px, transparent 0.5px)`,
+      dots: `radial-gradient(circle, rgba(255,255,255,0.4) 1px, transparent 1px)`,
+      grid: `linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)`,
       noise: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.15'/%3E%3C/svg%3E")`,
       gradient: `linear-gradient(135deg, var(--accent) 0%, transparent 60%)`,
       custom: bgCustomUrl ? `url("${bgCustomUrl}")` : 'none',
@@ -82,7 +86,7 @@ export function useTheme() {
     r.style.setProperty('--bg-pattern', patterns[bgPattern] || 'none');
 
     const sizes: Record<string, string> = {
-      dots: '16px 16px',
+      dots: '20px 20px',
       grid: '24px 24px, 24px 24px',
       noise: '200px 200px',
       gradient: '100% 100%',

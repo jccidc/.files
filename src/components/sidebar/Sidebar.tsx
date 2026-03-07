@@ -482,8 +482,7 @@ export function Sidebar() {
       style={{
         width: sidebarWidth,
         minWidth: sidebarWidth,
-        background: 'var(--surface)',
-        opacity: 'var(--sidebar-opacity)' as any,
+        background: 'var(--sidebar-bg, var(--surface))',
         borderRight: '1px solid var(--border)',
         display: 'flex',
         flexDirection: 'column',

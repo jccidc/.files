@@ -111,7 +111,7 @@ pub fn find_local_repo(name: String) -> Option<String> {
         }
     }
 
-    // 2. Scan common project parent directories 1 level deep
+    // 2. Scan common project parent directories (1-2 levels deep)
     let scan_roots = [
         "C:\\Projects".to_string(),
         format!("{}\\Projects", &user_profile),
@@ -122,6 +122,7 @@ pub fn find_local_repo(name: String) -> Option<String> {
         format!("{}\\Desktop", &user_profile),
     ];
     let name_lower = name.to_lowercase();
+
     for root in &scan_roots {
         let root_path = Path::new(root);
         if !root_path.is_dir() {
@@ -130,10 +131,26 @@ pub fn find_local_repo(name: String) -> Option<String> {
         if let Ok(entries) = std::fs::read_dir(root_path) {
             for entry in entries.filter_map(|e| e.ok()) {
                 let entry_path = entry.path();
-                if entry_path.is_dir() && entry_path.join(".git").is_dir() {
-                    if let Some(dir_name) = entry_path.file_name().and_then(|n| n.to_str()) {
-                        if dir_name.to_lowercase() == name_lower {
-                            return Some(entry_path.to_string_lossy().to_string());
+                if !entry_path.is_dir() {
+                    continue;
+                }
+                let dir_name = match entry_path.file_name().and_then(|n| n.to_str()) {
+                    Some(n) => n.to_lowercase(),
+                    None => continue,
+                };
+                if dir_name != name_lower {
+                    continue;
+                }
+                // Direct match: folder itself is the git repo
+                if entry_path.join(".git").is_dir() {
+                    return Some(entry_path.to_string_lossy().to_string());
+                }
+                // Nested match: .git lives in a subfolder (e.g. projects/jccidc/Website/.git)
+                if let Ok(sub_entries) = std::fs::read_dir(&entry_path) {
+                    for sub in sub_entries.filter_map(|e| e.ok()) {
+                        let sub_path = sub.path();
+                        if sub_path.is_dir() && sub_path.join(".git").is_dir() {
+                            return Some(sub_path.to_string_lossy().to_string());
                         }
                     }
                 }
@@ -141,7 +158,45 @@ pub fn find_local_repo(name: String) -> Option<String> {
         }
     }
 
+    // 3. Fallback: check git remote URL for repos with mismatched folder names
+    for root in &scan_roots {
+        let root_path = Path::new(root);
+        if !root_path.is_dir() {
+            continue;
+        }
+        if let Ok(entries) = std::fs::read_dir(root_path) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let entry_path = entry.path();
+                if !entry_path.is_dir() || !entry_path.join(".git").is_dir() {
+                    continue;
+                }
+                if repo_remote_matches(&entry_path, &name_lower) {
+                    return Some(entry_path.to_string_lossy().to_string());
+                }
+            }
+        }
+    }
+
     None
+}
+
+/// Check if a git repo's remote origin URL matches the given repo name.
+fn repo_remote_matches(repo_path: &Path, name: &str) -> bool {
+    let config_path = repo_path.join(".git").join("config");
+    if let Ok(content) = std::fs::read_to_string(&config_path) {
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if let Some(url) = trimmed.strip_prefix("url = ") {
+                if let Some(last_segment) = url.to_lowercase().rsplit('/').next() {
+                    let repo_name = last_segment.trim_end_matches(".git");
+                    if repo_name == name {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
 }
 
 // ---- Cloud Mount Detection ----

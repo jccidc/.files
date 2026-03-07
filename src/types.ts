@@ -82,6 +82,7 @@ export interface AppSettings {
   terminal_scrollback: number;
   pinned_paths: string[];
   github_pat: string;
+  github_repo_paths: Record<string, string>;  // full_name -> local path
   sidebar_section_order: string[];
   cloud_sources: CloudSource[];
 }

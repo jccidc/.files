@@ -190,14 +190,26 @@ function App() {
   useHotkeys(hotkeys);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      <Titlebar onOpenSettings={() => setSettingsOpen(true)} />
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {sidebarVisible && <Sidebar />}
-        <PanelContainer />
-        {previewPanelVisible && <PreviewPanel />}
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', position: 'relative' }}>
+      {/* Background base color — visible when panels are transparent */}
+      <div style={{ position: 'fixed', inset: 0, background: 'var(--void)', pointerEvents: 'none', zIndex: 0 }} />
+      {/* Background pattern overlay */}
+      <div style={{
+        position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
+        backgroundImage: 'var(--bg-pattern)',
+        backgroundSize: 'var(--bg-pattern-size)',
+        opacity: 'var(--bg-opacity)' as any,
+      }} />
+      {/* App content — above background layers */}
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', position: 'relative', zIndex: 1 }}>
+        <Titlebar onOpenSettings={() => setSettingsOpen(true)} />
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          {sidebarVisible && <Sidebar />}
+          <PanelContainer />
+          {previewPanelVisible && <PreviewPanel />}
+        </div>
+        <StatusBar />
       </div>
-      <StatusBar />
       <FuzzySearch open={searchOpen} onClose={() => setSearchOpen(false)} />
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>

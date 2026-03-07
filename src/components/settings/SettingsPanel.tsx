@@ -313,7 +313,7 @@ export function SettingsPanel({ open, onClose }: Props) {
               <div style={{ marginBottom: 8 }}>
                 <label style={labelStyle}>Sidebar: {Math.round((settings.sidebar_opacity ?? 1) * 100)}%</label>
                 <input
-                  type="range" min="50" max="100" value={Math.round((settings.sidebar_opacity ?? 1) * 100)}
+                  type="range" min="0" max="100" value={Math.round((settings.sidebar_opacity ?? 1) * 100)}
                   onChange={(e) => update({ sidebar_opacity: Number(e.target.value) / 100 })}
                   style={{ width: '100%', accentColor: 'var(--accent)' }}
                 />
@@ -321,7 +321,7 @@ export function SettingsPanel({ open, onClose }: Props) {
               <div style={{ marginBottom: 8 }}>
                 <label style={labelStyle}>Toolbar: {Math.round((settings.toolbar_opacity ?? 1) * 100)}%</label>
                 <input
-                  type="range" min="50" max="100" value={Math.round((settings.toolbar_opacity ?? 1) * 100)}
+                  type="range" min="0" max="100" value={Math.round((settings.toolbar_opacity ?? 1) * 100)}
                   onChange={(e) => update({ toolbar_opacity: Number(e.target.value) / 100 })}
                   style={{ width: '100%', accentColor: 'var(--accent)' }}
                 />
@@ -329,7 +329,7 @@ export function SettingsPanel({ open, onClose }: Props) {
               <div style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>Terminal: {Math.round((settings.terminal_opacity ?? 1) * 100)}%</label>
                 <input
-                  type="range" min="50" max="100" value={Math.round((settings.terminal_opacity ?? 1) * 100)}
+                  type="range" min="0" max="100" value={Math.round((settings.terminal_opacity ?? 1) * 100)}
                   onChange={(e) => update({ terminal_opacity: Number(e.target.value) / 100 })}
                   style={{ width: '100%', accentColor: 'var(--accent)' }}
                 />

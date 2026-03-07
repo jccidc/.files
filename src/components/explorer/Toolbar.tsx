@@ -351,8 +351,7 @@ export function Toolbar({ onRename, onDelete, sortField, sortAsc, onSort, filter
 
   return (
     <div style={{
-      background: 'var(--base)',
-      opacity: 'var(--toolbar-opacity)' as any,
+      background: 'var(--toolbar-bg, var(--base))',
       borderBottom: '1px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',

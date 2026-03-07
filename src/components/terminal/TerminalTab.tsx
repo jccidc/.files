@@ -108,8 +108,7 @@ export function TerminalTab({ tab }: { tab: Tab }) {
       ref={containerRef}
       style={{
         flex: 1,
-        background: 'var(--void)',
-        opacity: 'var(--terminal-opacity)' as any,
+        background: 'var(--terminal-bg, var(--void))',
         padding: 4,
         overflow: 'hidden',
       }}

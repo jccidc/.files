@@ -50,22 +50,10 @@ body,
 #root {
   height: 100%;
   overflow: hidden;
-  background: var(--void);
+  background: transparent;
   color: var(--t1);
   font-family: 'Outfit', sans-serif;
   font-size: 13px;
-}
-
-/* Background pattern overlay */
-#root::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: var(--bg-pattern);
-  background-size: var(--bg-pattern-size);
-  opacity: var(--bg-opacity);
-  pointer-events: none;
-  z-index: 0;
 }
 
 ::selection {

@@ -126,13 +126,25 @@ function PatSetup({ onSave }: { onSave: (pat: string) => void }) {
 
 // ---- GitHub Repo List ----
 
-function GitHubRepoList({ repos, loading, error, onClone, onRepoClick, cloning }: {
+function IconLink() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.3">
+      <path d="M4 6l2-2" />
+      <path d="M3 7.5A1.5 1.5 0 011.5 6L3 4.5A1.5 1.5 0 014.5 3" />
+      <path d="M7 2.5A1.5 1.5 0 018.5 4L7 5.5A1.5 1.5 0 015.5 7" />
+    </svg>
+  );
+}
+
+function GitHubRepoList({ repos, loading, error, onClone, onRepoClick, onLink, cloning, linkedRepos }: {
   repos: GitHubRepo[];
   loading: boolean;
   error: string | null;
   onClone: (repo: GitHubRepo) => void;
   onRepoClick: (repo: GitHubRepo) => void;
+  onLink: (repo: GitHubRepo) => void;
   cloning: string | null;
+  linkedRepos: Record<string, string>;
 }) {
   if (loading) {
     return <div style={{ padding: '4px 12px', fontSize: 11, color: 'var(--t3)' }}>Loading repos...</div>;
@@ -188,6 +200,11 @@ function GitHubRepoList({ repos, loading, error, onClone, onRepoClick, cloning }
               {r.stargazers_count > 0 && <span>* {r.stargazers_count}</span>}
             </div>
           </div>
+          {linkedRepos[r.full_name] && (
+            <span title={`Linked: ${linkedRepos[r.full_name]}`} style={{ color: 'var(--green)', flexShrink: 0, display: 'flex' }}>
+              <IconLink />
+            </span>
+          )}
           <span
             data-arrow
             style={{
@@ -197,6 +214,19 @@ function GitHubRepoList({ repos, loading, error, onClone, onRepoClick, cloning }
           >
             &rsaquo;
           </span>
+          <button
+            onClick={(e) => { e.stopPropagation(); onLink(r); }}
+            title="Link to local folder"
+            style={{
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              color: 'var(--t3)', padding: 4, borderRadius: 3,
+              display: 'flex', alignItems: 'center',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--t3)'; }}
+          >
+            <IconLink />
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); onClone(r); }}
             disabled={cloning === r.full_name}
@@ -222,6 +252,7 @@ function GitHubRepoList({ repos, loading, error, onClone, onRepoClick, cloning }
 export function CloudSources() {
   const navigate = useExplorerStore((s) => s.navigate);
   const githubPat = useSettingsStore((s) => s.settings.github_pat);
+  const githubRepoPaths = useSettingsStore((s) => s.settings.github_repo_paths) || {};
   const customSources = useSettingsStore((s) => s.settings.cloud_sources) || [];
   const updateSettings = useSettingsStore((s) => s.update);
 
@@ -276,16 +307,37 @@ export function CloudSources() {
   };
 
   const handleRepoClick = async (repo: GitHubRepo) => {
+    // 1. Check saved repo-path mapping first
+    const repoMap = useSettingsStore.getState().settings.github_repo_paths || {};
+    const savedPath = repoMap[repo.full_name];
+    if (savedPath) {
+      navigate(savedPath);
+      return;
+    }
+    // 2. Auto-detect via Rust scan
     try {
       const localPath = await findLocalRepo(repo.name);
       if (localPath) {
+        // Save the mapping for future use
+        await updateSettings({ github_repo_paths: { ...repoMap, [repo.full_name]: localPath } });
         navigate(localPath);
-      } else {
-        handleClone(repo);
+        return;
       }
-    } catch {
-      handleClone(repo);
-    }
+    } catch {}
+    // 3. Fall back to clone dialog
+    handleClone(repo);
+  };
+
+  const handleLink = async (repo: GitHubRepo) => {
+    // Open a dialog to pick a local folder
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const selected = await open({ directory: true, title: `Link ${repo.name} to local folder` });
+      if (selected && typeof selected === 'string') {
+        const repoMap = useSettingsStore.getState().settings.github_repo_paths || {};
+        await updateSettings({ github_repo_paths: { ...repoMap, [repo.full_name]: selected } });
+      }
+    } catch {}
   };
 
   const handleClone = async (repo: GitHubRepo) => {
@@ -397,7 +449,9 @@ export function CloudSources() {
               error={reposError}
               onClone={handleClone}
               onRepoClick={handleRepoClick}
+              onLink={handleLink}
               cloning={cloning}
+              linkedRepos={githubRepoPaths}
             />
           )}
 
