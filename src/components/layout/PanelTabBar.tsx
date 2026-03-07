@@ -37,6 +37,15 @@ function IconPlus() {
   );
 }
 
+function IconPreview() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--accent)" strokeWidth="1.5">
+      <circle cx="8" cy="8" r="5" />
+      <circle cx="8" cy="8" r="2" fill="var(--accent)" stroke="none" />
+    </svg>
+  );
+}
+
 function IconSplitH() {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2">
@@ -88,7 +97,7 @@ function PanelTabItem({ tab, panelId }: { tab: Tab; panelId: string }) {
       onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--hover)'; }}
       onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
     >
-      {tab.type === 'explorer' ? <IconFolder /> : <IconTerminal />}
+      {tab.type === 'explorer' ? <IconFolder /> : tab.type === 'terminal' ? <IconTerminal /> : <IconPreview />}
       <span>{tab.title}</span>
       {!tab.pinned && (
         <div
@@ -123,6 +132,12 @@ export function PanelTabBar({ panelId }: Props) {
   const handleNewExplorer = () => {
     addTab(panelId, {
       id: crypto.randomUUID(), type: 'explorer', title: 'Explorer', path: 'C:\\', pinned: false,
+    });
+  };
+
+  const handleNewTerminal = () => {
+    addTab(panelId, {
+      id: crypto.randomUUID(), type: 'terminal', title: 'Terminal', pinned: false,
     });
   };
 
@@ -184,11 +199,17 @@ export function PanelTabBar({ panelId }: Props) {
           <PanelTabItem key={tab.id} tab={tab} panelId={panelId} />
         ))}
       </div>
-      <button onClick={handleNewExplorer} style={smallBtn} title="New tab"
+      <button onClick={handleNewExplorer} style={smallBtn} title="New explorer tab"
         onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--t1)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--t3)'; }}
       >
         <IconPlus />
+      </button>
+      <button onClick={handleNewTerminal} style={smallBtn} title="New terminal (Ctrl+Shift+T)"
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--green)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--t3)'; }}
+      >
+        <IconTerminal />
       </button>
       <button onClick={handleSplitH} style={smallBtn} title="Split right (Ctrl+Shift+D)"
         onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--t1)'; }}
