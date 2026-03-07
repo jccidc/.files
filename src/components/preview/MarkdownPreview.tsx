@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react';
-import { marked } from 'marked';
+import { Marked } from 'marked';
 import { readTextFile } from '../../api/filesystem';
 
 interface Props {
   path: string;
 }
 
-marked.setOptions({
-  gfm: true,
-  breaks: true,
-});
+const md = new Marked({ gfm: true, breaks: true });
 
 export function MarkdownPreview({ path }: Props) {
   const [html, setHtml] = useState<string | null>(null);
@@ -24,7 +21,7 @@ export function MarkdownPreview({ path }: Props) {
     readTextFile(path, 524288)
       .then(async (content) => {
         if (cancelled) return;
-        const result = await marked.parse(content);
+        const result = await md.parse(content);
         setHtml(result);
       })
       .catch((e) => { if (!cancelled) setError(String(e)); })
