@@ -12,7 +12,8 @@ interface Props {
 export function PanelContent({ panelId }: Props) {
   const panel = usePanelsStore((s) => s.panels[panelId]);
   const closePanel = useLayoutStore((s) => s.closePanel);
-  const panelIds = useLayoutStore((s) => s.getPanelIds());
+  const tree = useLayoutStore((s) => s.tree);
+  const panelIds = useLayoutStore.getState().getPanelIds();
   const focusPanel = usePanelsStore((s) => s.focusPanel);
 
   const activeTab = panel?.tabs.find((t) => t.id === panel.activeTabId);
