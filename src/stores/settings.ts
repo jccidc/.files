@@ -24,6 +24,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   terminal_font_size: 13,
   terminal_cursor_style: 'block',
   terminal_scrollback: 5000,
+  pinned_paths: [],
 };
 
 interface SettingsState {

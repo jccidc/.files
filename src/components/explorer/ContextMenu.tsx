@@ -11,6 +11,8 @@ interface ContextMenuProps {
   onRefresh: () => void;
   onNewTerminal: (cwd: string) => void;
   onPreviewInTab?: (entry: FileEntry) => void;
+  onPinToQuickAccess?: (path: string) => void;
+  isPinned?: (path: string) => boolean;
 }
 
 interface MenuItem {
@@ -21,7 +23,7 @@ interface MenuItem {
   danger?: boolean;
 }
 
-export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefresh, onNewTerminal, onPreviewInTab }: ContextMenuProps) {
+export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefresh, onNewTerminal, onPreviewInTab, onPinToQuickAccess, isPinned }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,6 +56,13 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
       items.push({ label: 'Preview in Tab', action: () => { onPreviewInTab(entry); onClose(); } });
     }
     items.push({ label: 'Copy Path', shortcut: 'Ctrl+Shift+C', action: () => { onCopyPath(entry.path); onClose(); } });
+    if (entry.is_dir && onPinToQuickAccess) {
+      const pinned = isPinned?.(entry.path);
+      items.push({
+        label: pinned ? 'Unpin from Quick Access' : 'Pin to Quick Access',
+        action: () => { onPinToQuickAccess(entry.path); onClose(); },
+      });
+    }
     items.push({ label: '', action: () => {}, separator: true });
     items.push({ label: 'Rename', shortcut: 'F2', action: () => {
       onClose();

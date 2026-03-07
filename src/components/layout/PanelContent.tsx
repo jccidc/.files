@@ -12,7 +12,6 @@ interface Props {
 export function PanelContent({ panelId }: Props) {
   const panel = usePanelsStore((s) => s.panels[panelId]);
   const closePanel = useLayoutStore((s) => s.closePanel);
-  const tree = useLayoutStore((s) => s.tree);
   const panelIds = useLayoutStore.getState().getPanelIds();
   const focusPanel = usePanelsStore((s) => s.focusPanel);
 
@@ -56,6 +55,7 @@ export function PanelContent({ panelId }: Props) {
               created: '',
               extension: activeTab.previewPath.split('.').pop() || null,
               readonly: false,
+              children_count: null,
             }}
           />
         )}

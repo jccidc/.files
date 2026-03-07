@@ -22,7 +22,7 @@ Windows-native file explorer replacement built on Tauri v2 with a React/TypeScri
 
 ## Rejected / Deferred to v2
 
-- Cloud OAuth integration (GDrive/OneDrive already mount as local drives)
+- Cloud OAuth for GDrive/OneDrive (detect local mounts instead; GitHub auth via device flow)
 - Tantivy full-text search index (walkdir + fuzzy-matcher is enough for v1)
 - File tags system
 - Multi-window tab tear-off (keep splits within single window)
@@ -308,19 +308,30 @@ Settings:       JSON via serde (Rust) + Zustand persist (frontend)
 - Space bar quick preview (overlay, press Space/Esc to dismiss)
 - Preview as toggleable right panel OR independent tab
 
-### Phase 6 — Git Integration
-**Goal:** Full Git client in sidebar.
+### Phase 6 — Git, Cloud Sources & Quick Access
+**Goal:** Full Git client, cloud repo browsing, and pinnable Quick Access.
 
+**Pin to Quick Access:**
+- Right-click folder > "Pin to Quick Access" (context menu action)
+- Pinned paths persisted in AppSettings (Rust + Zustand)
+- Sidebar Quick Access section shows pinned items with unpin option
+- Drag to reorder pinned items
+
+**Git Integration:**
 - Rust: git2 crate for local operations (status, stage, unstage, commit, diff, branch)
-- GitHub REST API via reqwest: auth (device flow or PAT), list repos, clone
-- GitPanel sidebar section: auth status, repo browser, branch selector
-- Staged/unstaged file lists with stage/unstage buttons
+- GitPanel sidebar section: branch selector, staged/unstaged file lists
 - Inline diff viewer (add/remove highlighting, hunk headers)
 - Commit dialog with message input
 - Push/pull/stash actions
 - Git status icons on file rows (modified, staged, untracked, conflict)
 - Branch + ahead/behind in status bar
 - Context menu git actions: stage, diff, discard changes
+
+**Cloud Sources:**
+- GitHub REST API via reqwest: device flow OAuth or PAT auth
+- GitHub sidebar section: auth status, repo browser, clone to local
+- OneDrive/Google Drive: detect local mount paths, add as sidebar sources
+- Cloud source entries in sidebar SOURCES section with auth badges
 
 ### Phase 7 — Windows Integration & Release
 **Goal:** Replace Windows Explorer, ship installer.

@@ -12,6 +12,7 @@ pub struct FileEntry {
     pub created: String,
     pub extension: Option<String>,
     pub readonly: bool,
+    pub children_count: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]

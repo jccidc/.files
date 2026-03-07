@@ -1,4 +1,5 @@
 import type { FileEntry } from '../../types';
+import { FileIcon } from '../common/FileIcon';
 
 function formatSize(bytes: number): string {
   if (bytes === 0) return '--';
@@ -33,8 +34,6 @@ function GridCard({
   onContextMenu: (e: React.MouseEvent) => void;
   onDragStart: (e: React.DragEvent) => void;
 }) {
-  const ext = (entry.extension || '').toLowerCase();
-
   return (
     <div
       draggable
@@ -63,21 +62,7 @@ function GridCard({
     >
       {/* Icon */}
       <div style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {entry.is_dir ? (
-          <svg width="40" height="40" viewBox="0 0 16 16" fill="var(--yellow)" stroke="none">
-            <path d="M1.5 3a1 1 0 011-1H6l1.5 1.5H13.5a1 1 0 011 1V13a1 1 0 01-1 1h-12a1 1 0 01-1-1V3z" />
-          </svg>
-        ) : (
-          <svg width="36" height="36" viewBox="0 0 16 16" fill="none" stroke="var(--t3)" strokeWidth="0.8">
-            <path d="M4 1.5h5l3.5 3.5V14a1 1 0 01-1 1H4a1 1 0 01-1-1V2.5a1 1 0 011-1z" />
-            <text
-              x="8" y="11" textAnchor="middle" fill="var(--t3)" stroke="none"
-              style={{ fontSize: '3.5px', fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}
-            >
-              {ext.toUpperCase().slice(0, 4)}
-            </text>
-          </svg>
-        )}
+        <FileIcon entry={entry} size={entry.is_dir ? 40 : 36} />
       </div>
 
       {/* Name */}

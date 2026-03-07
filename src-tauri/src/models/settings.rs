@@ -42,6 +42,8 @@ pub struct AppSettings {
     pub terminal_cursor_style: String,
     #[serde(default = "default_scrollback")]
     pub terminal_scrollback: u32,
+    #[serde(default)]
+    pub pinned_paths: Vec<String>,
 }
 
 fn default_theme() -> String { "dotfiles-dark".to_string() }
@@ -83,6 +85,7 @@ impl Default for AppSettings {
             terminal_font_size: default_font_size(),
             terminal_cursor_style: default_cursor(),
             terminal_scrollback: default_scrollback(),
+            pinned_paths: Vec::new(),
         }
     }
 }

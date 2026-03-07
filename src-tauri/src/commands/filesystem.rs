@@ -42,10 +42,17 @@ fn build_file_entry(path: &Path) -> Result<FileEntry, String> {
         })
         .unwrap_or_default();
 
+    let is_dir = metadata.is_dir();
+    let children_count = if is_dir {
+        std::fs::read_dir(path).ok().map(|rd| rd.count() as u32)
+    } else {
+        None
+    };
+
     Ok(FileEntry {
         name,
         path: path.to_string_lossy().to_string(),
-        is_dir: metadata.is_dir(),
+        is_dir,
         is_hidden: path_utils::is_hidden(path),
         is_symlink,
         size: metadata.len(),
@@ -53,6 +60,7 @@ fn build_file_entry(path: &Path) -> Result<FileEntry, String> {
         created,
         extension,
         readonly: metadata.permissions().readonly(),
+        children_count,
     })
 }
 

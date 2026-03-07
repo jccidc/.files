@@ -1,4 +1,5 @@
 import { useExplorerStore } from '../../stores/explorer';
+import { useGitStore } from '../../stores/git';
 
 function IconList() {
   return (
@@ -19,10 +20,18 @@ function IconGrid() {
 
 export function StatusBar() {
   const currentPath = useExplorerStore((s) => s.currentPath);
-  const count = useExplorerStore((s) => s.entries.length);
+  const entries = useExplorerStore((s) => s.entries);
+  const count = entries.length;
   const selected = useExplorerStore((s) => s.selectedPaths.size);
   const viewMode = useExplorerStore((s) => s.viewMode);
   const setViewMode = useExplorerStore((s) => s.setViewMode);
+
+  const repoInfo = useGitStore((s) => s.repoInfo);
+  const dirCount = entries.filter((e) => e.is_dir).length;
+  const fileCount = count - dirCount;
+
+  const segments = currentPath.replace(/\\/g, '/').split('/').filter(Boolean);
+  const folderName = segments[segments.length - 1] || currentPath;
 
   const btnStyle = (active: boolean): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -38,12 +47,43 @@ export function StatusBar() {
       alignItems: 'center', justifyContent: 'space-between',
       padding: '0 12px', fontSize: 11, color: 'var(--t3)', userSelect: 'none',
     }}>
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {currentPath}
-      </span>
+      {/* Left: mode + branch + folder name */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+        <span style={{ color: 'var(--accent)', fontWeight: 500 }}>Explorer</span>
+        {repoInfo?.is_repo && repoInfo.branch && (
+          <>
+            <span style={{ color: 'var(--border)' }}>|</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="var(--t2)" strokeWidth="1.3" style={{ flexShrink: 0 }}>
+                <circle cx="3" cy="3" r="1.5" /><circle cx="3" cy="9" r="1.5" />
+                <circle cx="9" cy="3" r="1.5" /><line x1="3" y1="4.5" x2="3" y2="7.5" />
+                <path d="M9 4.5C9 6 7 6 3 7.5" />
+              </svg>
+              <span style={{ color: 'var(--t1)' }}>{repoInfo.branch}</span>
+              {(repoInfo.ahead > 0 || repoInfo.behind > 0) && (
+                <span style={{ fontSize: 10 }}>
+                  {repoInfo.ahead > 0 && <span style={{ color: 'var(--green)' }}>+{repoInfo.ahead}</span>}
+                  {repoInfo.behind > 0 && <span style={{ color: 'var(--red)' }}>-{repoInfo.behind}</span>}
+                </span>
+              )}
+            </span>
+          </>
+        )}
+        <span style={{ color: 'var(--border)' }}>|</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {folderName}
+        </span>
+      </div>
+
+      {/* Right: counts + view toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
         {selected > 0 && <span style={{ color: 'var(--accent)' }}>{selected} selected</span>}
-        <span>{count} item{count !== 1 ? 's' : ''}</span>
+        <span>
+          {dirCount > 0 && `${dirCount} folder${dirCount !== 1 ? 's' : ''}`}
+          {dirCount > 0 && fileCount > 0 && ', '}
+          {fileCount > 0 && `${fileCount} file${fileCount !== 1 ? 's' : ''}`}
+          {count === 0 && '0 items'}
+        </span>
         <div style={{ display: 'flex', gap: 2 }}>
           <button style={btnStyle(viewMode === 'list')} onClick={() => setViewMode('list')} title="List view">
             <IconList />

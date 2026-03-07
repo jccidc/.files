@@ -9,6 +9,7 @@ export interface FileEntry {
   created: string;
   extension: string | null;
   readonly: boolean;
+  children_count: number | null;
 }
 
 export interface DirListing {
@@ -49,6 +50,7 @@ export interface AppSettings {
   terminal_font_size: number;
   terminal_cursor_style: string;
   terminal_scrollback: number;
+  pinned_paths: string[];
 }
 
 export type TabType = 'explorer' | 'terminal' | 'preview';

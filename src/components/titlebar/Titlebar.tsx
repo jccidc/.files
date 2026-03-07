@@ -108,13 +108,26 @@ export function Titlebar({ onOpenSettings }: Props) {
             padding: '4px 16px',
             color: 'var(--t3)',
             fontSize: 12,
-            minWidth: 200,
+            minWidth: 280,
             textAlign: 'center',
             pointerEvents: 'auto',
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
           }}
         >
-          Search files...
+          <span>Search files & commands...</span>
+          <kbd style={{
+            background: 'var(--base)',
+            border: '1px solid var(--border)',
+            borderRadius: 3,
+            padding: '1px 5px',
+            fontSize: 10,
+            color: 'var(--t3)',
+            fontFamily: "'JetBrains Mono', monospace",
+          }}>Ctrl+K</kbd>
         </div>
       </div>
 

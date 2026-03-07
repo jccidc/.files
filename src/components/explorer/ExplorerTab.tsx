@@ -11,26 +11,11 @@ import { FileGrid } from './FileGrid';
 import { BatchRename } from './BatchRename';
 import { QuickPreview } from '../preview/QuickPreview';
 import { usePreviewStore } from '../../stores/preview';
+import { FileIcon } from '../common/FileIcon';
+import { useGitStore } from '../../stores/git';
 import type { Tab, FileEntry } from '../../types';
 
 const ROW_HEIGHT = 30;
-
-function IconFolderSmall() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="var(--yellow)" stroke="none">
-      <path d="M1.5 3a1 1 0 011-1H6l1.5 1.5H13.5a1 1 0 011 1V13a1 1 0 01-1 1h-12a1 1 0 01-1-1V3z" />
-    </svg>
-  );
-}
-
-function IconFile() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--t3)" strokeWidth="1.2">
-      <path d="M4 1.5h5l3.5 3.5V14a1 1 0 01-1 1H4a1 1 0 01-1-1V2.5a1 1 0 011-1z" />
-      <polyline points="9,1.5 9,5.5 12.5,5.5" fill="none" />
-    </svg>
-  );
-}
 
 function IconChevron({ expanded }: { expanded?: boolean }) {
   return (
@@ -239,7 +224,7 @@ function PeekRow({ entry, depth, onNavigate }: { entry: FileEntry; depth: number
       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', paddingLeft: 12 + depth * 20, overflow: 'hidden' }}>
-        {entry.is_dir ? <IconFolderSmall /> : <IconFile />}
+        <FileIcon entry={entry} />
         <span style={{
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           color: entry.is_hidden ? 'var(--t3)' : 'var(--t2)', fontSize: 12,
@@ -267,6 +252,7 @@ interface FileRowProps {
   peekOpen: boolean;
   peekEnabled: boolean;
   colWidths: string;
+  gitStatus?: string;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
@@ -277,7 +263,15 @@ interface FileRowProps {
   onDragStart: (e: React.DragEvent) => void;
 }
 
-function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWidths, onClick, onDoubleClick, onContextMenu, onRenameDone, onHover, onHoverEnd, onPeekToggle, onDragStart }: FileRowProps) {
+const gitStatusColors: Record<string, string> = {
+  modified: 'var(--yellow)', added: 'var(--green)', deleted: 'var(--red)',
+  renamed: 'var(--cyan)', untracked: 'var(--t3)', conflict: 'var(--red)', typechange: 'var(--purple)',
+};
+const gitStatusLetters: Record<string, string> = {
+  modified: 'M', added: 'A', deleted: 'D', renamed: 'R', untracked: '?', conflict: '!', typechange: 'T',
+};
+
+function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWidths, gitStatus: gs, onClick, onDoubleClick, onContextMenu, onRenameDone, onHover, onHoverEnd, onPeekToggle, onDragStart }: FileRowProps) {
   return (
     <div
       draggable
@@ -309,7 +303,7 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
             <IconChevron expanded={peekOpen} />
           </span>
         )}
-        {entry.is_dir ? <IconFolderSmall /> : <IconFile />}
+        <FileIcon entry={entry} />
         {renaming ? (
           <InlineRename entry={entry} onDone={onRenameDone} />
         ) : (
@@ -318,14 +312,24 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
             color: entry.is_hidden ? 'var(--t3)' : 'var(--t1)', fontSize: 12,
           }}>
             {entry.name}
+            {entry.is_dir && entry.children_count != null && (
+              <span style={{ color: 'var(--t3)', fontSize: 11, marginLeft: 6 }}>
+                {entry.children_count}
+              </span>
+            )}
           </span>
         )}
       </div>
       <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 12px' }}>
         {entry.is_dir ? '--' : formatSize(entry.size)}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 12px' }}>
-        {formatDate(entry.modified)}
+      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span>{formatDate(entry.modified)}</span>
+        {gs && (
+          <span style={{ color: gitStatusColors[gs] || 'var(--t3)', fontWeight: 600, fontSize: 10, marginLeft: 4 }}>
+            {gitStatusLetters[gs] || ''}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -422,6 +426,10 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const [batchRenameOpen, setBatchRenameOpen] = useState(false);
   const { updateTab: panelUpdateTab, addTab: panelAddTab } = usePanelsStore();
   const followSelection = usePreviewStore((s) => s.followSelection);
+  const pinnedPaths = useSettingsStore((s) => s.settings.pinned_paths);
+  const updateSettings = useSettingsStore((s) => s.update);
+  const gitFiles = useGitStore((s) => s.files);
+  const gitRepoInfo = useGitStore((s) => s.repoInfo);
 
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
   const [sortField, setSortField] = useState<SortField>('name');
@@ -442,6 +450,24 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const [modColW, setModColW] = useState(140);
 
   const colWidths = `1fr ${sizeColW}px ${modColW}px`;
+
+  // Build git status lookup: filename -> status
+  const gitStatusMap = new Map<string, string>();
+  if (gitRepoInfo?.is_repo && gitRepoInfo.root) {
+    const repoRoot = gitRepoInfo.root.replace(/\\/g, '/').replace(/\/$/, '');
+    const curNorm = currentPath.replace(/\\/g, '/').replace(/\/$/, '');
+    for (const gf of gitFiles) {
+      // gf.path is relative to repo root (forward slashes)
+      const absPath = repoRoot + '/' + gf.path;
+      // Get just the filename portion for the current directory
+      const dirOfFile = absPath.substring(0, absPath.lastIndexOf('/'));
+      if (dirOfFile === curNorm) {
+        const name = absPath.substring(absPath.lastIndexOf('/') + 1);
+        // Prefer showing unstaged status, but if only staged show that
+        if (!gitStatusMap.has(name)) gitStatusMap.set(name, gf.status);
+      }
+    }
+  }
 
   const sortedEntries = sortEntries(entries, sortField, sortAsc);
 
@@ -635,6 +661,15 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   };
 
   const handleCopyPath = (path: string) => navigator.clipboard.writeText(path).catch(() => {});
+  const handlePinToggle = (path: string) => {
+    const current = pinnedPaths || [];
+    if (current.includes(path)) {
+      updateSettings({ pinned_paths: current.filter((p) => p !== path) });
+    } else {
+      updateSettings({ pinned_paths: [...current, path] });
+    }
+  };
+  const isPathPinned = (path: string) => (pinnedPaths || []).includes(path);
   const handleNewTerminal = (cwd: string) => {
     if (panelId) {
       panelAddTab(panelId, { id: crypto.randomUUID(), type: 'terminal', title: 'Terminal', path: cwd, pinned: false });
@@ -718,6 +753,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
                     peekOpen={peekPaths.has(item.entry.path)}
                     peekEnabled={peekEnabled && item.entry.is_dir}
                     colWidths={colWidths}
+                    gitStatus={gitStatusMap.get(item.entry.name)}
                     onClick={(e) => handleRowClick(item.entry, globalIdx, e)}
                     onDoubleClick={() => handleDoubleClick(item.entry)}
                     onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, entry: item.entry }); }}
@@ -782,6 +818,8 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
               });
             }
           }}
+          onPinToQuickAccess={handlePinToggle}
+          isPinned={isPathPinned}
         />
       )}
     </div>
