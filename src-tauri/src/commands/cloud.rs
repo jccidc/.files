@@ -183,25 +183,8 @@ pub fn detect_cloud_mounts() -> Vec<CloudMount> {
         }
     }
 
-    // Google Drive - check common mount points and resolve .lnk shortcuts
-    let gdrive_paths = [
-        format!("{}\\Google Drive", &user_profile),
-        format!("{}\\My Drive", &user_profile),
-        "G:\\My Drive".to_string(),
-    ];
-    for gp in &gdrive_paths {
-        let normalized = gp.replace('/', "\\");
-        if Path::new(&normalized).is_dir() && !is_gdfs_root(Path::new(&normalized)) {
-            if !mounts.iter().any(|m| m.path == normalized) {
-                mounts.push(CloudMount {
-                    provider: "gdrive".into(),
-                    label: "Google Drive".into(),
-                    path: normalized,
-                });
-            }
-        }
-    }
-    // Also check GDFS root (G:\) for .lnk shortcuts pointing to real My Drive
+    // Google Drive - first try resolving .lnk shortcuts from GDFS roots (G:\, H:\)
+    // These resolve to the REAL paths that contain actual files, not virtual GDFS paths
     for drive_letter in &["G:\\", "H:\\"] {
         let root = Path::new(drive_letter);
         if root.is_dir() && is_gdfs_root(root) {
@@ -222,6 +205,26 @@ pub fn detect_cloud_mounts() -> Vec<CloudMount> {
                             });
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // Fallback: check common non-GDFS Google Drive paths (only if no GDFS mounts found)
+    if !mounts.iter().any(|m| m.provider == "gdrive") {
+        let gdrive_paths = [
+            format!("{}\\Google Drive", &user_profile),
+            format!("{}\\My Drive", &user_profile),
+        ];
+        for gp in &gdrive_paths {
+            let normalized = gp.replace('/', "\\");
+            if Path::new(&normalized).is_dir() && !is_gdfs_root(Path::new(&normalized)) {
+                if !mounts.iter().any(|m| m.path == normalized) {
+                    mounts.push(CloudMount {
+                        provider: "gdrive".into(),
+                        label: "Google Drive".into(),
+                        path: normalized,
+                    });
                 }
             }
         }
