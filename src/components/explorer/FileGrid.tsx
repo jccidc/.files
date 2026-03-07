@@ -1,6 +1,13 @@
 import type { FileEntry } from '../../types';
 import { FileIcon } from '../common/FileIcon';
 
+function gridDisplayName(entry: FileEntry): string {
+  if ((entry.extension || '').toLowerCase() === 'lnk') {
+    return entry.name.replace(/\.lnk$/i, '');
+  }
+  return entry.name;
+}
+
 function formatSize(bytes: number): string {
   if (bytes === 0) return '--';
   if (bytes < 1024) return bytes + ' B';
@@ -71,7 +78,7 @@ function GridCard({
         color: entry.is_hidden ? 'var(--t3)' : 'var(--t1)',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
-        {entry.name}
+        {gridDisplayName(entry)}
       </div>
 
       {/* Size */}

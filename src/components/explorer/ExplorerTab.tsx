@@ -17,6 +17,14 @@ import type { Tab, FileEntry } from '../../types';
 
 const ROW_HEIGHT = 30;
 
+/** Strip .lnk extension for cleaner display */
+function displayName(entry: FileEntry): string {
+  if ((entry.extension || '').toLowerCase() === 'lnk') {
+    return entry.name.replace(/\.lnk$/i, '');
+  }
+  return entry.name;
+}
+
 function IconChevron({ expanded }: { expanded?: boolean }) {
   return (
     <svg
@@ -82,7 +90,7 @@ function HoverTooltip({ entry, x, y }: { entry: FileEntry; x: number; y: number 
       padding: '8px 12px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
       pointerEvents: 'none', maxWidth: 320, fontSize: 11,
     }}>
-      <div style={{ fontWeight: 500, color: 'var(--t1)', marginBottom: 4, wordBreak: 'break-all' }}>{entry.name}</div>
+      <div style={{ fontWeight: 500, color: 'var(--t1)', marginBottom: 4, wordBreak: 'break-all' }}>{displayName(entry)}</div>
       <div style={{ color: 'var(--t3)', lineHeight: 1.6 }}>
         {entry.is_dir ? 'Folder' : `${(entry.extension || '').toUpperCase()} File`}
         {!entry.is_dir && <span> -- {formatSize(entry.size)}</span>}
@@ -155,7 +163,7 @@ function PeekRow({ entry, selected, colWidths, onClick, onDoubleClick }: {
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           color: entry.is_hidden ? 'var(--t3)' : 'var(--t2)', fontSize: 12,
         }}>
-          {entry.name}
+          {displayName(entry)}
         </span>
       </div>
       <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 12px' }}>
@@ -237,7 +245,7 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             color: entry.is_hidden ? 'var(--t3)' : 'var(--t1)', fontSize: 12,
           }}>
-            {entry.name}
+            {displayName(entry)}
             {entry.is_dir && entry.children_count != null && (
               <span style={{ color: 'var(--t3)', fontSize: 11, marginLeft: 6 }}>
                 {entry.children_count}

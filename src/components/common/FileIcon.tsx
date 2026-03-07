@@ -52,6 +52,16 @@ export function FileIcon({ entry, size = 16 }: { entry: FileEntry; size?: number
     );
   }
 
+  // .lnk shortcut — show as folder with arrow overlay
+  if ((entry.extension || '').toLowerCase() === 'lnk') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+        <path d="M1.5 3a1 1 0 011-1H6l1.5 1.5H13.5a1 1 0 011 1V13a1 1 0 01-1 1h-12a1 1 0 01-1-1V3z" fill="var(--warm)" opacity="0.7" />
+        <path d="M7 7l3 2.5L7 12" stroke="var(--accent)" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+
   const ext = (entry.extension || '').toLowerCase();
   const showLabel = size >= 32;
 
