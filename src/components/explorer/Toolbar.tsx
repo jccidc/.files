@@ -14,6 +14,7 @@ interface ToolbarProps {
   onFilterChange: (text: string) => void;
   groupBy: GroupBy;
   onGroupByChange: (g: GroupBy) => void;
+  onSearch: () => void;
 }
 
 // -- Icon components (14x14, strokeWidth 1.5) --
@@ -255,7 +256,7 @@ const GROUP_OPTIONS: { key: GroupBy; label: string }[] = [
 
 // -- Component --
 
-export function Toolbar({ onRename, onDelete, sortField, sortAsc, onSort, filterText, onFilterChange, groupBy, onGroupByChange }: ToolbarProps) {
+export function Toolbar({ onRename, onDelete, sortField, sortAsc, onSort, filterText, onFilterChange, groupBy, onGroupByChange, onSearch }: ToolbarProps) {
   const currentPath = useExplorerStore((s) => s.currentPath);
   const navigate = useExplorerStore((s) => s.navigate);
   const canGoBack = useExplorerStore((s) => s.canGoBack);
@@ -657,13 +658,13 @@ export function Toolbar({ onRename, onDelete, sortField, sortAsc, onSort, filter
           </div>
         )}
 
-        {/* Search icon (activates filter) */}
+        {/* Search (opens fuzzy search modal) */}
         <button
           style={btnBase}
-          onClick={() => { if (!filterOpen) setFilterOpen(true); filterInputRef.current?.focus(); }}
+          onClick={onSearch}
           onMouseEnter={handleBtnHover}
           onMouseLeave={(e) => handleBtnLeave(e)}
-          title="Search in folder"
+          title="Search files (Ctrl+P)"
         >
           <IconSearch />
         </button>

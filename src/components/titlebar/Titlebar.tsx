@@ -90,46 +90,8 @@ export function Titlebar({ onOpenSettings }: Props) {
         </span>
       </div>
 
-      {/* Center: search placeholder */}
-      <div
-        data-tauri-drag-region
-        style={{
-          flex: 1,
-          display: 'flex',
-          justifyContent: 'center',
-          pointerEvents: 'none',
-        }}
-      >
-        <div
-          style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-            padding: '4px 16px',
-            color: 'var(--t3)',
-            fontSize: 12,
-            minWidth: 280,
-            textAlign: 'center',
-            pointerEvents: 'auto',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-          }}
-        >
-          <span>Search files & commands...</span>
-          <kbd style={{
-            background: 'var(--base)',
-            border: '1px solid var(--border)',
-            borderRadius: 3,
-            padding: '1px 5px',
-            fontSize: 10,
-            color: 'var(--t3)',
-            fontFamily: "'JetBrains Mono', monospace",
-          }}>Ctrl+K</kbd>
-        </div>
-      </div>
+      {/* Center: drag region spacer */}
+      <div data-tauri-drag-region style={{ flex: 1 }} />
 
       {/* Right: action buttons + window controls */}
       <div style={{ display: 'flex', alignItems: 'center' }}>

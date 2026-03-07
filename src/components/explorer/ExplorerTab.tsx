@@ -717,6 +717,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         onFilterChange={setFilterText}
         groupBy={groupBy}
         onGroupByChange={setGroupBy}
+        onSearch={() => window.dispatchEvent(new CustomEvent('open-fuzzy-search'))}
       />
 
       {/* Column headers with resize handles */}

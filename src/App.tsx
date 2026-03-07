@@ -30,6 +30,13 @@ function App() {
 
   useTheme();
 
+  // Listen for search event from toolbar
+  useEffect(() => {
+    const handler = () => setSearchOpen(true);
+    window.addEventListener('open-fuzzy-search', handler);
+    return () => window.removeEventListener('open-fuzzy-search', handler);
+  }, []);
+
   // Initialize default panel on first launch
   useEffect(() => {
     load();
