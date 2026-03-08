@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import './theme/tokens.css';
 import { Titlebar } from './components/titlebar/Titlebar';
 import { Sidebar } from './components/sidebar/Sidebar';
@@ -46,6 +47,23 @@ function App() {
         { id: crypto.randomUUID(), type: 'explorer', title: 'Explorer', path: 'C:\\', pinned: false },
       ]);
     }
+  }, []);
+
+  // Listen for single-instance folder open
+  useEffect(() => {
+    const unlisten = listen<string>('open-folder', (event) => {
+      const folderPath = event.payload;
+      if (!folderPath) return;
+      const pid = usePanelsStore.getState().focusedPanelId || DEFAULT_PANEL_ID;
+      usePanelsStore.getState().addTab(pid, {
+        id: crypto.randomUUID(),
+        type: 'explorer',
+        title: folderPath.split('\\').pop() || 'Explorer',
+        path: folderPath,
+        pinned: false,
+      });
+    });
+    return () => { unlisten.then((fn) => fn()); };
   }, []);
 
   const hotkeys = useMemo(
