@@ -130,7 +130,7 @@ export function SettingsPanel({ open, onClose }: Props) {
 
   const startNewTheme = () => {
     const baseT = THEMES[baseThemeId] || THEMES['dotfiles-dark'];
-    const id = `custom-${Date.now()}`;
+    const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     setSmartColors({
       base: baseT.base, surface: baseT.surface, t1: baseT.t1,
       accent: baseT.accent, border: baseT.border, warm: baseT.warm,
@@ -158,7 +158,7 @@ export function SettingsPanel({ open, onClose }: Props) {
     } else {
       updated.push(editingTheme);
     }
-    update({ custom_themes: updated as any, theme: editingTheme.id });
+    update({ custom_themes: updated, theme: editingTheme.id });
     setEditingTheme(null);
   };
 
@@ -171,7 +171,7 @@ export function SettingsPanel({ open, onClose }: Props) {
 
   const deleteCustomTheme = (id: string) => {
     const updated = customThemes.filter(t => t.id !== id);
-    const patch: Partial<typeof settings> = { custom_themes: updated as any };
+    const patch: Partial<typeof settings> = { custom_themes: updated };
     if (settings.theme === id) patch.theme = 'dotfiles-dark';
     update(patch);
   };
@@ -188,14 +188,14 @@ export function SettingsPanel({ open, onClose }: Props) {
     derived.id = editingTheme.id;
     derived.name = editingTheme.name;
     setEditingTheme(derived);
-    applyTheme(derived);
+    applyTheme(derived, settings.accent_color || undefined);
   };
 
   const handleAdvancedChange = (key: keyof ThemeTokens, value: string) => {
     if (!editingTheme) return;
     const updated = { ...editingTheme, [key]: value };
     setEditingTheme(updated);
-    applyTheme(updated);
+    applyTheme(updated, settings.accent_color || undefined);
   };
 
   const exportTheme = async (t: ThemeTokens) => {
@@ -223,9 +223,9 @@ export function SettingsPanel({ open, onClose }: Props) {
           alert('Invalid theme file: missing required color fields.');
           return;
         }
-        obj.id = `custom-${Date.now()}`;
+        obj.id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         const updated = [...customThemes, obj as ThemeTokens];
-        update({ custom_themes: updated as any, theme: obj.id });
+        update({ custom_themes: updated, theme: obj.id });
       } catch {
         alert('Invalid JSON file.');
       }
@@ -559,7 +559,7 @@ export function SettingsPanel({ open, onClose }: Props) {
                           derived.id = editingTheme.id;
                           derived.name = editingTheme.name;
                           setEditingTheme(derived);
-                          applyTheme(derived);
+                          applyTheme(derived, settings.accent_color || undefined);
                         }}
                         style={{ ...selectStyle, maxWidth: 240 }}
                       >
