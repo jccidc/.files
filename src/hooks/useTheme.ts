@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useSettingsStore } from '../stores/settings';
-import { THEMES, applyTheme } from '../theme/themes';
+import { applyTheme, resolveTheme } from '../theme/themes';
 
 export function useTheme() {
   const theme = useSettingsStore((s) => s.settings.theme);
   const accentColor = useSettingsStore((s) => s.settings.accent_color);
+  const customThemes = useSettingsStore((s) => s.settings.custom_themes);
   const uiScale = useSettingsStore((s) => s.settings.ui_scale);
   const windowEffect = useSettingsStore((s) => s.settings.window_effect);
   const baseOpacity = useSettingsStore((s) => s.settings.base_opacity);
@@ -29,9 +30,9 @@ export function useTheme() {
 
   // Theme + accent
   useEffect(() => {
-    const tokens = THEMES[theme] || THEMES['dotfiles-dark'];
+    const tokens = resolveTheme(theme, customThemes || []);
     applyTheme(tokens, accentColor || undefined);
-  }, [theme, accentColor]);
+  }, [theme, accentColor, customThemes]);
 
   // UI scale
   useEffect(() => {
