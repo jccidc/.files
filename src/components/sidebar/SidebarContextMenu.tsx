@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface SidebarContextMenuProps {
   x: number;
@@ -75,7 +76,7 @@ export function SidebarContextMenu({ x, y, path, isDir, onClose, onOpen, onOpenI
   const adjustedX = x + menuWidth > window.innerWidth ? x - menuWidth : x;
   const adjustedY = y + menuHeight > window.innerHeight ? y - menuHeight : y;
 
-  return (
+  return createPortal(
     <div
       ref={ref}
       style={{
@@ -104,6 +105,7 @@ export function SidebarContextMenu({ x, y, path, isDir, onClose, onOpen, onOpenI
           </div>
         ),
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
