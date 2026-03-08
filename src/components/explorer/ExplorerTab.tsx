@@ -600,6 +600,14 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         const target = await resolveShortcut(entry.path);
         if (target) navigate(target);
       } catch {}
+    } else {
+      // Open file with system default application
+      try {
+        const { openPath } = await import('@tauri-apps/plugin-opener');
+        await openPath(entry.path);
+      } catch (e) {
+        console.error('Failed to open file:', e);
+      }
     }
   };
 
