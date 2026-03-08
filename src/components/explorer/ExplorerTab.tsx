@@ -842,9 +842,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
                             toggleSelected(pi.entry.path);
                             followSelection(pi.entry);
                           }}
-                          onDoubleClick={() => {
-                            if (pi.entry.is_dir) navigate(pi.entry.path);
-                          }}
+                          onDoubleClick={() => handleDoubleClick(pi.entry)}
                         />
                       );
                     })}

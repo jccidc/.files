@@ -40,11 +40,11 @@ export const usePreviewStore = create<PreviewState>()(
 
       followSelection: (entry) => {
         if (!entry) return;
-        const { pinned } = get();
+        const { pinned, panelVisible } = get();
         if (pinned) return;
-        // Auto-show preview panel for files
-        if (!entry.is_dir) {
-          set({ previewEntry: entry, panelVisible: true });
+        // Only update preview content if panel is already open
+        if (!entry.is_dir && panelVisible) {
+          set({ previewEntry: entry });
         }
       },
     }),
