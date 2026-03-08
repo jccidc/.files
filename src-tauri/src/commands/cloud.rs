@@ -3,6 +3,12 @@ use std::path::Path;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 // ---- Cloud Mount Cache ----
 // Avoids spawning PowerShell for .lnk resolution on every 5s drive poll
 
@@ -229,6 +235,7 @@ fn resolve_lnk(path: &Path) -> Option<String> {
     );
     let output = std::process::Command::new("powershell")
         .args(["-NoProfile", "-Command", &script])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .ok()?;
     if output.status.success() {

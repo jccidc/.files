@@ -15,7 +15,6 @@ import { FileIcon } from '../common/FileIcon';
 import { useGitStore } from '../../stores/git';
 import type { Tab, FileEntry } from '../../types';
 
-const ROW_HEIGHT = 30;
 
 /** Strip .lnk extension for cleaner display */
 function displayName(entry: FileEntry): string {
@@ -151,13 +150,13 @@ function PeekRow({ entry, selected, colWidths, onClick, onDoubleClick }: {
       onDoubleClick={onDoubleClick}
       style={{
         display: 'grid', gridTemplateColumns: colWidths, alignItems: 'center',
-        height: ROW_HEIGHT, cursor: 'pointer', borderRadius: 2,
+        height: 'var(--row-height)', cursor: 'pointer', borderRadius: 2,
         background: selected ? 'var(--active)' : 'transparent',
       }}
       onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = 'var(--hover)'; }}
       onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = selected ? 'var(--active)' : 'transparent'; }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', paddingLeft: 28, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--density-gap)', padding: '0 var(--density-pad-x)', paddingLeft: 28, overflow: 'hidden' }}>
         <FileIcon entry={entry} />
         <span style={{
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -166,10 +165,10 @@ function PeekRow({ entry, selected, colWidths, onClick, onDoubleClick }: {
           {displayName(entry)}
         </span>
       </div>
-      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 12px' }}>
+      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 var(--density-pad-x)' }}>
         {entry.is_dir ? '--' : formatSize(entry.size)}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 12px' }}>
+      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 var(--density-pad-x)' }}>
         {formatDate(entry.modified)}
       </div>
     </div>
@@ -224,11 +223,11 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
       onMouseMove={(e) => onHover(entry, e.clientX, e.clientY)}
       style={{
         display: 'grid', gridTemplateColumns: colWidths, alignItems: 'center',
-        height: ROW_HEIGHT, background: selected ? 'var(--active)' : even ? 'transparent' : 'rgba(255,255,255,0.01)',
+        height: 'var(--row-height)', background: selected ? 'var(--active)' : even ? 'transparent' : 'rgba(255,255,255,0.01)',
         cursor: 'pointer', borderRadius: 2,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--density-gap)', padding: '0 var(--density-pad-x)', overflow: 'hidden' }}>
         {entry.is_dir && peekEnabled && (
           <span
             onClick={(e) => { e.stopPropagation(); onPeekToggle(); }}
@@ -254,10 +253,10 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
           </span>
         )}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 12px' }}>
+      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 var(--density-pad-x)' }}>
         {entry.is_dir ? '--' : formatSize(entry.size)}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 var(--density-pad-x)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span>{formatDate(entry.modified)}</span>
         {gs && (
           <span style={{ color: gitStatusColors[gs] || 'var(--t3)', fontWeight: 600, fontSize: 10, marginLeft: 4 }}>
@@ -701,7 +700,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   };
 
   const colHeaderStyle = (field: SortField): React.CSSProperties => ({
-    padding: '6px 12px', fontSize: 11, fontWeight: 500, color: sortField === field ? 'var(--accent)' : 'var(--t3)',
+    padding: 'var(--density-pad-y) var(--density-pad-x)', fontSize: 11, fontWeight: 500, color: sortField === field ? 'var(--accent)' : 'var(--t3)',
     textAlign: 'left', cursor: 'pointer', userSelect: 'none',
     display: 'flex', alignItems: 'center', gap: 4, position: 'relative',
   });
@@ -776,7 +775,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
               if (item.groupHeader) {
                 elements.push(
                   <div key={`group-${i}-${item.groupHeader}`} style={{
-                    padding: '8px 12px 4px', fontSize: 11, fontWeight: 600,
+                    padding: 'var(--density-pad-y) var(--density-pad-x)', fontSize: 11, fontWeight: 600,
                     color: 'var(--accent)', textTransform: 'uppercase',
                     letterSpacing: '0.05em', borderBottom: '1px solid var(--border)',
                     background: 'var(--deep)', position: 'sticky', top: 0, zIndex: 5,
@@ -825,7 +824,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
                     marginBottom: 2,
                     background: 'var(--deep)',
                     borderRadius: '0 4px 4px 0',
-                    maxHeight: PEEK_VISIBLE * ROW_HEIGHT,
+                    maxHeight: `calc(${PEEK_VISIBLE} * var(--row-height))`,
                     overflowY: peekItems.length > PEEK_VISIBLE ? 'auto' : 'hidden',
                     overscrollBehavior: 'contain',
                   }}>

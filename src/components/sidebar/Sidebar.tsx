@@ -7,6 +7,7 @@ import { useGitStore } from '../../stores/git';
 import { FileIcon } from '../common/FileIcon';
 import { GitPanel } from './GitPanel';
 import { CloudSources } from './CloudSources';
+import { SidebarContextMenu } from './SidebarContextMenu';
 import type { DriveInfo, FileEntry } from '../../types';
 
 // ---- Icons ----
@@ -85,8 +86,8 @@ function IconDrag() {
 const itemStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 8,
-  padding: '5px 12px',
+  gap: 'var(--density-gap, 8px)',
+  padding: 'var(--density-pad-y, 5px) var(--density-pad-x, 12px)',
   cursor: 'pointer',
   fontSize: 12,
   color: 'var(--t2)',
@@ -96,8 +97,9 @@ const itemStyle: React.CSSProperties = {
 
 // ---- Expandable Folder Tree Item ----
 
-export function FolderTreeItem({ path, label, icon, depth, onNavigate }: {
+export function FolderTreeItem({ path, label, icon, depth, onNavigate, onContextMenu: onCtxMenu }: {
   path: string; label: string; icon: React.ReactNode; depth: number; onNavigate: (path: string) => void;
+  onContextMenu?: (e: React.MouseEvent, path: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [children, setChildren] = useState<FileEntry[] | null>(null);
@@ -120,6 +122,8 @@ export function FolderTreeItem({ path, label, icon, depth, onNavigate }: {
     <div>
       <div
         onClick={() => onNavigate(path)}
+        onDoubleClick={toggle}
+        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onCtxMenu?.(e, path); }}
         style={{
           ...itemStyle,
           paddingLeft: 12 + depth * 16,
@@ -134,7 +138,10 @@ export function FolderTreeItem({ path, label, icon, depth, onNavigate }: {
           e.currentTarget.style.color = 'var(--t2)';
         }}
       >
-        <span onClick={toggle} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+        <span
+          onClick={(e) => { e.stopPropagation(); toggle(e); }}
+          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px 4px 4px 0', margin: '-4px -4px -4px 0' }}
+        >
           <IconChevron expanded={expanded} />
         </span>
         {icon}
@@ -148,6 +155,7 @@ export function FolderTreeItem({ path, label, icon, depth, onNavigate }: {
           icon={<FileIcon entry={child} size={14} />}
           depth={depth + 1}
           onNavigate={onNavigate}
+          onContextMenu={onCtxMenu}
         />
       ))}
     </div>
@@ -210,6 +218,10 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [dragSection, setDragSection] = useState<string | null>(null);
   const [dragOverSection, setDragOverSection] = useState<string | null>(null);
+  const [sidebarCtx, setSidebarCtx] = useState<{ x: number; y: number; path: string } | null>(null);
+  const [dragPinIdx, setDragPinIdx] = useState<number | null>(null);
+  const [dragOverPinIdx, setDragOverPinIdx] = useState<number | null>(null);
+  const pinRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const resizing = useRef(false);
   const startX = useRef(0);
   const startW = useRef(0);
@@ -259,6 +271,71 @@ export function Sidebar() {
   }, [currentPath, checkRepo]);
 
   const toggleCollapsed = (key: string) => setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const handleSidebarContextMenu = (e: React.MouseEvent, path: string) => {
+    setSidebarCtx({ x: e.clientX, y: e.clientY, path });
+  };
+
+  const handleCopyPath = (path: string) => {
+    navigator.clipboard.writeText(path).catch(() => {});
+  };
+
+  const handlePinPointerDown = (idx: number, e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDragPinIdx(idx);
+
+    const onMove = (ev: PointerEvent) => {
+      let overIdx: number | null = null;
+      for (let i = 0; i < pinnedPaths.length; i++) {
+        const el = pinRefs.current[i];
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (ev.clientY >= rect.top && ev.clientY < rect.bottom) {
+          overIdx = i;
+          break;
+        }
+      }
+      setDragOverPinIdx(overIdx !== idx ? overIdx : null);
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+
+      let targetIdx: number | null = null;
+      for (let i = 0; i < pinnedPaths.length; i++) {
+        const el = pinRefs.current[i];
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (ev.clientY >= rect.top && ev.clientY < rect.bottom) {
+          targetIdx = i;
+          break;
+        }
+      }
+
+      if (targetIdx !== null && targetIdx !== idx) {
+        const order = [...pinnedPaths];
+        const [moved] = order.splice(idx, 1);
+        order.splice(targetIdx, 0, moved);
+        updateSettings({ pinned_paths: order });
+      }
+
+      setDragPinIdx(null);
+      setDragOverPinIdx(null);
+    };
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  };
+
+  const handleDeletePath = async (path: string) => {
+    try {
+      const { deleteToTrash } = await import('../../api/shell');
+      await deleteToTrash([path]);
+    } catch { /* ignore */ }
+  };
 
   const handleUnpin = (path: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -376,6 +453,7 @@ export function Sidebar() {
                 icon={<DriveIcon type={d.drive_type} />}
                 depth={0}
                 onNavigate={navigate}
+                onContextMenu={handleSidebarContextMenu}
               />
             </div>
             {d.drive_type === 'removable' && (
@@ -419,25 +497,38 @@ export function Sidebar() {
                 icon={<FileIcon entry={{ name: qa.label, path: qa.path, is_dir: true, is_hidden: false, is_symlink: false, size: 0, modified: '', created: '', extension: null, readonly: false, children_count: null }} size={14} />}
                 depth={0}
                 onNavigate={navigate}
+                onContextMenu={handleSidebarContextMenu}
               />
             ))}
-            {pinnedPaths.map((p) => (
+            {pinnedPaths.map((p, idx) => (
               <div
                 key={p}
-                style={{ display: 'flex', alignItems: 'center', margin: '0 6px', borderRadius: 4 }}
+                ref={(el) => { pinRefs.current[idx] = el; }}
+                style={{
+                  display: 'flex', alignItems: 'center', margin: '0 6px', borderRadius: 4,
+                  opacity: dragPinIdx === idx ? 0.5 : 1,
+                  borderTop: dragOverPinIdx === idx ? '2px solid var(--accent)' : '2px solid transparent',
+                }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); handleSidebarContextMenu(e, p); }}
               >
+                <span
+                  onPointerDown={(e) => handlePinPointerDown(idx, e)}
+                  style={{ cursor: 'grab', display: 'flex', alignItems: 'center', padding: '0 2px 0 8px', touchAction: 'none', flexShrink: 0 }}
+                >
+                  <IconDrag />
+                </span>
                 <div
                   onClick={() => navigate(p)}
                   style={{
                     flex: 1, display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '5px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--t2)',
+                    padding: '5px 4px', cursor: 'pointer', fontSize: 12, color: 'var(--t2)',
                     overflow: 'hidden',
                   }}
                 >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="var(--accent)" stroke="none" style={{ flexShrink: 0 }}>
-                    <circle cx="5" cy="5" r="3" />
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--accent)" stroke="none" style={{ flexShrink: 0 }}>
+                    <path d="M1.5 3a1 1 0 011-1H6l1.5 1.5H13.5a1 1 0 011 1V13a1 1 0 01-1 1h-12a1 1 0 01-1-1V3z" />
                   </svg>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {getLabelFromPath(p)}
@@ -508,6 +599,29 @@ export function Sidebar() {
           zIndex: 10,
         }}
       />
+
+      {/* Sidebar context menu */}
+      {sidebarCtx && (
+        <SidebarContextMenu
+          x={sidebarCtx.x}
+          y={sidebarCtx.y}
+          path={sidebarCtx.path}
+          isDir={true}
+          onClose={() => setSidebarCtx(null)}
+          onOpen={(p) => navigate(p)}
+          onCopyPath={handleCopyPath}
+          onDelete={handleDeletePath}
+          onPinToggle={(p) => {
+            const current = pinnedPaths || [];
+            if (current.includes(p)) {
+              updateSettings({ pinned_paths: current.filter((pp) => pp !== p) });
+            } else {
+              updateSettings({ pinned_paths: [...current, p] });
+            }
+          }}
+          isPinned={(pinnedPaths || []).includes(sidebarCtx.path)}
+        />
+      )}
     </div>
   );
 }

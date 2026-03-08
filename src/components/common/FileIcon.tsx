@@ -1,3 +1,4 @@
+import { useSettingsStore } from '../../stores/settings';
 import type { FileEntry } from '../../types';
 
 // Extension -> color mapping
@@ -34,17 +35,28 @@ const extColors: Record<string, string> = {
   lock: '#9B9B9B', diff: '#41B883', patch: '#41B883',
 };
 
-function getIconColor(entry: FileEntry): string {
-  if (entry.is_dir) return 'var(--warm)';
+function getIconColor(entry: FileEntry, theme: string): string {
+  if (theme === 'monochrome') return 'var(--t2)';
+  if (entry.is_dir) return theme === 'colorful' ? 'var(--accent)' : 'var(--warm)';
+  if (theme === 'minimal') return 'var(--t3)';
   const ext = (entry.extension || '').toLowerCase();
   return extColors[ext] || 'var(--t3)';
 }
 
 // Smaller icon for list view (16x16)
 export function FileIcon({ entry, size = 16 }: { entry: FileEntry; size?: number }) {
-  const color = getIconColor(entry);
+  const iconTheme = useSettingsStore((s) => s.settings.icon_theme) || 'minimal';
+  const color = getIconColor(entry, iconTheme);
 
   if (entry.is_dir) {
+    // Colorful: filled folder with accent color; Monochrome: outline only; Minimal: filled warm
+    if (iconTheme === 'monochrome') {
+      return (
+        <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke={color} strokeWidth="1.2" style={{ flexShrink: 0 }}>
+          <path d="M1.5 3a1 1 0 011-1H6l1.5 1.5H13.5a1 1 0 011 1V13a1 1 0 01-1 1h-12a1 1 0 01-1-1V3z" />
+        </svg>
+      );
+    }
     return (
       <svg width={size} height={size} viewBox="0 0 16 16" fill={color} stroke="none" style={{ flexShrink: 0 }}>
         <path d="M1.5 3a1 1 0 011-1H6l1.5 1.5H13.5a1 1 0 011 1V13a1 1 0 01-1 1h-12a1 1 0 01-1-1V3z" />
@@ -52,11 +64,11 @@ export function FileIcon({ entry, size = 16 }: { entry: FileEntry; size?: number
     );
   }
 
-  // .lnk shortcut — show as folder with arrow overlay
+  // .lnk shortcut -- show as folder with arrow overlay
   if ((entry.extension || '').toLowerCase() === 'lnk') {
     return (
       <svg width={size} height={size} viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-        <path d="M1.5 3a1 1 0 011-1H6l1.5 1.5H13.5a1 1 0 011 1V13a1 1 0 01-1 1h-12a1 1 0 01-1-1V3z" fill="var(--warm)" opacity="0.7" />
+        <path d="M1.5 3a1 1 0 011-1H6l1.5 1.5H13.5a1 1 0 011 1V13a1 1 0 01-1 1h-12a1 1 0 01-1-1V3z" fill={iconTheme === 'monochrome' ? 'none' : 'var(--warm)'} stroke={iconTheme === 'monochrome' ? color : 'none'} strokeWidth="1.2" opacity="0.7" />
         <path d="M7 7l3 2.5L7 12" stroke="var(--accent)" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     );
@@ -64,14 +76,18 @@ export function FileIcon({ entry, size = 16 }: { entry: FileEntry; size?: number
 
   const ext = (entry.extension || '').toLowerCase();
   const showLabel = size >= 32;
+  // Colorful: filled file body with extension color
+  const fillColor = iconTheme === 'colorful' ? color : 'none';
+  const strokeColor = iconTheme === 'colorful' ? 'none' : color;
+  const textColor = iconTheme === 'colorful' ? 'var(--void)' : color;
 
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-      <path d="M4 1.5h5l3.5 3.5V14a1 1 0 01-1 1H4a1 1 0 01-1-1V2.5a1 1 0 011-1z" fill="none" stroke={color} strokeWidth="1.2" />
-      <polyline points="9,1.5 9,5.5 12.5,5.5" fill="none" stroke={color} strokeWidth="1.2" />
+      <path d="M4 1.5h5l3.5 3.5V14a1 1 0 01-1 1H4a1 1 0 01-1-1V2.5a1 1 0 011-1z" fill={fillColor} stroke={strokeColor} strokeWidth={strokeColor !== 'none' ? '1.2' : '0'} opacity={iconTheme === 'colorful' ? 0.85 : 1} />
+      <polyline points="9,1.5 9,5.5 12.5,5.5" fill="none" stroke={iconTheme === 'colorful' ? 'rgba(255,255,255,0.4)' : color} strokeWidth="1.2" />
       {showLabel && ext && (
         <text
-          x="8" y="12" textAnchor="middle" fill={color} stroke="none"
+          x="8" y="12" textAnchor="middle" fill={textColor} stroke="none"
           style={{ fontSize: '3.5px', fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}
         >
           {ext.toUpperCase().slice(0, 4)}

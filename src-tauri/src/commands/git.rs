@@ -4,6 +4,12 @@ use git2::{
 use serde::Serialize;
 use std::path::Path;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 // ---- Models ----
 
 #[derive(Debug, Clone, Serialize)]
@@ -474,6 +480,7 @@ pub async fn git_push(path: String) -> Result<String, String> {
     let output = std::process::Command::new("git")
         .args(["push"])
         .current_dir(&workdir)
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| format!("Failed to run git push: {}", e))?;
 
@@ -495,6 +502,7 @@ pub async fn git_pull(path: String) -> Result<String, String> {
     let output = std::process::Command::new("git")
         .args(["pull"])
         .current_dir(&workdir)
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| format!("Failed to run git pull: {}", e))?;
 
@@ -536,6 +544,7 @@ pub async fn git_checkout(path: String, branch: String) -> Result<String, String
     let output = std::process::Command::new("git")
         .args(["checkout", &branch])
         .current_dir(&workdir)
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| format!("Failed to run git checkout: {}", e))?;
 
@@ -553,6 +562,7 @@ pub async fn git_checkout(path: String, branch: String) -> Result<String, String
 pub async fn git_clone(url: String, target_dir: String) -> Result<String, String> {
     let output = std::process::Command::new("git")
         .args(["clone", &url, &target_dir])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| format!("Failed to run git clone: {}", e))?;
 

@@ -1,5 +1,11 @@
 use std::path::Path;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 #[tauri::command]
 pub fn delete_to_trash(paths: Vec<String>) -> Result<(), String> {
     for p in &paths {
@@ -20,6 +26,7 @@ pub fn delete_to_trash(paths: Vec<String>) -> Result<(), String> {
         );
         let output = std::process::Command::new("powershell")
             .args(["-NoProfile", "-Command", &script])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .map_err(|e| e.to_string())?;
 
@@ -46,6 +53,7 @@ pub fn open_in_explorer(path: String) -> Result<(), String> {
 pub fn open_file(path: String) -> Result<(), String> {
     std::process::Command::new("cmd")
         .args(["/C", "start", "", &path])
+        .creation_flags(CREATE_NO_WINDOW)
         .spawn()
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -124,6 +132,7 @@ pub fn resolve_shortcut(path: String) -> Result<Option<String>, String> {
     );
     let output = std::process::Command::new("powershell")
         .args(["-NoProfile", "-Command", &script])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| e.to_string())?;
     if output.status.success() {
@@ -149,6 +158,7 @@ pub fn eject_drive(letter: String) -> Result<(), String> {
     );
     let output = std::process::Command::new("powershell")
         .args(["-NoProfile", "-Command", &script])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| format!("Failed to eject: {}", e))?;
 
