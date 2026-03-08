@@ -43,6 +43,15 @@ pub fn open_in_explorer(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn open_file(path: String) -> Result<(), String> {
+    std::process::Command::new("cmd")
+        .args(["/C", "start", "", &path])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn copy_files(sources: Vec<String>, dest: String) -> Result<(), String> {
     let dest_path = Path::new(&dest);
     if !dest_path.is_dir() {

@@ -102,6 +102,7 @@ pub fn run() {
             search::fuzzy_find,
             shell::delete_to_trash,
             shell::open_in_explorer,
+            shell::open_file,
             shell::copy_files,
             shell::move_files,
             shell::rename_file,

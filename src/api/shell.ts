@@ -8,6 +8,10 @@ export async function openInExplorer(path: string): Promise<void> {
   return invoke('open_in_explorer', { path });
 }
 
+export async function openFile(path: string): Promise<void> {
+  return invoke('open_file', { path });
+}
+
 export async function copyFiles(sources: string[], dest: string): Promise<void> {
   return invoke('copy_files', { sources, dest });
 }

@@ -3,7 +3,7 @@ import { useExplorerStore } from '../../stores/explorer';
 import { useSettingsStore } from '../../stores/settings';
 import { usePanelsStore } from '../../stores/panels';
 import { watchDir, unwatchDir, onFsChange } from '../../api/watcher';
-import { deleteToTrash, renameFile, resolveShortcut } from '../../api/shell';
+import { deleteToTrash, renameFile, resolveShortcut, openFile } from '../../api/shell';
 import { readDir } from '../../api/filesystem';
 import { ContextMenu } from './ContextMenu';
 import { FileGrid } from './FileGrid';
@@ -603,8 +603,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     } else {
       // Open file with system default application
       try {
-        const { openPath } = await import('@tauri-apps/plugin-opener');
-        await openPath(entry.path);
+        await openFile(entry.path);
       } catch (e) {
         console.error('Failed to open file:', e);
       }
