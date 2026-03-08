@@ -6,7 +6,7 @@ use commands::{cloud, filesystem, git, search, settings, shell, terminal, watche
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
-    Manager, WindowEvent,
+    Emitter, Manager, WindowEvent,
     window::{Effect, EffectState, EffectsBuilder},
 };
 
@@ -15,6 +15,19 @@ pub fn run() {
     env_logger::init();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // args[0] is the exe path, args[1..] are CLI arguments
+            if args.len() > 1 {
+                let folder_path = args[1].clone();
+                let _ = app.emit("open-folder", folder_path);
+            }
+            // Always bring window to front
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
