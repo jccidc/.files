@@ -267,3 +267,107 @@ export function applyTheme(theme: ThemeTokens, accentOverride?: string) {
   root.style.setProperty('--purple', theme.purple);
   root.style.setProperty('--cyan', theme.cyan);
 }
+
+// ---------------------------------------------------------------------------
+// Color utility functions (private)
+// ---------------------------------------------------------------------------
+
+/** Parse hex to RGB tuple */
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [
+    parseInt(h.slice(0, 2), 16),
+    parseInt(h.slice(2, 4), 16),
+    parseInt(h.slice(4, 6), 16),
+  ];
+}
+
+/** RGB tuple to hex */
+function rgbToHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+}
+
+/** Darken a hex color by percent (0-100) */
+function darken(hex: string, pct: number): string {
+  const [r, g, b] = hexToRgb(hex);
+  const f = 1 - pct / 100;
+  return rgbToHex(r * f, g * f, b * f);
+}
+
+/** Lighten a hex color by percent (0-100) */
+function lighten(hex: string, pct: number): string {
+  const [r, g, b] = hexToRgb(hex);
+  const f = pct / 100;
+  return rgbToHex(r + (255 - r) * f, g + (255 - g) * f, b + (255 - b) * f);
+}
+
+/** Mix two hex colors (0 = all colorA, 1 = all colorB) */
+function mixColors(a: string, b: string, t: number): string {
+  const [r1, g1, b1] = hexToRgb(a);
+  const [r2, g2, b2] = hexToRgb(b);
+  return rgbToHex(
+    r1 + (r2 - r1) * t,
+    g1 + (g2 - g1) * t,
+    b1 + (b2 - b1) * t,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Theme derivation, resolution, and validation (exported)
+// ---------------------------------------------------------------------------
+
+/** Derive full 24-token theme from 6 key colors + a base theme for status colors */
+export function deriveTokens(
+  name: string,
+  base: string,
+  surface: string,
+  t1: string,
+  accent: string,
+  border: string,
+  warm: string,
+  baseTheme: ThemeTokens,
+): ThemeTokens {
+  const [ar, ag, ab] = hexToRgb(accent);
+  return {
+    id: '', // caller sets this
+    name,
+    void: darken(base, 20),
+    deepest: darken(base, 15),
+    deep: darken(base, 8),
+    base,
+    surface,
+    raised: lighten(surface, 5),
+    hover: lighten(base, 10),
+    active: lighten(base, 18),
+    border,
+    t1,
+    t2: mixColors(t1, base, 0.5),
+    t3: mixColors(t1, base, 0.75),
+    accent,
+    aglow: `rgba(${ar},${ag},${ab},0.12)`,
+    warm,
+    green: baseTheme.green,
+    red: baseTheme.red,
+    yellow: baseTheme.yellow,
+    purple: baseTheme.purple,
+    cyan: baseTheme.cyan,
+  };
+}
+
+/** Look up theme by id: built-in first, then custom, fallback to dotfiles-dark */
+export function resolveTheme(id: string, customThemes: ThemeTokens[]): ThemeTokens {
+  return THEMES[id] || customThemes.find(t => t.id === id) || THEMES['dotfiles-dark'];
+}
+
+const THEME_KEYS: (keyof ThemeTokens)[] = [
+  'id', 'name', 'void', 'deepest', 'deep', 'base', 'surface', 'raised',
+  'hover', 'active', 'border', 't1', 't2', 't3', 'accent', 'aglow',
+  'warm', 'green', 'red', 'yellow', 'purple', 'cyan',
+];
+
+/** Validate that an object has all ThemeTokens fields as strings */
+export function validateThemeJson(obj: unknown): obj is ThemeTokens {
+  if (!obj || typeof obj !== 'object') return false;
+  const o = obj as Record<string, unknown>;
+  return THEME_KEYS.every(k => typeof o[k] === 'string');
+}
