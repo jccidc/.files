@@ -44,14 +44,9 @@
     ],
     "windows": {
       "nsis": {
-        "oneClick": false,
-        "perMachine": false,
-        "allowElevation": true,
-        "createDesktopShortcut": true,
-        "createStartMenuShortcut": true,
-        "shortcutName": ".files",
+        "installMode": "both",
         "displayLanguageSelector": false,
-        "installerHooks": "nsis/installer.nsi"
+        "installerHooks": "nsis/installer.nsh"
       }
     }
   }
