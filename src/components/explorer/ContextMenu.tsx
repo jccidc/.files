@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { FileEntry } from '../../types';
 
 interface ContextMenuProps {
@@ -37,10 +38,17 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        // Right-click outside will re-trigger the menu at new position via onMouseDown;
+        // close this instance so the new one can open cleanly
+        onClose();
+      }
     };
     const escHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('mousedown', handler);
+    // Use requestAnimationFrame to avoid catching the same mousedown that opened us
+    requestAnimationFrame(() => {
+      document.addEventListener('mousedown', handler);
+    });
     document.addEventListener('keydown', escHandler);
     return () => {
       document.removeEventListener('mousedown', handler);
@@ -120,7 +128,7 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
   const adjustedX = x + menuWidth > window.innerWidth ? x - menuWidth : x;
   const adjustedY = y + menuHeight > window.innerHeight ? y - menuHeight : y;
 
-  return (
+  return createPortal(
     <div
       ref={ref}
       style={{
@@ -161,6 +169,7 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
           </div>
         ),
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

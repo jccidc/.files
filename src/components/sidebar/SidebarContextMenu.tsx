@@ -32,7 +32,9 @@ export function SidebarContextMenu({ x, y, path, isDir, onClose, onOpen, onOpenI
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     const escHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('mousedown', handler);
+    requestAnimationFrame(() => {
+      document.addEventListener('mousedown', handler);
+    });
     document.addEventListener('keydown', escHandler);
     return () => {
       document.removeEventListener('mousedown', handler);

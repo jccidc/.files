@@ -123,7 +123,8 @@ export function FolderTreeItem({ path, label, icon, depth, onNavigate, onContext
       <div
         onClick={() => onNavigate(path)}
         onDoubleClick={toggle}
-        onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onCtxMenu?.(e, path); }}
+        onContextMenu={(e) => e.preventDefault()}
+        onMouseDown={(e) => { if (e.button === 2) { e.preventDefault(); e.stopPropagation(); onCtxMenu?.(e, path); } }}
         style={{
           ...itemStyle,
           paddingLeft: 12 + depth * 16,
@@ -481,7 +482,7 @@ export function Sidebar() {
     cloud: () => (
       <div key="cloud" ref={(el) => { sectionRefs.current['cloud'] = el; }}>
         <SectionLabel text="Cloud" collapsed={collapsed.cloud} onToggle={() => toggleCollapsed('cloud')} {...makeDragProps('cloud')} />
-        {!collapsed.cloud && <CloudSources />}
+        {!collapsed.cloud && <CloudSources onContextMenu={handleSidebarContextMenu} />}
       </div>
     ),
     'quick-access': () => (
@@ -511,7 +512,8 @@ export function Sidebar() {
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); handleSidebarContextMenu(e, p); }}
+                onContextMenu={(e) => e.preventDefault()}
+                onMouseDown={(e) => { if (e.button === 2) { e.preventDefault(); e.stopPropagation(); handleSidebarContextMenu(e, p); } }}
               >
                 <span
                   onPointerDown={(e) => handlePinPointerDown(idx, e)}

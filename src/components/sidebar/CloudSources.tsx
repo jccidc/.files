@@ -249,7 +249,7 @@ function GitHubRepoList({ repos, loading, error, onClone, onRepoClick, onLink, c
 
 // ---- Main CloudSources ----
 
-export function CloudSources() {
+export function CloudSources({ onContextMenu }: { onContextMenu?: (e: React.MouseEvent, path: string) => void }) {
   const navigate = useExplorerStore((s) => s.navigate);
   const githubPat = useSettingsStore((s) => s.settings.github_pat);
   const githubRepoPaths = useSettingsStore((s) => s.settings.github_repo_paths) || {};
@@ -372,6 +372,7 @@ export function CloudSources() {
           icon={providerIcon[m.provider] || <IconCloud />}
           depth={0}
           onNavigate={navigate}
+          onContextMenu={onContextMenu}
         />
       ))}
 
@@ -384,6 +385,7 @@ export function CloudSources() {
           icon={providerIcon[cs.provider] || <IconCloud />}
           depth={0}
           onNavigate={navigate}
+          onContextMenu={onContextMenu}
         />
       ))}
 

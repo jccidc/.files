@@ -46,7 +46,8 @@ function GridCard({
       draggable={selected}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
-      onContextMenu={onContextMenu}
+      onContextMenu={(e) => e.preventDefault()}
+      onMouseDown={(e) => { if (e.button === 2) { e.preventDefault(); e.stopPropagation(); onContextMenu(e); } }}
       onDragStart={selected ? onDragStart : undefined}
       style={{
         width: 100,
@@ -105,7 +106,7 @@ export function FileGrid({ entries, selectedPaths, onRowClick, onDoubleClick, on
           selected={selectedPaths.has(entry.path)}
           onClick={(e) => onRowClick(entry, i, e)}
           onDoubleClick={() => onDoubleClick(entry)}
-          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onContextMenu(e, entry); }}
+          onContextMenu={(e) => { e.stopPropagation(); onContextMenu(e, entry); }}
           onDragStart={(e) => onDragStart(e, entry)}
         />
       ))}

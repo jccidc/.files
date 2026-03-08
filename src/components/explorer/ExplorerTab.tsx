@@ -211,7 +211,8 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
       onDragStart={selected ? onDragStart : undefined}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
-      onContextMenu={onContextMenu}
+      onContextMenu={(e) => e.preventDefault()}
+      onMouseDown={(e) => { if (e.button === 2) { e.preventDefault(); e.stopPropagation(); onContextMenu(e); } }}
       onMouseEnter={(e) => {
         if (!selected) e.currentTarget.style.background = 'var(--hover)';
         onHover(entry, e.clientX, e.clientY);
@@ -231,7 +232,9 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
         {entry.is_dir && peekEnabled && (
           <span
             onClick={(e) => { e.stopPropagation(); onPeekToggle(); }}
-            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0, padding: '4px 2px', margin: '-4px -2px' }}
+            style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: 20, height: 20, margin: '-4px 0 -4px -4px', borderRadius: 3 }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
             <IconChevron expanded={peekOpen} />
           </span>
@@ -712,7 +715,8 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         outline: dropHighlight ? '2px solid var(--accent)' : 'none',
         outlineOffset: -2,
       }}
-      onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, entry: null }); }}
+      onContextMenu={(e) => e.preventDefault()}
+      onMouseDown={(e) => { if (e.button === 2) { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, entry: null }); } }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -800,7 +804,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
                     gitStatus={gitStatusMap.get(item.entry.name)}
                     onClick={(e) => handleRowClick(item.entry, i, e)}
                     onDoubleClick={() => handleDoubleClick(item.entry)}
-                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, entry: item.entry }); }}
+                    onContextMenu={(e) => { e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, entry: item.entry }); }}
                     onRenameDone={handleRenameDone}
                     onHover={handleHover}
                     onHoverEnd={handleHoverEnd}

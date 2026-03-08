@@ -37,7 +37,7 @@ const extColors: Record<string, string> = {
 
 function getIconColor(entry: FileEntry, theme: string): string {
   if (theme === 'monochrome') return 'var(--t2)';
-  if (entry.is_dir) return theme === 'colorful' ? 'var(--accent)' : 'var(--warm)';
+  if (entry.is_dir) return 'var(--warm)';
   if (theme === 'minimal') return 'var(--t3)';
   const ext = (entry.extension || '').toLowerCase();
   return extColors[ext] || 'var(--t3)';

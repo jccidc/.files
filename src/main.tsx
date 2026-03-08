@@ -27,6 +27,9 @@ window.addEventListener('unhandledrejection', (e) => {
   document.body.innerHTML = `<pre style="padding:24px;color:#f87171;font-family:monospace">Unhandled rejection: ${e.reason}\n${e.reason?.stack || ''}</pre>`;
 });
 
+// Suppress native WebView2 context menu globally
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
     <ErrorBoundary>
