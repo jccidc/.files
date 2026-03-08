@@ -2,7 +2,7 @@ mod commands;
 mod models;
 mod utils;
 
-use commands::{cloud, filesystem, git, search, settings, shell, terminal, watcher};
+use commands::{cloud, filesystem, git, registry, search, settings, shell, terminal, watcher};
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
@@ -123,6 +123,8 @@ pub fn run() {
             cloud::github_list_repos,
             cloud::detect_cloud_mounts,
             cloud::find_local_repo,
+            registry::is_default_folder_handler,
+            registry::set_default_folder_handler,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

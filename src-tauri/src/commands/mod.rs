@@ -5,4 +5,5 @@ pub mod search;
 pub mod settings;
 pub mod shell;
 pub mod terminal;
+pub mod registry;
 pub mod watcher;
