@@ -1,4 +1,4 @@
-!macro CUSTOM_INSTALL
+!macro NSIS_HOOK_POSTINSTALL
   ; Register "Open with .files" context menu for directories
   WriteRegStr HKCU "Software\Classes\Directory\shell\dotfiles" "" "Open with .files"
   WriteRegStr HKCU "Software\Classes\Directory\shell\dotfiles" "Icon" "$INSTDIR\dotfiles.exe"
@@ -10,7 +10,7 @@
   WriteRegStr HKCU "Software\Classes\Directory\Background\shell\dotfiles\command" "" '"$INSTDIR\dotfiles.exe" "%V"'
 !macroend
 
-!macro CUSTOM_UNINSTALL
+!macro NSIS_HOOK_PREUNINSTALL
   ; Remove context menu entries
   DeleteRegKey HKCU "Software\Classes\Directory\shell\dotfiles"
   DeleteRegKey HKCU "Software\Classes\Directory\Background\shell\dotfiles"
