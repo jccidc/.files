@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useSettingsStore } from '../../stores/settings';
 import { THEMES, ACCENT_PRESETS } from '../../theme/themes';
 import { detectCloudMounts } from '../../api/cloud';
+import { isDefaultFolderHandler, setDefaultFolderHandler } from '../../api/registry';
 import type { CloudSource } from '../../types';
 
 type Section = 'appearance' | 'explorer' | 'terminal' | 'keybindings' | 'cloud';
@@ -92,6 +93,21 @@ export function SettingsPanel({ open, onClose }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [detectedMounts, setDetectedMounts] = useState<{ provider: string; label: string; path: string }[]>([]);
   const [newSource, setNewSource] = useState({ label: '', path: '', provider: 'custom' });
+  const [isDefaultHandler, setIsDefaultHandler] = useState(false);
+
+  useEffect(() => {
+    isDefaultFolderHandler().then(setIsDefaultHandler).catch(() => {});
+  }, []);
+
+  const handleDefaultHandlerToggle = async () => {
+    const next = !isDefaultHandler;
+    try {
+      await setDefaultFolderHandler(next);
+      setIsDefaultHandler(next);
+    } catch (e) {
+      console.error('Failed to set default handler:', e);
+    }
+  };
 
   useEffect(() => {
     if (section === 'cloud') {
@@ -595,6 +611,17 @@ export function SettingsPanel({ open, onClose }: Props) {
                   style={inputStyle}
                   placeholder="node_modules,.git,__pycache__"
                 />
+              </div>
+
+              {sectionTitle('Windows Integration')}
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Default folder handler</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>Open folders in .files instead of Explorer</div>
+                </div>
+                <button style={toggleStyle(isDefaultHandler)} onClick={handleDefaultHandlerToggle}>
+                  <div style={toggleDot(isDefaultHandler)} />
+                </button>
               </div>
             </>
           )}
