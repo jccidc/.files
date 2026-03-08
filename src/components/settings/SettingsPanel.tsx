@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSettingsStore } from '../../stores/settings';
-import { THEMES, ACCENT_PRESETS } from '../../theme/themes';
+import { THEMES, ACCENT_PRESETS, deriveTokens, resolveTheme, validateThemeJson, applyTheme } from '../../theme/themes';
+import type { ThemeTokens } from '../../types';
 import { detectCloudMounts } from '../../api/cloud';
 import { isDefaultFolderHandler, setDefaultFolderHandler } from '../../api/registry';
 import type { CloudSource } from '../../types';
@@ -94,6 +95,14 @@ export function SettingsPanel({ open, onClose }: Props) {
   const [detectedMounts, setDetectedMounts] = useState<{ provider: string; label: string; path: string }[]>([]);
   const [newSource, setNewSource] = useState({ label: '', path: '', provider: 'custom' });
   const [isDefaultHandler, setIsDefaultHandler] = useState(false);
+  const [editingTheme, setEditingTheme] = useState<ThemeTokens | null>(null);
+  const [editMode, setEditMode] = useState<'smart' | 'advanced'>('smart');
+  const [baseThemeId, setBaseThemeId] = useState('dotfiles-dark');
+  const [smartColors, setSmartColors] = useState({
+    base: '#111419', surface: '#161A21', t1: '#D8DEE9',
+    accent: '#3B82F6', border: '#1A1F28', warm: '#D4A06A',
+  });
+  const themeImportRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     isDefaultFolderHandler().then(setIsDefaultHandler).catch(() => {});
@@ -114,6 +123,115 @@ export function SettingsPanel({ open, onClose }: Props) {
       detectCloudMounts().then(setDetectedMounts).catch(() => {});
     }
   }, [section]);
+
+  const MAX_CUSTOM_THEMES = 10;
+  const customThemes: ThemeTokens[] = (settings.custom_themes || []) as ThemeTokens[];
+  const canCreate = customThemes.length < MAX_CUSTOM_THEMES;
+
+  const startNewTheme = () => {
+    const baseT = THEMES[baseThemeId] || THEMES['dotfiles-dark'];
+    const id = `custom-${Date.now()}`;
+    setSmartColors({
+      base: baseT.base, surface: baseT.surface, t1: baseT.t1,
+      accent: baseT.accent, border: baseT.border, warm: baseT.warm,
+    });
+    setEditingTheme({ ...baseT, id, name: 'My Theme' });
+    setEditMode('smart');
+  };
+
+  const startEditTheme = (t: ThemeTokens) => {
+    setEditingTheme({ ...t });
+    setSmartColors({
+      base: t.base, surface: t.surface, t1: t.t1,
+      accent: t.accent, border: t.border, warm: t.warm,
+    });
+    setBaseThemeId('dotfiles-dark');
+    setEditMode('smart');
+  };
+
+  const saveEditingTheme = () => {
+    if (!editingTheme) return;
+    const existing = customThemes.findIndex(t => t.id === editingTheme.id);
+    const updated = [...customThemes];
+    if (existing >= 0) {
+      updated[existing] = editingTheme;
+    } else {
+      updated.push(editingTheme);
+    }
+    update({ custom_themes: updated as any, theme: editingTheme.id });
+    setEditingTheme(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingTheme(null);
+    // Re-apply the actual current theme to undo live preview changes
+    const currentTheme = resolveTheme(settings.theme, customThemes);
+    applyTheme(currentTheme, settings.accent_color || undefined);
+  };
+
+  const deleteCustomTheme = (id: string) => {
+    const updated = customThemes.filter(t => t.id !== id);
+    const patch: Partial<typeof settings> = { custom_themes: updated as any };
+    if (settings.theme === id) patch.theme = 'dotfiles-dark';
+    update(patch);
+  };
+
+  const handleSmartColorChange = (key: keyof typeof smartColors, value: string) => {
+    const next = { ...smartColors, [key]: value };
+    setSmartColors(next);
+    if (!editingTheme) return;
+    const baseT = THEMES[baseThemeId] || THEMES['dotfiles-dark'];
+    const derived = deriveTokens(
+      editingTheme.name, next.base, next.surface, next.t1,
+      next.accent, next.border, next.warm, baseT,
+    );
+    derived.id = editingTheme.id;
+    derived.name = editingTheme.name;
+    setEditingTheme(derived);
+    applyTheme(derived);
+  };
+
+  const handleAdvancedChange = (key: keyof ThemeTokens, value: string) => {
+    if (!editingTheme) return;
+    const updated = { ...editingTheme, [key]: value };
+    setEditingTheme(updated);
+    applyTheme(updated);
+  };
+
+  const exportTheme = async (t: ThemeTokens) => {
+    try {
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const path = await save({
+        defaultPath: `${t.name.replace(/[^a-zA-Z0-9]/g, '-')}.dotfiles-theme.json`,
+        filters: [{ name: 'Theme', extensions: ['json'] }],
+      });
+      if (!path) return;
+      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+      await writeTextFile(path, JSON.stringify(t, null, 2));
+    } catch (e) {
+      console.error('Export failed:', e);
+    }
+  };
+
+  const importThemeFromFile = (file: File) => {
+    if (!canCreate) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const obj = JSON.parse(reader.result as string);
+        if (!validateThemeJson(obj)) {
+          alert('Invalid theme file: missing required color fields.');
+          return;
+        }
+        obj.id = `custom-${Date.now()}`;
+        const updated = [...customThemes, obj as ThemeTokens];
+        update({ custom_themes: updated as any, theme: obj.id });
+      } catch {
+        alert('Invalid JSON file.');
+      }
+    };
+    reader.readAsText(file);
+  };
 
   if (!open) return null;
 
@@ -263,7 +381,8 @@ export function SettingsPanel({ open, onClose }: Props) {
           {section === 'appearance' && (
             <>
               {sectionTitle('Theme')}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8, marginBottom: 16 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8, marginBottom: 8 }}>
+                {/* Built-in themes */}
                 {Object.values(THEMES).map((t) => (
                   <button
                     key={t.id}
@@ -281,7 +400,271 @@ export function SettingsPanel({ open, onClose }: Props) {
                     <div style={{ fontSize: 10, color: t.t1, fontWeight: 500 }}>{t.name}</div>
                   </button>
                 ))}
+                {/* Custom themes */}
+                {customThemes.map((t) => (
+                  <div
+                    key={t.id}
+                    style={{ position: 'relative' }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.querySelectorAll<HTMLElement>('[data-theme-action]').forEach(
+                        (el) => { el.style.opacity = '1'; }
+                      );
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.querySelectorAll<HTMLElement>('[data-theme-action]').forEach(
+                        (el) => { el.style.opacity = '0'; }
+                      );
+                    }}
+                  >
+                    <button
+                      onClick={() => update({ theme: t.id })}
+                      style={{
+                        width: '100%', padding: '10px 6px',
+                        border: settings.theme === t.id ? '2px solid var(--accent)' : '2px solid var(--border)',
+                        borderRadius: 8, cursor: 'pointer', background: t.base, textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ display: 'flex', gap: 2, justifyContent: 'center', marginBottom: 5 }}>
+                        <div style={{ width: 12, height: 12, borderRadius: 2, background: t.accent }} />
+                        <div style={{ width: 12, height: 12, borderRadius: 2, background: t.surface }} />
+                        <div style={{ width: 12, height: 12, borderRadius: 2, background: t.t1 }} />
+                      </div>
+                      <div style={{ fontSize: 10, color: t.t1, fontWeight: 500 }}>{t.name}</div>
+                    </button>
+                    {/* Edit / Delete overlay */}
+                    <div
+                      data-theme-action
+                      style={{
+                        position: 'absolute', top: 2, right: 2, display: 'flex', gap: 2,
+                        opacity: 0, transition: 'opacity 0.15s',
+                      }}
+                    >
+                      <button
+                        onClick={(e) => { e.stopPropagation(); startEditTheme(t); }}
+                        title="Edit"
+                        style={{
+                          width: 20, height: 20, borderRadius: 4, border: 'none', cursor: 'pointer',
+                          background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 10,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >&#9998;</button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteCustomTheme(t.id); }}
+                        title="Delete"
+                        style={{
+                          width: 20, height: 20, borderRadius: 4, border: 'none', cursor: 'pointer',
+                          background: 'rgba(0,0,0,0.6)', color: 'var(--red)', fontSize: 10,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >&#10005;</button>
+                    </div>
+                    {/* Export button */}
+                    <button
+                      data-theme-action
+                      onClick={(e) => { e.stopPropagation(); exportTheme(t); }}
+                      title="Export theme"
+                      style={{
+                        position: 'absolute', bottom: 2, right: 2, width: 20, height: 20,
+                        borderRadius: 4, border: 'none', cursor: 'pointer',
+                        background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 10,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        opacity: 0, transition: 'opacity 0.15s',
+                      }}
+                    >&#8681;</button>
+                  </div>
+                ))}
               </div>
+
+              {/* Create / Import buttons */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                <button
+                  onClick={startNewTheme}
+                  disabled={!canCreate}
+                  style={{
+                    padding: '6px 14px', borderRadius: 6, fontSize: 11, cursor: canCreate ? 'pointer' : 'not-allowed',
+                    border: '1px solid var(--border)', background: 'var(--raised)',
+                    color: canCreate ? 'var(--accent)' : 'var(--t3)',
+                    opacity: canCreate ? 1 : 0.5,
+                  }}
+                >+ Create Theme</button>
+                <button
+                  onClick={() => themeImportRef.current?.click()}
+                  disabled={!canCreate}
+                  style={{
+                    padding: '6px 14px', borderRadius: 6, fontSize: 11, cursor: canCreate ? 'pointer' : 'not-allowed',
+                    border: '1px solid var(--border)', background: 'var(--raised)',
+                    color: canCreate ? 'var(--t2)' : 'var(--t3)',
+                    opacity: canCreate ? 1 : 0.5,
+                  }}
+                >Import Theme</button>
+                <input
+                  ref={themeImportRef}
+                  type="file"
+                  accept=".json"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) importThemeFromFile(f);
+                    e.target.value = '';
+                  }}
+                />
+                {!canCreate && (
+                  <span style={{ fontSize: 10, color: 'var(--t3)', alignSelf: 'center' }}>
+                    Max {MAX_CUSTOM_THEMES} custom themes
+                  </span>
+                )}
+              </div>
+
+              {/* Theme editor */}
+              {editingTheme && (
+                <div style={{
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 8, padding: 16, marginBottom: 16,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>Theme Editor</span>
+                    <button
+                      onClick={() => setEditMode(editMode === 'smart' ? 'advanced' : 'smart')}
+                      style={{
+                        padding: '4px 10px', borderRadius: 4, fontSize: 10, cursor: 'pointer',
+                        border: '1px solid var(--border)', background: 'var(--raised)', color: 'var(--t2)',
+                      }}
+                    >{editMode === 'smart' ? 'Advanced' : 'Simple'}</button>
+                  </div>
+
+                  {/* Name */}
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={labelStyle}>Name</label>
+                    <input
+                      value={editingTheme.name}
+                      onChange={(e) => setEditingTheme({ ...editingTheme, name: e.target.value })}
+                      style={{ ...inputStyle, maxWidth: 240 }}
+                      maxLength={30}
+                    />
+                  </div>
+
+                  {/* Base theme selector (smart mode) */}
+                  {editMode === 'smart' && (
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={labelStyle}>Base Theme (for status colors)</label>
+                      <select
+                        value={baseThemeId}
+                        onChange={(e) => {
+                          setBaseThemeId(e.target.value);
+                          const baseT = THEMES[e.target.value] || THEMES['dotfiles-dark'];
+                          const derived = deriveTokens(
+                            editingTheme.name, smartColors.base, smartColors.surface,
+                            smartColors.t1, smartColors.accent, smartColors.border, smartColors.warm, baseT,
+                          );
+                          derived.id = editingTheme.id;
+                          derived.name = editingTheme.name;
+                          setEditingTheme(derived);
+                          applyTheme(derived);
+                        }}
+                        style={{ ...selectStyle, maxWidth: 240 }}
+                      >
+                        {Object.values(THEMES).map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Smart mode: 6 color pickers */}
+                  {editMode === 'smart' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                      {([
+                        ['base', 'Base'],
+                        ['surface', 'Surface'],
+                        ['t1', 'Text'],
+                        ['accent', 'Accent'],
+                        ['border', 'Border'],
+                        ['warm', 'Warm'],
+                      ] as const).map(([key, label]) => (
+                        <div key={key}>
+                          <label style={{ ...labelStyle, fontSize: 10 }}>{label}</label>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <input
+                              type="color"
+                              value={smartColors[key]}
+                              onChange={(e) => handleSmartColorChange(key, e.target.value)}
+                              style={{ width: 28, height: 28, border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer', padding: 0, background: 'transparent' }}
+                            />
+                            <span style={{ fontSize: 10, color: 'var(--t3)', fontFamily: "'JetBrains Mono', monospace" }}>
+                              {smartColors[key]}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Advanced mode: all 24 tokens grouped */}
+                  {editMode === 'advanced' && (
+                    <div>
+                      {([
+                        ['Depth Layers', ['void', 'deepest', 'deep', 'base', 'surface', 'raised', 'hover', 'active']],
+                        ['Text', ['t1', 't2', 't3']],
+                        ['Semantic', ['accent', 'aglow', 'warm', 'border']],
+                        ['Status', ['green', 'red', 'yellow', 'purple', 'cyan']],
+                      ] as [string, (keyof ThemeTokens)[]][]).map(([group, keys]) => (
+                        <div key={group} style={{ marginBottom: 12 }}>
+                          <label style={{ ...labelStyle, fontSize: 10, fontWeight: 600 }}>{group}</label>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+                            {keys.map(k => (
+                              <div key={k}>
+                                <label style={{ fontSize: 9, color: 'var(--t3)', display: 'block', marginBottom: 2 }}>{k}</label>
+                                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                  {k === 'aglow' ? (
+                                    <input
+                                      value={editingTheme[k]}
+                                      onChange={(e) => handleAdvancedChange(k, e.target.value)}
+                                      style={{ ...inputStyle, fontSize: 9, padding: '3px 6px', maxWidth: 120 }}
+                                      placeholder="rgba(...)"
+                                    />
+                                  ) : (
+                                    <>
+                                      <input
+                                        type="color"
+                                        value={editingTheme[k]}
+                                        onChange={(e) => handleAdvancedChange(k, e.target.value)}
+                                        style={{ width: 22, height: 22, border: '1px solid var(--border)', borderRadius: 3, cursor: 'pointer', padding: 0, background: 'transparent' }}
+                                      />
+                                      <span style={{ fontSize: 9, color: 'var(--t3)', fontFamily: "'JetBrains Mono', monospace" }}>
+                                        {editingTheme[k]}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Save / Cancel */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={cancelEdit}
+                      style={{
+                        padding: '6px 16px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                        border: '1px solid var(--border)', background: 'var(--raised)', color: 'var(--t2)',
+                      }}
+                    >Cancel</button>
+                    <button
+                      onClick={saveEditingTheme}
+                      disabled={!editingTheme.name.trim()}
+                      style={{
+                        padding: '6px 16px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                        border: '1px solid var(--accent)', background: 'var(--accent)', color: '#fff',
+                        fontWeight: 600, opacity: editingTheme.name.trim() ? 1 : 0.5,
+                      }}
+                    >Save Theme</button>
+                  </div>
+                </div>
+              )}
 
               {sectionTitle('Accent Color')}
               <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
