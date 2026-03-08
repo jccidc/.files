@@ -39,6 +39,31 @@ export interface CloudSource {
   enabled: boolean;
 }
 
+export interface ThemeTokens {
+  id: string;
+  name: string;
+  void: string;
+  deepest: string;
+  deep: string;
+  base: string;
+  surface: string;
+  raised: string;
+  hover: string;
+  active: string;
+  border: string;
+  t1: string;
+  t2: string;
+  t3: string;
+  accent: string;
+  aglow: string;
+  warm: string;
+  green: string;
+  red: string;
+  yellow: string;
+  purple: string;
+  cyan: string;
+}
+
 export interface AppSettings {
   // Appearance
   theme: string;
@@ -87,6 +112,7 @@ export interface AppSettings {
   github_repo_paths: Record<string, string>;  // full_name -> local path
   sidebar_section_order: string[];
   cloud_sources: CloudSource[];
+  custom_themes: ThemeTokens[];
 }
 
 export type TabType = 'explorer' | 'terminal' | 'preview';

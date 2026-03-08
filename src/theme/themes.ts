@@ -1,27 +1,5 @@
-export interface ThemeTokens {
-  id: string;
-  name: string;
-  void: string;
-  deepest: string;
-  deep: string;
-  base: string;
-  surface: string;
-  raised: string;
-  hover: string;
-  active: string;
-  border: string;
-  t1: string;
-  t2: string;
-  t3: string;
-  accent: string;
-  aglow: string;
-  warm: string;
-  green: string;
-  red: string;
-  yellow: string;
-  purple: string;
-  cyan: string;
-}
+import type { ThemeTokens } from '../types';
+export type { ThemeTokens };
 
 export const THEMES: Record<string, ThemeTokens> = {
   'dotfiles-dark': {

@@ -46,6 +46,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   github_repo_paths: {},
   sidebar_section_order: ['sources', 'cloud', 'quick-access', 'git'],
   cloud_sources: [],
+  custom_themes: [],
 };
 
 interface SettingsState {
