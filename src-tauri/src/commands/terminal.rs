@@ -37,6 +37,9 @@ pub fn spawn_pty(
     let pair = pty_system.openpty(size).map_err(|e| e.to_string())?;
 
     let mut cmd = CommandBuilder::new(&shell);
+    // Remove Claude Code env vars so nested sessions work
+    cmd.env_remove("CLAUDECODE");
+    cmd.env_remove("CLAUDE_CODE_ENTRYPOINT");
     if let Some(ref dir) = cwd {
         cmd.cwd(dir);
     }

@@ -72,8 +72,8 @@ pub fn run() {
 
             // Minimize to tray on close (hide window instead of exiting)
             let window = app.get_webview_window("main").unwrap();
-            #[cfg(debug_assertions)]
-            window.open_devtools();
+            // Dev tools: uncomment to debug
+            // window.open_devtools();
             let win_handle = window.clone();
             window.on_window_event(move |event| {
                 if let WindowEvent::CloseRequested { api, .. } = event {
