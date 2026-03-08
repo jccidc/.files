@@ -32,6 +32,8 @@
   --density-pad-y: 5px;
   --density-pad-x: 12px;
   --density-gap: 8px;
+  --file-font-size: 13px;
+  --file-font-size-sm: 12px;
   --bg-pattern: none;
   --bg-pattern-size: auto;
   --bg-opacity: 0.05;

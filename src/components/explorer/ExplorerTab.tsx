@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useExplorerStore } from '../../stores/explorer';
 import { useSettingsStore } from '../../stores/settings';
 import { usePanelsStore } from '../../stores/panels';
@@ -139,8 +140,36 @@ function InlineRename({ entry, onDone }: { entry: FileEntry; onDone: (newName: s
 
 // ---- Peek Row (inline folder expand) ----
 
-function PeekRow({ entry, selected, colWidths, onClick, onDoubleClick }: {
-  entry: FileEntry; selected: boolean; colWidths: string;
+// ---- Column Cell Renderer ----
+
+const cellStyle: React.CSSProperties = { fontSize: 'var(--file-font-size-sm)', color: 'var(--t3)', padding: '0 var(--density-pad-x)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+
+function CellValue({ col, entry, gitStatus }: { col: ColumnId; entry: FileEntry; gitStatus?: string }) {
+  switch (col) {
+    case 'size':
+      return <div style={cellStyle}>{entry.is_dir ? '--' : formatSize(entry.size)}</div>;
+    case 'modified':
+      return <div style={cellStyle}>{formatDate(entry.modified)}</div>;
+    case 'created':
+      return <div style={cellStyle}>{formatDate(entry.created)}</div>;
+    case 'type':
+      return <div style={cellStyle}>{entry.is_dir ? 'Folder' : (entry.extension ? `.${entry.extension}` : '--')}</div>;
+    case 'status': {
+      const gs = gitStatus;
+      if (!gs) return <div style={cellStyle}>--</div>;
+      return (
+        <div style={{ ...cellStyle, color: gitStatusColors[gs] || 'var(--t3)', fontWeight: 600 }}>
+          {gitStatusLetters[gs] || ''} {gs}
+        </div>
+      );
+    }
+    default:
+      return null;
+  }
+}
+
+function PeekRow({ entry, selected, colWidths, columns, onClick, onDoubleClick }: {
+  entry: FileEntry; selected: boolean; colWidths: string; columns: ColumnDef[];
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
 }) {
@@ -160,17 +189,14 @@ function PeekRow({ entry, selected, colWidths, onClick, onDoubleClick }: {
         <FileIcon entry={entry} />
         <span style={{
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          color: entry.is_hidden ? 'var(--t3)' : 'var(--t2)', fontSize: 12,
+          color: entry.is_hidden ? 'var(--t3)' : 'var(--t2)', fontSize: 'var(--file-font-size)',
         }}>
           {displayName(entry)}
         </span>
       </div>
-      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 var(--density-pad-x)' }}>
-        {entry.is_dir ? '--' : formatSize(entry.size)}
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 var(--density-pad-x)' }}>
-        {formatDate(entry.modified)}
-      </div>
+      {columns.filter(c => c.id !== 'name').map(c => (
+        <CellValue key={c.id} col={c.id} entry={entry} />
+      ))}
     </div>
   );
 }
@@ -185,6 +211,7 @@ interface FileRowProps {
   peekOpen: boolean;
   peekEnabled: boolean;
   colWidths: string;
+  columns: ColumnDef[];
   gitStatus?: string;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
@@ -204,7 +231,7 @@ const gitStatusLetters: Record<string, string> = {
   modified: 'M', added: 'A', deleted: 'D', renamed: 'R', untracked: '?', conflict: '!', typechange: 'T',
 };
 
-function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWidths, gitStatus: gs, onClick, onDoubleClick, onContextMenu, onRenameDone, onHover, onHoverEnd, onPeekToggle, onDragStart }: FileRowProps) {
+function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWidths, columns, gitStatus: gs, onClick, onDoubleClick, onContextMenu, onRenameDone, onHover, onHoverEnd, onPeekToggle, onDragStart }: FileRowProps) {
   return (
     <div
       draggable={selected}
@@ -245,35 +272,27 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
         ) : (
           <span style={{
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            color: entry.is_hidden ? 'var(--t3)' : 'var(--t1)', fontSize: 12,
+            color: entry.is_hidden ? 'var(--t3)' : 'var(--t1)', fontSize: 'var(--file-font-size)',
           }}>
             {displayName(entry)}
             {entry.is_dir && entry.children_count != null && (
-              <span style={{ color: 'var(--t3)', fontSize: 11, marginLeft: 6 }}>
+              <span style={{ color: 'var(--t3)', fontSize: 'var(--file-font-size-sm)', marginLeft: 6 }}>
                 {entry.children_count}
               </span>
             )}
           </span>
         )}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 var(--density-pad-x)' }}>
-        {entry.is_dir ? '--' : formatSize(entry.size)}
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--t3)', padding: '0 var(--density-pad-x)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span>{formatDate(entry.modified)}</span>
-        {gs && (
-          <span style={{ color: gitStatusColors[gs] || 'var(--t3)', fontWeight: 600, fontSize: 10, marginLeft: 4 }}>
-            {gitStatusLetters[gs] || ''}
-          </span>
-        )}
-      </div>
+      {columns.filter(c => c.id !== 'name').map(c => (
+        <CellValue key={c.id} col={c.id} entry={entry} gitStatus={gs} />
+      ))}
     </div>
   );
 }
 
 // ---- Sort types ----
 
-type SortField = 'name' | 'size' | 'modified';
+type SortField = 'name' | 'size' | 'modified' | 'created' | 'type';
 
 function sortEntries(entries: FileEntry[], field: SortField, asc: boolean): FileEntry[] {
   const sorted = [...entries];
@@ -290,10 +309,94 @@ function sortEntries(entries: FileEntry[], field: SortField, asc: boolean): File
       case 'modified':
         cmp = a.modified.localeCompare(b.modified);
         break;
+      case 'created':
+        cmp = (a.created || '').localeCompare(b.created || '');
+        break;
+      case 'type':
+        cmp = (a.extension || '').localeCompare(b.extension || '');
+        break;
     }
     return asc ? cmp : -cmp;
   });
   return sorted;
+}
+
+// ---- Column definitions ----
+
+type ColumnId = 'name' | 'size' | 'modified' | 'created' | 'type' | 'status';
+
+interface ColumnDef {
+  id: ColumnId;
+  label: string;
+  sortField?: SortField;
+  defaultWidth: number; // px, 0 = 1fr
+  minWidth: number;
+  removable: boolean;
+}
+
+const ALL_COLUMNS: ColumnDef[] = [
+  { id: 'name',     label: 'Name',     sortField: 'name',     defaultWidth: 0, minWidth: 120, removable: false },
+  { id: 'size',     label: 'Size',     sortField: 'size',     defaultWidth: 100, minWidth: 60, removable: true },
+  { id: 'modified', label: 'Modified', sortField: 'modified', defaultWidth: 140, minWidth: 80, removable: true },
+  { id: 'created',  label: 'Created',  sortField: 'created',  defaultWidth: 140, minWidth: 80, removable: true },
+  { id: 'type',     label: 'Type',     sortField: 'type',     defaultWidth: 80,  minWidth: 50, removable: true },
+  { id: 'status',   label: 'Status',   sortField: undefined,  defaultWidth: 70,  minWidth: 50, removable: true },
+];
+
+const DEFAULT_VISIBLE: ColumnId[] = ['name', 'size', 'modified'];
+
+// ---- Column Chooser Menu (right-click on header) ----
+
+function ColumnChooserMenu({ x, y, visibleCols, onToggle, onClose }: {
+  x: number; y: number;
+  visibleCols: ColumnId[];
+  onToggle: (id: ColumnId) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handle = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    requestAnimationFrame(() => document.addEventListener('mousedown', handle));
+    return () => document.removeEventListener('mousedown', handle);
+  }, [onClose]);
+
+  return createPortal(
+    <div ref={ref} style={{
+      position: 'fixed', left: x, top: y, zIndex: 10000,
+      background: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: 6, padding: '4px 0', minWidth: 160,
+      boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+    }}>
+      <div style={{ padding: '4px 12px 6px', fontSize: 'var(--file-font-size-sm)', fontWeight: 600, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        Columns
+      </div>
+      {ALL_COLUMNS.map(col => {
+        const checked = visibleCols.includes(col.id);
+        return (
+          <div
+            key={col.id}
+            onClick={() => col.removable && onToggle(col.id)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '6px 12px', cursor: col.removable ? 'pointer' : 'default',
+              fontSize: 'var(--file-font-size)', color: col.removable ? 'var(--t1)' : 'var(--t3)',
+            }}
+            onMouseEnter={(e) => { if (col.removable) e.currentTarget.style.background = 'var(--hover)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            <span style={{ width: 16, textAlign: 'center', fontSize: 'var(--file-font-size-sm)', color: checked ? 'var(--accent)' : 'var(--t3)' }}>
+              {checked ? '\u2713' : ''}
+            </span>
+            {col.label}
+          </div>
+        );
+      })}
+    </div>,
+    document.body,
+  );
 }
 
 // ---- Context Menu State ----
@@ -385,11 +488,34 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const slowClickPath = useRef<string | null>(null);
   const watcherIdRef = useRef(tab.id);
 
-  // Column widths: [name(flex), size(px), modified(px)]
-  const [sizeColW, setSizeColW] = useState(100);
-  const [modColW, setModColW] = useState(140);
+  // Column system
+  const [visibleCols, setVisibleCols] = useState<ColumnId[]>(DEFAULT_VISIBLE);
+  const [colWidthOverrides, setColWidthOverrides] = useState<Record<string, number>>({});
+  const [headerCtxMenu, setHeaderCtxMenu] = useState<{ x: number; y: number } | null>(null);
 
-  const colWidths = `1fr ${sizeColW}px ${modColW}px`;
+  const activeColumns = visibleCols.map(id => ALL_COLUMNS.find(c => c.id === id)!);
+
+  const getColWidth = (col: ColumnDef) => colWidthOverrides[col.id] ?? col.defaultWidth;
+
+  const colWidths = activeColumns.map(c => c.defaultWidth === 0 ? '1fr' : `${getColWidth(c)}px`).join(' ');
+
+  const resizeColumn = (colId: ColumnId, delta: number) => {
+    const col = ALL_COLUMNS.find(c => c.id === colId)!;
+    setColWidthOverrides(prev => ({
+      ...prev,
+      [colId]: Math.max(col.minWidth, (prev[colId] ?? col.defaultWidth) + delta),
+    }));
+  };
+
+  const toggleColumn = (colId: ColumnId) => {
+    setVisibleCols(prev => {
+      if (prev.includes(colId)) return prev.filter(id => id !== colId);
+      // Insert after name, in definition order
+      const ordered = ALL_COLUMNS.map(c => c.id).filter(id => id === colId || prev.includes(id));
+      return ordered;
+    });
+    setHeaderCtxMenu(null);
+  };
 
   // Build git status lookup: filename -> status
   const gitStatusMap = new Map<string, string>();
@@ -702,9 +828,10 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     }
   };
 
-  const colHeaderStyle = (field: SortField): React.CSSProperties => ({
-    padding: 'var(--density-pad-y) var(--density-pad-x)', fontSize: 11, fontWeight: 500, color: sortField === field ? 'var(--accent)' : 'var(--t3)',
-    textAlign: 'left', cursor: 'pointer', userSelect: 'none',
+  const colHeaderStyle = (field?: SortField): React.CSSProperties => ({
+    padding: 'var(--density-pad-y) var(--density-pad-x)', fontSize: 'var(--file-font-size-sm)', fontWeight: 500,
+    color: field && sortField === field ? 'var(--accent)' : 'var(--t3)',
+    textAlign: 'left', cursor: field ? 'pointer' : 'default', userSelect: 'none',
     display: 'flex', alignItems: 'center', gap: 4, position: 'relative',
   });
 
@@ -738,29 +865,49 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         onSearch={() => window.dispatchEvent(new CustomEvent('open-fuzzy-search'))}
       />
 
-      {/* Column headers with resize handles */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: colWidths,
-        borderBottom: '1px solid var(--border)', background: 'var(--base)',
-      }}>
-        <div style={colHeaderStyle('name')} onClick={() => handleSort('name')}>
-          Name {sortField === 'name' && (sortAsc ? <IconSortAsc /> : <IconSortDesc />)}
-          <ColResizeHandle onResize={(d) => {
-            // When resizing the name column right edge, shrink/grow size col
-            setSizeColW((w) => Math.max(60, w - d));
-          }} />
-        </div>
-        <div style={colHeaderStyle('size')} onClick={() => handleSort('size')}>
-          Size {sortField === 'size' && (sortAsc ? <IconSortAsc /> : <IconSortDesc />)}
-          <ColResizeHandle onResize={(d) => {
-            setSizeColW((w) => Math.max(60, w + d));
-            setModColW((w) => Math.max(80, w - d));
-          }} />
-        </div>
-        <div style={colHeaderStyle('modified')} onClick={() => handleSort('modified')}>
-          Modified {sortField === 'modified' && (sortAsc ? <IconSortAsc /> : <IconSortDesc />)}
-        </div>
+      {/* Column headers with resize handles + right-click to configure */}
+      <div
+        style={{
+          display: 'grid', gridTemplateColumns: colWidths,
+          borderBottom: '1px solid var(--border)', background: 'var(--base)',
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+        onMouseDown={(e) => {
+          if (e.button === 2) { e.preventDefault(); e.stopPropagation(); setHeaderCtxMenu({ x: e.clientX, y: e.clientY }); }
+        }}
+      >
+        {activeColumns.map((col, idx) => (
+          <div
+            key={col.id}
+            style={colHeaderStyle(col.sortField)}
+            onClick={() => col.sortField && handleSort(col.sortField)}
+          >
+            {col.label} {col.sortField && sortField === col.sortField && (sortAsc ? <IconSortAsc /> : <IconSortDesc />)}
+            {idx < activeColumns.length - 1 && (
+              <ColResizeHandle onResize={(d) => {
+                const nextCol = activeColumns[idx + 1];
+                if (col.defaultWidth === 0) {
+                  // Name column (1fr) — resize shrinks/grows the next col
+                  resizeColumn(nextCol.id, -d);
+                } else {
+                  resizeColumn(col.id, d);
+                  if (nextCol) resizeColumn(nextCol.id, -d);
+                }
+              }} />
+            )}
+          </div>
+        ))}
       </div>
+
+      {/* Column chooser context menu */}
+      {headerCtxMenu && (
+        <ColumnChooserMenu
+          x={headerCtxMenu.x} y={headerCtxMenu.y}
+          visibleCols={visibleCols}
+          onToggle={toggleColumn}
+          onClose={() => setHeaderCtxMenu(null)}
+        />
+      )}
 
       {/* File list */}
       {loading && <div style={{ padding: 24, color: 'var(--t3)', textAlign: 'center', flex: 1 }}>Loading...</div>}
@@ -779,7 +926,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
               if (item.groupHeader) {
                 elements.push(
                   <div key={`group-${i}-${item.groupHeader}`} style={{
-                    padding: 'var(--density-pad-y) var(--density-pad-x)', fontSize: 11, fontWeight: 600,
+                    padding: 'var(--density-pad-y) var(--density-pad-x)', fontSize: 'var(--file-font-size-sm)', fontWeight: 600,
                     color: 'var(--accent)', textTransform: 'uppercase',
                     letterSpacing: '0.05em', borderBottom: '1px solid var(--border)',
                     background: 'var(--deep)', position: 'sticky', top: 0, zIndex: 5,
@@ -801,6 +948,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
                     peekOpen={peekPaths.has(item.entry.path)}
                     peekEnabled={peekEnabled && item.entry.is_dir}
                     colWidths={colWidths}
+                    columns={activeColumns}
                     gitStatus={gitStatusMap.get(item.entry.name)}
                     onClick={(e) => handleRowClick(item.entry, i, e)}
                     onDoubleClick={() => handleDoubleClick(item.entry)}
@@ -838,6 +986,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
                           key={`peek-${pi.entry.path}`}
                           entry={pi.entry}
                           colWidths={colWidths}
+                          columns={activeColumns}
                           selected={selectedPaths.has(pi.entry.path)}
                           onClick={(e) => {
                             e.stopPropagation();

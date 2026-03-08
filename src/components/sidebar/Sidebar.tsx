@@ -89,7 +89,7 @@ const itemStyle: React.CSSProperties = {
   gap: 'var(--density-gap, 8px)',
   padding: 'var(--density-pad-y, 5px) var(--density-pad-x, 12px)',
   cursor: 'pointer',
-  fontSize: 12,
+  fontSize: 'var(--file-font-size, 13px)',
   color: 'var(--t2)',
   borderRadius: 4,
   margin: '0 6px',
@@ -175,7 +175,7 @@ function SectionLabel({ text, collapsed, onToggle, onPointerDown, dragOver, drag
     <div
       onClick={onToggle}
       style={{
-        fontSize: 10,
+        fontSize: 'var(--file-font-size-sm, 12px)',
         fontWeight: 600,
         color: 'var(--t3)',
         textTransform: 'uppercase',
@@ -525,7 +525,7 @@ export function Sidebar() {
                   onClick={() => navigate(p)}
                   style={{
                     flex: 1, display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '5px 4px', cursor: 'pointer', fontSize: 12, color: 'var(--t2)',
+                    padding: '5px 4px', cursor: 'pointer', fontSize: 'var(--file-font-size, 13px)', color: 'var(--t2)',
                     overflow: 'hidden',
                   }}
                 >
@@ -541,7 +541,7 @@ export function Sidebar() {
                   title="Unpin"
                   style={{
                     background: 'transparent', border: 'none', cursor: 'pointer',
-                    color: 'var(--t3)', padding: '2px 6px', fontSize: 11, borderRadius: 3,
+                    color: 'var(--t3)', padding: '2px 6px', fontSize: 'var(--file-font-size-sm, 12px)', borderRadius: 3,
                     display: 'flex', alignItems: 'center',
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--red)'; }}

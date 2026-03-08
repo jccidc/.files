@@ -19,6 +19,7 @@ export function useTheme() {
   const animationSpeed = useSettingsStore((s) => s.settings.animation_speed);
   const borderRadius = useSettingsStore((s) => s.settings.border_radius);
   const density = useSettingsStore((s) => s.settings.density);
+  const fontSize = useSettingsStore((s) => s.settings.font_size);
   const bgPattern = useSettingsStore((s) => s.settings.bg_pattern);
   const bgCustomUrl = useSettingsStore((s) => s.settings.bg_custom_url);
   const bgOpacity = useSettingsStore((s) => s.settings.bg_opacity);
@@ -71,9 +72,14 @@ export function useTheme() {
     r.style.setProperty('--density-pad-x', d.padX);
     r.style.setProperty('--density-gap', d.gap);
 
+    // Font size
+    const fs = fontSize ?? 13;
+    r.style.setProperty('--file-font-size', `${fs}px`);
+    r.style.setProperty('--file-font-size-sm', `${fs - 1}px`);
+
     // Glow
     r.classList.toggle('glow-enabled', enableGlow !== false);
-  }, [sidebarOpacity, toolbarOpacity, terminalOpacity, baseOpacity, blurAmount, borderRadius, animationSpeed, enableAnimations, density, enableGlow]);
+  }, [sidebarOpacity, toolbarOpacity, terminalOpacity, baseOpacity, blurAmount, borderRadius, animationSpeed, enableAnimations, density, enableGlow, fontSize]);
 
   // Background pattern
   useEffect(() => {

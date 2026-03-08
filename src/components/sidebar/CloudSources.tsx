@@ -100,7 +100,7 @@ function PatSetup({ onSave }: { onSave: (pat: string) => void }) {
           placeholder="ghp_..."
           style={{
             flex: 1, background: 'var(--deep)', border: '1px solid var(--border)',
-            borderRadius: 4, padding: '4px 8px', color: 'var(--t1)', fontSize: 11,
+            borderRadius: 4, padding: '4px 8px', color: 'var(--t1)', fontSize: 'var(--file-font-size-sm, 12px)',
             fontFamily: "'JetBrains Mono', monospace", outline: 'none',
           }}
           onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
@@ -113,7 +113,7 @@ function PatSetup({ onSave }: { onSave: (pat: string) => void }) {
           style={{
             background: value.trim() ? 'var(--accent)' : 'var(--raised)',
             color: value.trim() ? '#fff' : 'var(--t3)',
-            border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 11,
+            border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 'var(--file-font-size-sm, 12px)',
             cursor: value.trim() ? 'pointer' : 'not-allowed',
           }}
         >
@@ -147,13 +147,13 @@ function GitHubRepoList({ repos, loading, error, onClone, onRepoClick, onLink, c
   linkedRepos: Record<string, string>;
 }) {
   if (loading) {
-    return <div style={{ padding: '4px 12px', fontSize: 11, color: 'var(--t3)' }}>Loading repos...</div>;
+    return <div style={{ padding: '4px 12px', fontSize: 'var(--file-font-size-sm, 12px)', color: 'var(--t3)' }}>Loading repos...</div>;
   }
   if (error) {
-    return <div style={{ padding: '4px 12px', fontSize: 11, color: 'var(--red)' }}>{error}</div>;
+    return <div style={{ padding: '4px 12px', fontSize: 'var(--file-font-size-sm, 12px)', color: 'var(--red)' }}>{error}</div>;
   }
   if (repos.length === 0) {
-    return <div style={{ padding: '4px 12px', fontSize: 11, color: 'var(--t3)' }}>No repos found</div>;
+    return <div style={{ padding: '4px 12px', fontSize: 'var(--file-font-size-sm, 12px)', color: 'var(--t3)' }}>No repos found</div>;
   }
 
   return (
@@ -164,7 +164,7 @@ function GitHubRepoList({ repos, loading, error, onClone, onRepoClick, onLink, c
           onClick={() => onRepoClick(r)}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '4px 12px', fontSize: 11, color: 'var(--t2)',
+            padding: '4px 12px', fontSize: 'var(--file-font-size-sm, 12px)', color: 'var(--t2)',
             cursor: 'pointer',
           }}
           onMouseEnter={(e) => {
@@ -461,7 +461,7 @@ export function CloudSources({ onContextMenu }: { onContextMenu?: (e: React.Mous
             <div
               onClick={() => setShowPatSetup(true)}
               style={{
-                padding: '4px 12px', fontSize: 11, color: 'var(--t3)', cursor: 'pointer',
+                padding: '4px 12px', fontSize: 'var(--file-font-size-sm, 12px)', color: 'var(--t3)', cursor: 'pointer',
               }}
               onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--t3)'; }}
@@ -490,7 +490,7 @@ export function CloudSources({ onContextMenu }: { onContextMenu?: (e: React.Mous
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--t1)', marginBottom: 8 }}>
               Clone {cloneTarget.repo.full_name}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>
+            <div style={{ fontSize: 'var(--file-font-size-sm, 12px)', color: 'var(--t3)', marginBottom: 8 }}>
               Clone destination:
             </div>
             <input
@@ -498,7 +498,7 @@ export function CloudSources({ onContextMenu }: { onContextMenu?: (e: React.Mous
               onChange={(e) => setCloneTarget({ ...cloneTarget, path: e.target.value })}
               style={{
                 width: '100%', background: 'var(--deep)', border: '1px solid var(--border)',
-                borderRadius: 4, padding: '6px 8px', color: 'var(--t1)', fontSize: 12,
+                borderRadius: 4, padding: '6px 8px', color: 'var(--t1)', fontSize: 'var(--file-font-size, 13px)',
                 fontFamily: "'JetBrains Mono', monospace", outline: 'none', boxSizing: 'border-box',
               }}
               onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
@@ -511,7 +511,7 @@ export function CloudSources({ onContextMenu }: { onContextMenu?: (e: React.Mous
                 onClick={() => setCloneTarget(null)}
                 style={{
                   background: 'var(--raised)', color: 'var(--t2)',
-                  border: 'none', borderRadius: 4, padding: '6px 16px', fontSize: 12, cursor: 'pointer',
+                  border: 'none', borderRadius: 4, padding: '6px 16px', fontSize: 'var(--file-font-size, 13px)', cursor: 'pointer',
                 }}
               >
                 Cancel
@@ -525,7 +525,7 @@ export function CloudSources({ onContextMenu }: { onContextMenu?: (e: React.Mous
                 title="Open in browser"
                 style={{
                   background: 'var(--raised)', color: 'var(--t2)',
-                  border: '1px solid var(--border)', borderRadius: 4, padding: '6px 16px', fontSize: 12, cursor: 'pointer',
+                  border: '1px solid var(--border)', borderRadius: 4, padding: '6px 16px', fontSize: 'var(--file-font-size, 13px)', cursor: 'pointer',
                 }}
               >
                 Browse on GitHub
@@ -534,7 +534,7 @@ export function CloudSources({ onContextMenu }: { onContextMenu?: (e: React.Mous
                 onClick={executeClone}
                 style={{
                   background: 'var(--accent)', color: '#fff',
-                  border: 'none', borderRadius: 4, padding: '6px 16px', fontSize: 12, cursor: 'pointer', fontWeight: 500,
+                  border: 'none', borderRadius: 4, padding: '6px 16px', fontSize: 'var(--file-font-size, 13px)', cursor: 'pointer', fontWeight: 500,
                 }}
               >
                 Clone
