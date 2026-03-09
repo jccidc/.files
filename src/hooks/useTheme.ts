@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { appConfigDir } from '@tauri-apps/api/path';
 import { useSettingsStore } from '../stores/settings';
 import { applyTheme, resolveTheme } from '../theme/themes';
 
@@ -25,7 +26,9 @@ export function useTheme() {
   const bgCustomUrl = useSettingsStore((s) => s.settings.bg_custom_url);
   const bgOpacity = useSettingsStore((s) => s.settings.bg_opacity);
   const customCss = useSettingsStore((s) => s.settings.custom_css);
+  const customFonts = useSettingsStore((s) => s.settings.custom_fonts);
   const customStyleRef = useRef<HTMLStyleElement | null>(null);
+  const fontStyleRef = useRef<HTMLStyleElement | null>(null);
   const cursorTrailRef = useRef<HTMLCanvasElement | null>(null);
 
   // Theme + accent
@@ -122,6 +125,41 @@ export function useTheme() {
       }
     };
   }, [customCss]);
+
+  // Custom font @font-face injection
+  useEffect(() => {
+    if (!fontStyleRef.current) {
+      fontStyleRef.current = document.createElement('style');
+      fontStyleRef.current.id = 'dotfiles-custom-fonts';
+      document.head.appendChild(fontStyleRef.current);
+    }
+
+    const fonts = customFonts || [];
+    if (fonts.length === 0) {
+      fontStyleRef.current.textContent = '';
+      return;
+    }
+
+    (async () => {
+      try {
+        const configDir = await appConfigDir();
+        const rules = fonts.map((f: any) => {
+          const url = convertFileSrc(`${configDir}fonts\\${f.file}`);
+          return `@font-face { font-family: '${f.name}'; src: url('${url}'); }`;
+        }).join('\n');
+        if (fontStyleRef.current) {
+          fontStyleRef.current.textContent = rules;
+        }
+      } catch {}
+    })();
+
+    return () => {
+      if (fontStyleRef.current) {
+        fontStyleRef.current.remove();
+        fontStyleRef.current = null;
+      }
+    };
+  }, [customFonts]);
 
   // Cursor trail effect
   useEffect(() => {
