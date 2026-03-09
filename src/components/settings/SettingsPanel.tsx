@@ -4,7 +4,8 @@ import { THEMES, ACCENT_PRESETS, deriveTokens, resolveTheme, validateThemeJson, 
 import type { ThemeTokens } from '../../types';
 import { detectCloudMounts } from '../../api/cloud';
 import { isDefaultFolderHandler, setDefaultFolderHandler } from '../../api/registry';
-import type { CloudSource } from '../../types';
+import { listSystemFonts, installCustomFont, removeCustomFont } from '../../api/fonts';
+import type { CloudSource, CustomFont } from '../../types';
 
 type Section = 'appearance' | 'explorer' | 'terminal' | 'keybindings' | 'cloud';
 
@@ -103,10 +104,21 @@ export function SettingsPanel({ open, onClose }: Props) {
     accent: '#3B82F6', border: '#1A1F28', warm: '#D4A06A',
   });
   const themeImportRef = useRef<HTMLInputElement>(null);
+  const [systemFonts, setSystemFonts] = useState<string[]>([]);
+  const [fontsLoaded, setFontsLoaded] = useState(false);
 
   useEffect(() => {
     isDefaultFolderHandler().then(setIsDefaultHandler).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (section === 'appearance' && !fontsLoaded) {
+      listSystemFonts().then((fonts) => {
+        setSystemFonts(fonts);
+        setFontsLoaded(true);
+      }).catch(() => setFontsLoaded(true));
+    }
+  }, [section, fontsLoaded]);
 
   const handleDefaultHandlerToggle = async () => {
     const next = !isDefaultHandler;
@@ -231,6 +243,36 @@ export function SettingsPanel({ open, onClose }: Props) {
       }
     };
     reader.readAsText(file);
+  };
+
+  const customFonts: CustomFont[] = (settings.custom_fonts || []) as CustomFont[];
+
+  const handleAddFont = async () => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const path = await open({
+        filters: [{ name: 'Fonts', extensions: ['ttf', 'otf', 'woff2'] }],
+        multiple: false,
+      });
+      if (!path) return;
+      const result = await installCustomFont(path as string);
+      const updated = [...customFonts, result];
+      update({ custom_fonts: updated, font_family: result.name });
+    } catch (e) {
+      console.error('Font install failed:', e);
+    }
+  };
+
+  const handleRemoveFont = async (font: CustomFont) => {
+    try {
+      await removeCustomFont(font.file);
+      const updated = customFonts.filter(f => f.file !== font.file);
+      const patch: Partial<typeof settings> = { custom_fonts: updated };
+      if (settings.font_family === font.name) patch.font_family = 'JetBrains Mono';
+      update(patch);
+    } catch (e) {
+      console.error('Font remove failed:', e);
+    }
   };
 
   if (!open) return null;
@@ -882,20 +924,62 @@ export function SettingsPanel({ open, onClose }: Props) {
               {sectionTitle('Font')}
               <div style={{ marginBottom: 16 }}>
                 <label style={labelStyle}>UI Font Family</label>
-                <select
-                  value={settings.font_family}
-                  onChange={(e) => update({ font_family: e.target.value })}
-                  style={selectStyle}
-                >
-                  <option value="JetBrains Mono">JetBrains Mono</option>
-                  <option value="Fira Code">Fira Code</option>
-                  <option value="Cascadia Code">Cascadia Code</option>
-                  <option value="Consolas">Consolas</option>
-                  <option value="SF Mono">SF Mono</option>
-                  <option value="Outfit">Outfit</option>
-                  <option value="Inter">Inter</option>
-                  <option value="Segoe UI">Segoe UI</option>
-                </select>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <select
+                    value={settings.font_family}
+                    onChange={(e) => update({ font_family: e.target.value })}
+                    style={{ ...selectStyle, flex: 1 }}
+                  >
+                    <optgroup label="Bundled">
+                      <option value="JetBrains Mono">JetBrains Mono</option>
+                      <option value="Outfit">Outfit</option>
+                    </optgroup>
+                    {customFonts.length > 0 && (
+                      <optgroup label="Custom">
+                        {customFonts.map((f) => (
+                          <option key={f.file} value={f.name}>{f.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {systemFonts.length > 0 && (
+                      <optgroup label="System">
+                        {systemFonts.map((name) => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                  <button
+                    onClick={handleAddFont}
+                    title="Add custom font file"
+                    style={{
+                      padding: '6px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
+                      border: '1px solid var(--border)', background: 'var(--raised)',
+                      color: 'var(--accent)', whiteSpace: 'nowrap',
+                    }}
+                  >+ Add Font</button>
+                </div>
+                {customFonts.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    {customFonts.map((f) => (
+                      <div key={f.file} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '4px 8px', fontSize: 11, color: 'var(--t2)',
+                        background: 'var(--surface)', borderRadius: 4, marginBottom: 4,
+                      }}>
+                        <span>{f.name} <span style={{ color: 'var(--t3)', fontSize: 10 }}>({f.file})</span></span>
+                        <button
+                          onClick={() => handleRemoveFont(f)}
+                          title="Remove font"
+                          style={{
+                            border: 'none', background: 'transparent', cursor: 'pointer',
+                            color: 'var(--red)', fontSize: 12, padding: '2px 4px',
+                          }}
+                        >x</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div style={{ marginBottom: 16 }}>
