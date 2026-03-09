@@ -280,10 +280,12 @@ export function Toolbar({ onRename, onDelete, sortField, sortAsc, onSort, filter
   const [filterOpen, setFilterOpen] = useState(false);
   const [pathEditing, setPathEditing] = useState(false);
   const [pathValue, setPathValue] = useState(currentPath);
+  const [pathCtxMenu, setPathCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const sortRef = useRef<HTMLDivElement>(null);
   const groupRef = useRef<HTMLDivElement>(null);
   const filterInputRef = useRef<HTMLInputElement>(null);
   const pathInputRef = useRef<HTMLInputElement>(null);
+  const pathSubmittedRef = useRef(false);
 
   const hasSelection = selectedPaths.size > 0;
   const hasSingleSelection = selectedPaths.size === 1;
@@ -303,7 +305,7 @@ export function Toolbar({ onRename, onDelete, sortField, sortAsc, onSort, filter
   // Ctrl+L to edit path
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'l') { e.preventDefault(); setPathEditing(true); }
+      if (e.ctrlKey && e.key === 'l') { e.preventDefault(); setPathValue(useExplorerStore.getState().currentPath); setPathEditing(true); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -319,6 +321,14 @@ export function Toolbar({ onRename, onDelete, sortField, sortAsc, onSort, filter
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [sortOpen, groupOpen]);
+
+  // Close path context menu on outside click
+  useEffect(() => {
+    if (!pathCtxMenu) return;
+    const handler = () => setPathCtxMenu(null);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [pathCtxMenu]);
 
   // Focus filter input when opened
   useEffect(() => {
@@ -339,8 +349,8 @@ export function Toolbar({ onRename, onDelete, sortField, sortAsc, onSort, filter
   };
 
   const handlePathKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') { setPathEditing(false); navigate(pathValue); }
-    else if (e.key === 'Escape') { setPathEditing(false); setPathValue(currentPath); }
+    if (e.key === 'Enter') { pathSubmittedRef.current = true; setPathEditing(false); navigate(pathValue); }
+    else if (e.key === 'Escape') { pathSubmittedRef.current = true; setPathEditing(false); setPathValue(currentPath); }
   };
 
   const sortLabel = SORT_FIELDS.find((f) => f.key === sortField)?.label || 'Name';
@@ -616,21 +626,79 @@ export function Toolbar({ onRename, onDelete, sortField, sortAsc, onSort, filter
         minHeight: 30,
       }}>
         {pathEditing ? (
+          <>
           <input
             ref={pathInputRef}
             value={pathValue}
             onChange={(e) => setPathValue(e.target.value)}
             onKeyDown={handlePathKeyDown}
-            onBlur={() => { setPathEditing(false); setPathValue(currentPath); }}
+            onBlur={() => { setTimeout(() => { if (!pathSubmittedRef.current && !pathCtxMenu) { setPathEditing(false); setPathValue(currentPath); } pathSubmittedRef.current = false; }, 200); }}
+            onMouseDown={(e) => {
+              if (e.button === 2) {
+                e.preventDefault();
+                e.stopPropagation();
+                setPathCtxMenu({ x: e.clientX, y: e.clientY });
+              }
+            }}
             style={{
               flex: 1, background: 'var(--surface)', border: '1px solid var(--accent)',
               borderRadius: 4, padding: '4px 8px', color: 'var(--t1)', fontSize: 12,
               fontFamily: "'JetBrains Mono', monospace", outline: 'none',
             }}
           />
+          {pathCtxMenu && (
+            <div
+              style={{
+                position: 'fixed', left: pathCtxMenu.x, top: pathCtxMenu.y, zIndex: 9999,
+                background: 'var(--raised)', border: '1px solid var(--border)', borderRadius: 6,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.4)', padding: 4, minWidth: 120,
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseLeave={() => {}}
+            >
+              {[
+                { label: 'Cut', fn: 'cut' },
+                { label: 'Copy', fn: 'copy' },
+                { label: 'Paste', fn: 'paste' },
+                { label: 'Select All', fn: 'selectall' },
+              ].map(({ label, fn }) => (
+                <button
+                  key={label}
+                  onClick={() => {
+                    if (fn === 'paste') {
+                      navigator.clipboard.readText().then((text) => {
+                        const input = pathInputRef.current;
+                        if (input) {
+                          const start = input.selectionStart ?? pathValue.length;
+                          const end = input.selectionEnd ?? pathValue.length;
+                          setPathValue(pathValue.slice(0, start) + text + pathValue.slice(end));
+                        }
+                      }).catch(() => {});
+                    } else if (fn === 'selectall') {
+                      pathInputRef.current?.select();
+                    } else {
+                      document.execCommand(fn);
+                    }
+                    setPathCtxMenu(null);
+                    pathInputRef.current?.focus();
+                  }}
+                  style={{
+                    display: 'block', width: '100%', padding: '6px 12px', border: 'none',
+                    background: 'transparent', color: 'var(--t1)', fontSize: 12,
+                    textAlign: 'left', cursor: 'pointer', borderRadius: 4,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          </>
         ) : (
           <div
-            onClick={() => setPathEditing(true)}
+            onClick={() => { setPathValue(currentPath); setPathEditing(true); }}
             style={{
               flex: 1, display: 'flex', alignItems: 'center', gap: 2,
               cursor: 'text', overflow: 'hidden', padding: '2px 4px',

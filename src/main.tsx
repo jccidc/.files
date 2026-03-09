@@ -27,8 +27,12 @@ window.addEventListener('unhandledrejection', (e) => {
   document.body.innerHTML = `<pre style="padding:24px;color:#f87171;font-family:monospace">Unhandled rejection: ${e.reason}\n${e.reason?.stack || ''}</pre>`;
 });
 
-// Suppress native WebView2 context menu globally
-document.addEventListener('contextmenu', (e) => e.preventDefault());
+// Suppress native WebView2 context menu globally, but allow it on text inputs
+document.addEventListener('contextmenu', (e) => {
+  const tag = (e.target as HTMLElement)?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  e.preventDefault();
+});
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

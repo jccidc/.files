@@ -11,6 +11,10 @@ interface HotkeyBinding {
 export function useHotkeys(bindings: HotkeyBinding[]) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Don't intercept shortcuts when typing in text inputs
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
       for (const b of bindings) {
         const ctrlMatch = (b.ctrl ?? false) === (e.ctrlKey || e.metaKey);
         const shiftMatch = (b.shift ?? false) === e.shiftKey;
