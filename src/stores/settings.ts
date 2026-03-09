@@ -47,6 +47,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   sidebar_section_order: ['sources', 'cloud', 'quick-access', 'git'],
   cloud_sources: [],
   custom_themes: [],
+  custom_fonts: [],
 };
 
 interface SettingsState {

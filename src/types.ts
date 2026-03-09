@@ -64,6 +64,11 @@ export interface ThemeTokens {
   cyan: string;
 }
 
+export interface CustomFont {
+  name: string;  // font family name
+  file: string;  // filename in app fonts dir
+}
+
 export interface AppSettings {
   // Appearance
   theme: string;
@@ -113,6 +118,7 @@ export interface AppSettings {
   sidebar_section_order: string[];
   cloud_sources: CloudSource[];
   custom_themes: ThemeTokens[];
+  custom_fonts: CustomFont[];
 }
 
 export type TabType = 'explorer' | 'terminal' | 'preview';

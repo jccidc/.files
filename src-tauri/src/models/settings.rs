@@ -91,6 +91,8 @@ pub struct AppSettings {
     pub cloud_sources: Vec<CloudSource>,
     #[serde(default)]
     pub custom_themes: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub custom_fonts: Vec<serde_json::Value>,
 }
 
 fn default_theme() -> String { "dotfiles-dark".to_string() }
@@ -161,6 +163,7 @@ impl Default for AppSettings {
             sidebar_section_order: default_sidebar_section_order(),
             cloud_sources: Vec::new(),
             custom_themes: Vec::new(),
+            custom_fonts: Vec::new(),
         }
     }
 }
