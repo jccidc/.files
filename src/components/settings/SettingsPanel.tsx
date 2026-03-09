@@ -106,6 +106,9 @@ export function SettingsPanel({ open, onClose }: Props) {
   const themeImportRef = useRef<HTMLInputElement>(null);
   const [systemFonts, setSystemFonts] = useState<string[]>([]);
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [fontPickerOpen, setFontPickerOpen] = useState(false);
+  const [fontSearch, setFontSearch] = useState('');
+  const fontPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     isDefaultFolderHandler().then(setIsDefaultHandler).catch(() => {});
@@ -119,6 +122,18 @@ export function SettingsPanel({ open, onClose }: Props) {
       }).catch(() => setFontsLoaded(true));
     }
   }, [section, fontsLoaded]);
+
+  // Close font picker on click outside
+  useEffect(() => {
+    if (!fontPickerOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (fontPickerRef.current && !fontPickerRef.current.contains(e.target as Node)) {
+        setFontPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [fontPickerOpen]);
 
   const handleDefaultHandlerToggle = async () => {
     const next = !isDefaultHandler;
@@ -922,33 +937,21 @@ export function SettingsPanel({ open, onClose }: Props) {
               )}
 
               {sectionTitle('Font')}
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 16, position: 'relative' }} ref={fontPickerRef}>
                 <label style={labelStyle}>UI Font Family</label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <select
-                    value={settings.font_family}
-                    onChange={(e) => update({ font_family: e.target.value })}
-                    style={{ ...selectStyle, flex: 1 }}
+                  {/* Custom font picker trigger */}
+                  <button
+                    onClick={() => { setFontPickerOpen(!fontPickerOpen); setFontSearch(''); }}
+                    style={{
+                      ...inputStyle, flex: 1, textAlign: 'left', cursor: 'pointer',
+                      fontFamily: `'${settings.font_family}', sans-serif`,
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    }}
                   >
-                    <optgroup label="Bundled">
-                      <option value="JetBrains Mono">JetBrains Mono</option>
-                      <option value="Outfit">Outfit</option>
-                    </optgroup>
-                    {customFonts.length > 0 && (
-                      <optgroup label="Custom">
-                        {customFonts.map((f) => (
-                          <option key={f.file} value={f.name}>{f.name}</option>
-                        ))}
-                      </optgroup>
-                    )}
-                    {systemFonts.length > 0 && (
-                      <optgroup label="System">
-                        {systemFonts.map((name) => (
-                          <option key={name} value={name}>{name}</option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </select>
+                    <span>{settings.font_family}</span>
+                    <span style={{ color: 'var(--t3)', fontSize: 10 }}>{fontPickerOpen ? '\u25B2' : '\u25BC'}</span>
+                  </button>
                   <button
                     onClick={handleAddFont}
                     title="Add custom font file"
@@ -959,25 +962,113 @@ export function SettingsPanel({ open, onClose }: Props) {
                     }}
                   >+ Add Font</button>
                 </div>
-                {customFonts.length > 0 && (
-                  <div style={{ marginTop: 8 }}>
-                    {customFonts.map((f) => (
-                      <div key={f.file} style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '4px 8px', fontSize: 11, color: 'var(--t2)',
-                        background: 'var(--surface)', borderRadius: 4, marginBottom: 4,
-                      }}>
-                        <span>{f.name} <span style={{ color: 'var(--t3)', fontSize: 10 }}>({f.file})</span></span>
-                        <button
-                          onClick={() => handleRemoveFont(f)}
-                          title="Remove font"
-                          style={{
-                            border: 'none', background: 'transparent', cursor: 'pointer',
-                            color: 'var(--red)', fontSize: 12, padding: '2px 4px',
-                          }}
-                        >x</button>
-                      </div>
-                    ))}
+
+                {/* Font picker dropdown */}
+                {fontPickerOpen && (
+                  <div
+                    style={{
+                      position: 'absolute', top: '100%', left: 0, right: 48, zIndex: 50,
+                      background: 'var(--raised)', border: '1px solid var(--border)',
+                      borderRadius: 8, marginTop: 4, overflow: 'hidden',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                    }}
+                  >
+                    {/* Search */}
+                    <div style={{ padding: 8, borderBottom: '1px solid var(--border)' }}>
+                      <input
+                        autoFocus
+                        value={fontSearch}
+                        onChange={(e) => setFontSearch(e.target.value)}
+                        placeholder="Search fonts..."
+                        style={{ ...inputStyle, fontSize: 11 }}
+                        onKeyDown={(e) => { if (e.key === 'Escape') setFontPickerOpen(false); }}
+                      />
+                    </div>
+                    {/* Font list */}
+                    <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+                      {/* Bundled */}
+                      {(() => {
+                        const bundled = ['JetBrains Mono', 'Outfit'].filter(n => n.toLowerCase().includes(fontSearch.toLowerCase()));
+                        const custom = customFonts.filter(f => f.name.toLowerCase().includes(fontSearch.toLowerCase()));
+                        const system = systemFonts.filter(n => n.toLowerCase().includes(fontSearch.toLowerCase()));
+                        return (
+                          <>
+                            {bundled.length > 0 && (
+                              <>
+                                <div style={{ padding: '6px 12px', fontSize: 9, color: 'var(--t3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Bundled</div>
+                                {bundled.map(name => (
+                                  <button
+                                    key={name}
+                                    onClick={() => { update({ font_family: name }); setFontPickerOpen(false); }}
+                                    style={{
+                                      display: 'block', width: '100%', padding: '8px 12px', border: 'none', cursor: 'pointer', textAlign: 'left',
+                                      background: settings.font_family === name ? 'var(--active)' : 'transparent',
+                                      color: settings.font_family === name ? 'var(--accent)' : 'var(--t1)',
+                                    }}
+                                    onMouseEnter={(e) => { if (settings.font_family !== name) e.currentTarget.style.background = 'var(--hover)'; }}
+                                    onMouseLeave={(e) => { if (settings.font_family !== name) e.currentTarget.style.background = 'transparent'; }}
+                                  >
+                                    <div style={{ fontFamily: `'${name}', sans-serif`, fontSize: 13 }}>{name}</div>
+                                    <div style={{ fontFamily: `'${name}', sans-serif`, fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>The quick brown fox jumps over the lazy dog</div>
+                                  </button>
+                                ))}
+                              </>
+                            )}
+                            {custom.length > 0 && (
+                              <>
+                                <div style={{ padding: '6px 12px', fontSize: 9, color: 'var(--t3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', borderTop: '1px solid var(--border)' }}>Custom</div>
+                                {custom.map(f => (
+                                  <div key={f.file} style={{ display: 'flex', alignItems: 'center' }}>
+                                    <button
+                                      onClick={() => { update({ font_family: f.name }); setFontPickerOpen(false); }}
+                                      style={{
+                                        flex: 1, padding: '8px 12px', border: 'none', cursor: 'pointer', textAlign: 'left',
+                                        background: settings.font_family === f.name ? 'var(--active)' : 'transparent',
+                                        color: settings.font_family === f.name ? 'var(--accent)' : 'var(--t1)',
+                                      }}
+                                      onMouseEnter={(e) => { if (settings.font_family !== f.name) e.currentTarget.style.background = 'var(--hover)'; }}
+                                      onMouseLeave={(e) => { if (settings.font_family !== f.name) e.currentTarget.style.background = 'transparent'; }}
+                                    >
+                                      <div style={{ fontFamily: `'${f.name}', sans-serif`, fontSize: 13 }}>{f.name}</div>
+                                      <div style={{ fontFamily: `'${f.name}', sans-serif`, fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>The quick brown fox jumps over the lazy dog</div>
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleRemoveFont(f); }}
+                                      title="Remove font"
+                                      style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--red)', fontSize: 11, padding: '4px 8px' }}
+                                    >x</button>
+                                  </div>
+                                ))}
+                              </>
+                            )}
+                            {system.length > 0 && (
+                              <>
+                                <div style={{ padding: '6px 12px', fontSize: 9, color: 'var(--t3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', borderTop: '1px solid var(--border)' }}>System</div>
+                                {system.map(name => (
+                                  <button
+                                    key={name}
+                                    onClick={() => { update({ font_family: name }); setFontPickerOpen(false); }}
+                                    style={{
+                                      display: 'block', width: '100%', padding: '8px 12px', border: 'none', cursor: 'pointer', textAlign: 'left',
+                                      background: settings.font_family === name ? 'var(--active)' : 'transparent',
+                                      color: settings.font_family === name ? 'var(--accent)' : 'var(--t1)',
+                                    }}
+                                    onMouseEnter={(e) => { if (settings.font_family !== name) e.currentTarget.style.background = 'var(--hover)'; }}
+                                    onMouseLeave={(e) => { if (settings.font_family !== name) e.currentTarget.style.background = 'transparent'; }}
+                                  >
+                                    <div style={{ fontFamily: `'${name}', sans-serif`, fontSize: 13 }}>{name}</div>
+                                    <div style={{ fontFamily: `'${name}', sans-serif`, fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>The quick brown fox jumps over the lazy dog</div>
+                                  </button>
+                                ))}
+                              </>
+                            )}
+                            {bundled.length === 0 && custom.length === 0 && system.length === 0 && (
+                              <div style={{ padding: '12px', fontSize: 11, color: 'var(--t3)', textAlign: 'center' }}>No fonts match "{fontSearch}"</div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
                 )}
               </div>
