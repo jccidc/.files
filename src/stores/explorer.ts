@@ -6,7 +6,7 @@ import { useSettingsStore } from './settings';
 
 export type ViewMode = 'list' | 'grid';
 
-interface ExplorerState {
+export interface TabExplorerState {
   currentPath: string;
   entries: FileEntry[];
   selectedPaths: Set<string>;
@@ -17,153 +17,234 @@ interface ExplorerState {
   historyIndex: number;
   canGoBack: boolean;
   canGoForward: boolean;
-  clipboardPaths: string[];
-  clipboardMode: 'copy' | 'cut' | null;
-  navigate: (path: string) => Promise<void>;
-  refresh: () => Promise<void>;
-  setSelected: (paths: Set<string>) => void;
-  toggleSelected: (path: string) => void;
-  selectAll: () => void;
-  clearSelection: () => void;
-  setViewMode: (mode: ViewMode) => void;
-  goBack: () => Promise<void>;
-  goForward: () => Promise<void>;
-  goUp: () => Promise<void>;
-  goHome: () => Promise<void>;
-  copyPaths: (paths: string[]) => void;
-  cutPaths: (paths: string[]) => void;
-  paste: () => Promise<void>;
 }
 
-export const useExplorerStore = create<ExplorerState>((set, get) => {
-  const loadPath = async (path: string) => {
+const DEFAULT_TAB_STATE: TabExplorerState = {
+  currentPath: 'C:\\',
+  entries: [],
+  selectedPaths: new Set(),
+  loading: false,
+  error: null,
+  viewMode: 'list',
+  history: ['C:\\'],
+  historyIndex: 0,
+  canGoBack: false,
+  canGoForward: false,
+};
+
+function createTabState(initialPath?: string): TabExplorerState {
+  const path = initialPath || 'C:\\';
+  return { ...DEFAULT_TAB_STATE, currentPath: path, history: [path], selectedPaths: new Set() };
+}
+
+interface ExplorerStore {
+  tabStates: Record<string, TabExplorerState>;
+  activeTabId: string | null;
+  clipboardPaths: string[];
+  clipboardMode: 'copy' | 'cut' | null;
+
+  // Tab lifecycle
+  initTab: (tabId: string, initialPath?: string) => void;
+  removeTab: (tabId: string) => void;
+  setActiveTab: (tabId: string) => void;
+
+  // Per-tab actions
+  navigate: (tabId: string, path: string) => Promise<void>;
+  refresh: (tabId: string) => Promise<void>;
+  setSelected: (tabId: string, paths: Set<string>) => void;
+  toggleSelected: (tabId: string, path: string) => void;
+  selectAll: (tabId: string) => void;
+  clearSelection: (tabId: string) => void;
+  setViewMode: (tabId: string, mode: ViewMode) => void;
+  goBack: (tabId: string) => Promise<void>;
+  goForward: (tabId: string) => Promise<void>;
+  goUp: (tabId: string) => Promise<void>;
+  goHome: (tabId: string) => Promise<void>;
+
+  // Global clipboard
+  copyPaths: (paths: string[]) => void;
+  cutPaths: (paths: string[]) => void;
+  paste: (tabId: string) => Promise<void>;
+
+  // Helper
+  getTab: (tabId: string) => TabExplorerState;
+}
+
+export const useExplorerStore = create<ExplorerStore>((set, get) => {
+  const getTabState = (tabId: string): TabExplorerState =>
+    get().tabStates[tabId] ?? DEFAULT_TAB_STATE;
+
+  const updateTab = (tabId: string, patch: Partial<TabExplorerState>) => {
+    set((s) => ({
+      tabStates: {
+        ...s.tabStates,
+        [tabId]: { ...(s.tabStates[tabId] ?? createTabState()), ...patch },
+      },
+    }));
+  };
+
+  const loadPath = async (tabId: string, path: string) => {
     const showHidden = useSettingsStore.getState().settings.show_hidden;
-    set({ loading: true, error: null });
+    updateTab(tabId, { loading: true, error: null });
     try {
       const listing = await readDir(path, showHidden);
-      set({ currentPath: listing.path, entries: listing.entries, selectedPaths: new Set(), loading: false });
+      updateTab(tabId, {
+        currentPath: listing.path,
+        entries: listing.entries,
+        selectedPaths: new Set(),
+        loading: false,
+      });
     } catch (e) {
-      set({ error: String(e), loading: false });
+      updateTab(tabId, { error: String(e), loading: false });
     }
   };
 
   return {
-    currentPath: 'C:\\',
-    entries: [],
-    selectedPaths: new Set(),
-    loading: false,
-    error: null,
-    viewMode: 'list',
-    history: ['C:\\'],
-    historyIndex: 0,
-    canGoBack: false,
-    canGoForward: false,
+    tabStates: {},
+    activeTabId: null,
     clipboardPaths: [],
     clipboardMode: null,
 
-    navigate: async (path: string) => {
-      const { history, historyIndex } = get();
-      const newHistory = history.slice(0, historyIndex + 1);
+    initTab: (tabId, initialPath) => {
+      const existing = get().tabStates[tabId];
+      if (!existing) {
+        set((s) => ({
+          tabStates: { ...s.tabStates, [tabId]: createTabState(initialPath) },
+          activeTabId: s.activeTabId || tabId,
+        }));
+      }
+    },
+
+    removeTab: (tabId) => {
+      set((s) => {
+        const { [tabId]: _, ...rest } = s.tabStates;
+        return {
+          tabStates: rest,
+          activeTabId: s.activeTabId === tabId
+            ? Object.keys(rest)[0] || null
+            : s.activeTabId,
+        };
+      });
+    },
+
+    setActiveTab: (tabId) => set({ activeTabId: tabId }),
+
+    navigate: async (tabId, path) => {
+      const tab = getTabState(tabId);
+      const newHistory = tab.history.slice(0, tab.historyIndex + 1);
       newHistory.push(path);
       const newIndex = newHistory.length - 1;
-      set({
+      updateTab(tabId, {
         history: newHistory,
         historyIndex: newIndex,
         canGoBack: newIndex > 0,
         canGoForward: false,
       });
-      await loadPath(path);
+      await loadPath(tabId, path);
     },
 
-    refresh: async () => {
-      const { currentPath } = get();
+    refresh: async (tabId) => {
+      const tab = getTabState(tabId);
       const showHidden = useSettingsStore.getState().settings.show_hidden;
-      set({ loading: true, error: null });
+      updateTab(tabId, { loading: true, error: null });
       try {
-        const listing = await readDir(currentPath, showHidden);
-        set({ entries: listing.entries, loading: false });
+        const listing = await readDir(tab.currentPath, showHidden);
+        updateTab(tabId, { entries: listing.entries, loading: false });
       } catch (e) {
-        set({ error: String(e), loading: false });
+        updateTab(tabId, { error: String(e), loading: false });
       }
     },
 
-    goBack: async () => {
-      const { history, historyIndex } = get();
-      if (historyIndex <= 0) return;
-      const newIndex = historyIndex - 1;
-      set({
+    goBack: async (tabId) => {
+      const tab = getTabState(tabId);
+      if (tab.historyIndex <= 0) return;
+      const newIndex = tab.historyIndex - 1;
+      updateTab(tabId, {
         historyIndex: newIndex,
         canGoBack: newIndex > 0,
-        canGoForward: newIndex < history.length - 1,
+        canGoForward: newIndex < tab.history.length - 1,
       });
-      await loadPath(history[newIndex]);
+      await loadPath(tabId, tab.history[newIndex]);
     },
 
-    goForward: async () => {
-      const { history, historyIndex } = get();
-      if (historyIndex >= history.length - 1) return;
-      const newIndex = historyIndex + 1;
-      set({
+    goForward: async (tabId) => {
+      const tab = getTabState(tabId);
+      if (tab.historyIndex >= tab.history.length - 1) return;
+      const newIndex = tab.historyIndex + 1;
+      updateTab(tabId, {
         historyIndex: newIndex,
         canGoBack: newIndex > 0,
-        canGoForward: newIndex < history.length - 1,
+        canGoForward: newIndex < tab.history.length - 1,
       });
-      await loadPath(history[newIndex]);
+      await loadPath(tabId, tab.history[newIndex]);
     },
 
-    goUp: async () => {
-      const { currentPath, navigate } = get();
-      const parent = currentPath.replace(/\\[^\\]+\\?$/, '') || 'C:\\';
-      if (parent !== currentPath) {
-        await navigate(parent);
+    goUp: async (tabId) => {
+      const tab = getTabState(tabId);
+      const parent = tab.currentPath.replace(/\\[^\\]+\\?$/, '') || 'C:\\';
+      if (parent !== tab.currentPath) {
+        await get().navigate(tabId, parent);
       }
     },
 
-    goHome: async () => {
-      const { currentPath, navigate } = get();
-      const match = currentPath.match(/^([A-Z]:\\Users\\[^\\]+)/i);
+    goHome: async (tabId) => {
+      const tab = getTabState(tabId);
+      const match = tab.currentPath.match(/^([A-Z]:\\Users\\[^\\]+)/i);
       const home = match ? match[1] : 'C:\\Users\\Public';
-      await navigate(home);
+      await get().navigate(tabId, home);
     },
 
-    setSelected: (paths) => set({ selectedPaths: paths }),
+    setSelected: (tabId, paths) => updateTab(tabId, { selectedPaths: paths }),
 
-    toggleSelected: (path) =>
-      set((state) => {
-        const next = new Set(state.selectedPaths);
-        if (next.has(path)) {
-          next.delete(path);
-        } else {
-          next.add(path);
-        }
-        return { selectedPaths: next };
-      }),
+    toggleSelected: (tabId, path) => {
+      const tab = getTabState(tabId);
+      const next = new Set(tab.selectedPaths);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      updateTab(tabId, { selectedPaths: next });
+    },
 
-    selectAll: () =>
-      set((state) => ({
-        selectedPaths: new Set(state.entries.map((e) => e.path)),
-      })),
+    selectAll: (tabId) => {
+      const tab = getTabState(tabId);
+      updateTab(tabId, { selectedPaths: new Set(tab.entries.map((e) => e.path)) });
+    },
 
-    clearSelection: () => set({ selectedPaths: new Set() }),
-    setViewMode: (mode) => set({ viewMode: mode }),
+    clearSelection: (tabId) => updateTab(tabId, { selectedPaths: new Set() }),
 
-    copyPaths: (paths: string[]) => set({ clipboardPaths: paths, clipboardMode: 'copy' }),
-    cutPaths: (paths: string[]) => set({ clipboardPaths: paths, clipboardMode: 'cut' }),
+    setViewMode: (tabId, mode) => updateTab(tabId, { viewMode: mode }),
 
-    paste: async () => {
-      const { clipboardPaths, clipboardMode, currentPath, refresh } = get();
+    copyPaths: (paths) => set({ clipboardPaths: paths, clipboardMode: 'copy' }),
+    cutPaths: (paths) => set({ clipboardPaths: paths, clipboardMode: 'cut' }),
+
+    paste: async (tabId) => {
+      const { clipboardPaths, clipboardMode } = get();
+      const tab = getTabState(tabId);
       if (!clipboardPaths.length || !clipboardMode) return;
       try {
         if (clipboardMode === 'copy') {
-          await copyFiles(clipboardPaths, currentPath);
+          await copyFiles(clipboardPaths, tab.currentPath);
         } else {
-          await moveFiles(clipboardPaths, currentPath);
+          await moveFiles(clipboardPaths, tab.currentPath);
           set({ clipboardPaths: [], clipboardMode: null });
         }
-        await refresh();
+        await get().refresh(tabId);
       } catch (e) {
-        set({ error: String(e) });
+        updateTab(tabId, { error: String(e) });
       }
     },
+
+    getTab: (tabId) => getTabState(tabId),
   };
 });
+
+/**
+ * Hook to get the active (focused) tab's explorer state.
+ * Used by Sidebar, StatusBar, GitPanel, etc. that don't have a specific tabId.
+ */
+export function useActiveExplorerState(): TabExplorerState & { tabId: string | null } {
+  const activeTabId = useExplorerStore((s) => s.activeTabId);
+  const tabState = useExplorerStore((s) =>
+    s.activeTabId ? s.tabStates[s.activeTabId] ?? DEFAULT_TAB_STATE : DEFAULT_TAB_STATE,
+  );
+  return { ...tabState, tabId: activeTabId };
+}

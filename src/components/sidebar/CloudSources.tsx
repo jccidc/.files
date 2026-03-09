@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSettingsStore } from '../../stores/settings';
-import { useExplorerStore } from '../../stores/explorer';
+import { useExplorerStore, useActiveExplorerState } from '../../stores/explorer';
 import { githubListRepos, detectCloudMounts, findLocalRepo } from '../../api/cloud';
 import { gitClone } from '../../api/git';
 import { FolderTreeItem } from './Sidebar';
@@ -250,7 +250,11 @@ function GitHubRepoList({ repos, loading, error, onClone, onRepoClick, onLink, c
 // ---- Main CloudSources ----
 
 export function CloudSources({ onContextMenu }: { onContextMenu?: (e: React.MouseEvent, path: string) => void }) {
-  const navigate = useExplorerStore((s) => s.navigate);
+  const { tabId: activeTabId } = useActiveExplorerState();
+  const navigate = (path: string) => {
+    const tid = activeTabId || useExplorerStore.getState().activeTabId;
+    if (tid) useExplorerStore.getState().navigate(tid, path);
+  };
   const githubPat = useSettingsStore((s) => s.settings.github_pat);
   const githubRepoPaths = useSettingsStore((s) => s.settings.github_repo_paths) || {};
   const customSources = useSettingsStore((s) => s.settings.cloud_sources) || [];

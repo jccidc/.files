@@ -5,6 +5,7 @@ import { usePreviewStore } from '../../stores/preview';
 export type GroupBy = 'none' | 'type' | 'date' | 'size' | 'letter';
 
 interface ToolbarProps {
+  tabId: string;
   onRename: () => void;
   onDelete: () => void;
   sortField: string;
@@ -256,22 +257,24 @@ const GROUP_OPTIONS: { key: GroupBy; label: string }[] = [
 
 // -- Component --
 
-export function Toolbar({ onRename, onDelete, sortField, sortAsc, onSort, filterText, onFilterChange, groupBy, onGroupByChange, onSearch }: ToolbarProps) {
-  const currentPath = useExplorerStore((s) => s.currentPath);
-  const navigate = useExplorerStore((s) => s.navigate);
-  const canGoBack = useExplorerStore((s) => s.canGoBack);
-  const canGoForward = useExplorerStore((s) => s.canGoForward);
-  const goBack = useExplorerStore((s) => s.goBack);
-  const goForward = useExplorerStore((s) => s.goForward);
-  const goUp = useExplorerStore((s) => s.goUp);
-  const goHome = useExplorerStore((s) => s.goHome);
-  const selectedPaths = useExplorerStore((s) => s.selectedPaths);
-  const viewMode = useExplorerStore((s) => s.viewMode);
-  const setViewMode = useExplorerStore((s) => s.setViewMode);
+export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort, filterText, onFilterChange, groupBy, onGroupByChange, onSearch }: ToolbarProps) {
+  const tabState = useExplorerStore((s) => s.tabStates[tabId]);
+  const currentPath = tabState?.currentPath ?? 'C:\\';
+  const canGoBack = tabState?.canGoBack ?? false;
+  const canGoForward = tabState?.canGoForward ?? false;
+  const selectedPaths = tabState?.selectedPaths ?? new Set<string>();
+  const viewMode = tabState?.viewMode ?? 'list';
   const clipboardPaths = useExplorerStore((s) => s.clipboardPaths);
-  const copyPaths = useExplorerStore((s) => s.copyPaths);
-  const cutPaths = useExplorerStore((s) => s.cutPaths);
-  const paste = useExplorerStore((s) => s.paste);
+
+  const navigate = (path: string) => useExplorerStore.getState().navigate(tabId, path);
+  const goBack = () => useExplorerStore.getState().goBack(tabId);
+  const goForward = () => useExplorerStore.getState().goForward(tabId);
+  const goUp = () => useExplorerStore.getState().goUp(tabId);
+  const goHome = () => useExplorerStore.getState().goHome(tabId);
+  const setViewMode = (mode: 'list' | 'grid') => useExplorerStore.getState().setViewMode(tabId, mode);
+  const copyPaths = (paths: string[]) => useExplorerStore.getState().copyPaths(paths);
+  const cutPaths = (paths: string[]) => useExplorerStore.getState().cutPaths(paths);
+  const paste = () => useExplorerStore.getState().paste(tabId);
   const previewVisible = usePreviewStore((s) => s.panelVisible);
   const togglePreview = usePreviewStore((s) => s.togglePanel);
 
@@ -305,7 +308,7 @@ export function Toolbar({ onRename, onDelete, sortField, sortAsc, onSort, filter
   // Ctrl+L to edit path
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'l') { e.preventDefault(); setPathValue(useExplorerStore.getState().currentPath); setPathEditing(true); }
+      if (e.ctrlKey && e.key === 'l') { e.preventDefault(); setPathValue(useExplorerStore.getState().getTab(tabId).currentPath); setPathEditing(true); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);

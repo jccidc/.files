@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { fuzzyFind, type SearchResult } from '../../api/search';
-import { useExplorerStore } from '../../stores/explorer';
+import { useExplorerStore, useActiveExplorerState } from '../../stores/explorer';
 
 export function FuzzySearch({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [query, setQuery] = useState('');
@@ -9,8 +9,11 @@ export function FuzzySearch({ open, onClose }: { open: boolean; onClose: () => v
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const currentPath = useExplorerStore((s) => s.currentPath);
-  const navigate = useExplorerStore((s) => s.navigate);
+  const { currentPath, tabId: activeTabId } = useActiveExplorerState();
+  const navigate = (path: string) => {
+    const tid = activeTabId || useExplorerStore.getState().activeTabId;
+    if (tid) useExplorerStore.getState().navigate(tid, path);
+  };
 
   useEffect(() => {
     if (open) {

@@ -1,4 +1,4 @@
-import { useExplorerStore } from '../../stores/explorer';
+import { useActiveExplorerState, useExplorerStore } from '../../stores/explorer';
 import { useGitStore } from '../../stores/git';
 
 function IconList() {
@@ -19,12 +19,12 @@ function IconGrid() {
 }
 
 export function StatusBar() {
-  const currentPath = useExplorerStore((s) => s.currentPath);
-  const entries = useExplorerStore((s) => s.entries);
+  const { currentPath, entries, selectedPaths, viewMode, tabId } = useActiveExplorerState();
   const count = entries.length;
-  const selected = useExplorerStore((s) => s.selectedPaths.size);
-  const viewMode = useExplorerStore((s) => s.viewMode);
-  const setViewMode = useExplorerStore((s) => s.setViewMode);
+  const selected = selectedPaths.size;
+  const setViewMode = (mode: 'list' | 'grid') => {
+    if (tabId) useExplorerStore.getState().setViewMode(tabId, mode);
+  };
 
   const repoInfo = useGitStore((s) => s.repoInfo);
   const dirCount = entries.filter((e) => e.is_dir).length;

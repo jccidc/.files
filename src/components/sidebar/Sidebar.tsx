@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useLayoutStore } from '../../stores/layout';
-import { useExplorerStore } from '../../stores/explorer';
+import { useExplorerStore, useActiveExplorerState } from '../../stores/explorer';
 import { getDrives, getKnownFolderPaths, readDir } from '../../api/filesystem';
 import { useSettingsStore } from '../../stores/settings';
 import { useGitStore } from '../../stores/git';
@@ -206,8 +206,11 @@ function SectionLabel({ text, collapsed, onToggle, onPointerDown, dragOver, drag
 
 export function Sidebar() {
   const { sidebarWidth, setSidebarWidth } = useLayoutStore();
-  const navigate = useExplorerStore((s) => s.navigate);
-  const currentPath = useExplorerStore((s) => s.currentPath);
+  const { currentPath, tabId: activeTabId } = useActiveExplorerState();
+  const navigate = (path: string) => {
+    const tid = activeTabId || useExplorerStore.getState().activeTabId;
+    if (tid) useExplorerStore.getState().navigate(tid, path);
+  };
   const pinnedPaths = useSettingsStore((s) => s.settings.pinned_paths) || [];
   const updateSettings = useSettingsStore((s) => s.update);
   const sectionOrder = useSettingsStore((s) => s.settings.sidebar_section_order) || ['sources', 'cloud', 'quick-access', 'git'];

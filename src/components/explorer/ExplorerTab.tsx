@@ -456,8 +456,35 @@ function ColResizeHandle({ onResize }: { onResize: (delta: number) => void }) {
 // ---- Main Component ----
 
 export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
-  const { currentPath, entries, selectedPaths, loading, error, viewMode, navigate, refresh, setSelected, toggleSelected, clearSelection } =
-    useExplorerStore();
+  const tabId = tab.id;
+  const store = useExplorerStore;
+
+  // Initialize tab state
+  useEffect(() => {
+    store.getState().initTab(tabId, tab.path);
+  }, [tabId]);
+
+  // Mark as active when this tab is visible (focused)
+  useEffect(() => {
+    store.getState().setActiveTab(tabId);
+  }, [tabId]);
+
+  // Per-tab state selectors
+  const tabState = store((s) => s.tabStates[tabId]);
+  const currentPath = tabState?.currentPath ?? 'C:\\';
+  const entries = tabState?.entries ?? [];
+  const selectedPaths = tabState?.selectedPaths ?? new Set<string>();
+  const loading = tabState?.loading ?? false;
+  const error = tabState?.error ?? null;
+  const viewMode = tabState?.viewMode ?? 'list';
+
+  // Per-tab actions (bound to tabId)
+  const navigate = useCallback((path: string) => store.getState().navigate(tabId, path), [tabId]);
+  const refresh = useCallback(() => store.getState().refresh(tabId), [tabId]);
+  const setSelected = useCallback((paths: Set<string>) => store.getState().setSelected(tabId, paths), [tabId]);
+  const toggleSelected = useCallback((path: string) => store.getState().toggleSelected(tabId, path), [tabId]);
+  const clearSelection = useCallback(() => store.getState().clearSelection(tabId), [tabId]);
+
   const showTooltips = useSettingsStore((s) => s.settings.show_tooltips);
   const tooltipDelay = useSettingsStore((s) => s.settings.tooltip_delay);
   const peekEnabled = useSettingsStore((s) => s.settings.peek_enabled);
@@ -678,6 +705,8 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   // Click handler with shift-range and ctrl-toggle
   const handleRowClick = useCallback(
     (entry: FileEntry, index: number, e: React.MouseEvent) => {
+      // Mark this tab as active on interaction
+      store.getState().setActiveTab(tabId);
       if (e.shiftKey && lastClickedIndex.current >= 0) {
         const start = Math.min(lastClickedIndex.current, index);
         const end = Math.max(lastClickedIndex.current, index);
@@ -714,7 +743,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         }
       }
     },
-    [sortedEntries, selectedPaths, setSelected, toggleSelected, clearSelection],
+    [tabId, sortedEntries, selectedPaths, setSelected, toggleSelected, clearSelection],
   );
 
   const handleDoubleClick = async (entry: FileEntry) => {
@@ -843,12 +872,17 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         outlineOffset: -2,
       }}
       onContextMenu={(e) => e.preventDefault()}
-      onMouseDown={(e) => { if (e.button === 2) { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, entry: null }); } }}
+      onMouseDown={(e) => {
+        // Focus this tab on any click
+        store.getState().setActiveTab(tabId);
+        if (e.button === 2) { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, entry: null }); }
+      }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       <Toolbar
+        tabId={tabId}
         onRename={() => { if (selectedPaths.size === 1) setRenamingPath([...selectedPaths][0]); }}
         onDelete={() => {
           if (selectedPaths.size > 0) {
@@ -887,7 +921,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
               <ColResizeHandle onResize={(d) => {
                 const nextCol = activeColumns[idx + 1];
                 if (col.defaultWidth === 0) {
-                  // Name column (1fr) — resize shrinks/grows the next col
+                  // Name column (1fr) -- resize shrinks/grows the next col
                   resizeColumn(nextCol.id, -d);
                 } else {
                   resizeColumn(col.id, d);
@@ -1059,7 +1093,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           isPinned={isPathPinned}
           onCut={(paths) => useExplorerStore.getState().cutPaths(paths)}
           onCopy={(paths) => useExplorerStore.getState().copyPaths(paths)}
-          onPaste={() => useExplorerStore.getState().paste()}
+          onPaste={() => useExplorerStore.getState().paste(tabId)}
           canPaste={useExplorerStore.getState().clipboardPaths.length > 0}
           selectedCount={selectedPaths.size}
           gitFileStatus={ctxMenu.entry ? gitStatusMap.get(ctxMenu.entry.name) || null : null}

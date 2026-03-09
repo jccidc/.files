@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { usePanelsStore } from '../../stores/panels';
 import { useLayoutStore, DEFAULT_PANEL_ID } from '../../stores/layout';
-import { useExplorerStore } from '../../stores/explorer';
+import { useExplorerStore, useActiveExplorerState } from '../../stores/explorer';
 
 interface Command {
   id: string;
@@ -17,7 +17,11 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
 
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar);
   const splitPanel = useLayoutStore((s) => s.splitPanel);
-  const refresh = useExplorerStore((s) => s.refresh);
+  const { tabId: activeTabId } = useActiveExplorerState();
+  const refresh = () => {
+    const tid = activeTabId || useExplorerStore.getState().activeTabId;
+    if (tid) useExplorerStore.getState().refresh(tid);
+  };
 
   const commands: Command[] = useMemo(
     () => [

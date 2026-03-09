@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useGitStore } from '../../stores/git';
-import { useExplorerStore } from '../../stores/explorer';
+import { useActiveExplorerState } from '../../stores/explorer';
 import type { GitFileStatus, GitDiffFile } from '../../api/git';
 
 // ---- Icons ----
@@ -234,7 +234,7 @@ function SectionHeader({
 // ---- Main GitPanel ----
 
 export function GitPanel() {
-  const currentPath = useExplorerStore((s) => s.currentPath);
+  const { currentPath } = useActiveExplorerState();
   const {
     repoInfo, files, diff, loading, error, commitMessage, branches,
     checkRepo, refreshStatus, refreshBranches, loadDiff, stage, unstage, commit, discard,

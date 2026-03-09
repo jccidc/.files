@@ -20,7 +20,11 @@ function App() {
   const sidebarVisible = useLayoutStore((s) => s.sidebarVisible);
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar);
   const load = useSettingsStore((s) => s.load);
-  const refresh = useExplorerStore((s) => s.refresh);
+  const activeTabId = useExplorerStore((s) => s.activeTabId);
+  const refresh = () => {
+    const tid = useExplorerStore.getState().activeTabId;
+    if (tid) useExplorerStore.getState().refresh(tid);
+  };
   const [searchOpen, setSearchOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -117,7 +121,10 @@ function App() {
       {
         key: 'a',
         ctrl: true,
-        handler: () => useExplorerStore.getState().selectAll(),
+        handler: () => {
+          const tid = useExplorerStore.getState().activeTabId;
+          if (tid) useExplorerStore.getState().selectAll(tid);
+        },
       },
       {
         key: ',',
@@ -163,46 +170,67 @@ function App() {
       {
         key: 'ArrowLeft',
         alt: true,
-        handler: () => useExplorerStore.getState().goBack(),
+        handler: () => {
+          const tid = useExplorerStore.getState().activeTabId;
+          if (tid) useExplorerStore.getState().goBack(tid);
+        },
       },
       {
         key: 'ArrowRight',
         alt: true,
-        handler: () => useExplorerStore.getState().goForward(),
+        handler: () => {
+          const tid = useExplorerStore.getState().activeTabId;
+          if (tid) useExplorerStore.getState().goForward(tid);
+        },
       },
       {
         key: 'ArrowUp',
         alt: true,
-        handler: () => useExplorerStore.getState().goUp(),
+        handler: () => {
+          const tid = useExplorerStore.getState().activeTabId;
+          if (tid) useExplorerStore.getState().goUp(tid);
+        },
       },
       {
         key: 'Home',
         alt: true,
-        handler: () => useExplorerStore.getState().goHome(),
+        handler: () => {
+          const tid = useExplorerStore.getState().activeTabId;
+          if (tid) useExplorerStore.getState().goHome(tid);
+        },
       },
       {
         key: 'c',
         ctrl: true,
         handler: () => {
-          const sel = useExplorerStore.getState().selectedPaths;
-          if (sel.size > 0) useExplorerStore.getState().copyPaths([...sel]);
+          const s = useExplorerStore.getState();
+          const tid = s.activeTabId;
+          if (!tid) return;
+          const sel = s.getTab(tid).selectedPaths;
+          if (sel.size > 0) s.copyPaths([...sel]);
         },
       },
       {
         key: 'x',
         ctrl: true,
         handler: () => {
-          const sel = useExplorerStore.getState().selectedPaths;
-          if (sel.size > 0) useExplorerStore.getState().cutPaths([...sel]);
+          const s = useExplorerStore.getState();
+          const tid = s.activeTabId;
+          if (!tid) return;
+          const sel = s.getTab(tid).selectedPaths;
+          if (sel.size > 0) s.cutPaths([...sel]);
         },
       },
       {
         key: 'v',
         ctrl: true,
-        handler: () => useExplorerStore.getState().paste(),
+        handler: () => {
+          const tid = useExplorerStore.getState().activeTabId;
+          if (tid) useExplorerStore.getState().paste(tid);
+        },
       },
     ],
-    [toggleSidebar, refresh, splitPanel, togglePreviewPanel],
+    [toggleSidebar, refresh, splitPanel, togglePreviewPanel, activeTabId],
   );
 
   useHotkeys(hotkeys);
