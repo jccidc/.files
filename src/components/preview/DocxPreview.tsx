@@ -62,7 +62,7 @@ export function DocxPreview({ path }: Props) {
       <div
         style={{
           flex: 1, overflow: 'auto', padding: 16,
-          color: 'var(--t1)', fontFamily: "'Outfit', sans-serif", fontSize: 14,
+          color: 'var(--t1)', fontFamily: "var(--font-family)", fontSize: 14,
           lineHeight: 1.7,
         }}
         dangerouslySetInnerHTML={{ __html: html || '' }}

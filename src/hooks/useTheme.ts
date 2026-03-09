@@ -27,6 +27,7 @@ export function useTheme() {
   const bgOpacity = useSettingsStore((s) => s.settings.bg_opacity);
   const customCss = useSettingsStore((s) => s.settings.custom_css);
   const customFonts = useSettingsStore((s) => s.settings.custom_fonts);
+  const fontFamily = useSettingsStore((s) => s.settings.font_family);
   const customStyleRef = useRef<HTMLStyleElement | null>(null);
   const fontStyleRef = useRef<HTMLStyleElement | null>(null);
   const cursorTrailRef = useRef<HTMLCanvasElement | null>(null);
@@ -81,9 +82,13 @@ export function useTheme() {
     r.style.setProperty('--file-font-size', `${fs}px`);
     r.style.setProperty('--file-font-size-sm', `${fs - 1}px`);
 
+    // Font family
+    const ff = fontFamily || 'Outfit';
+    r.style.setProperty('--font-family', `'${ff}', sans-serif`);
+
     // Glow
     r.classList.toggle('glow-enabled', enableGlow !== false);
-  }, [sidebarOpacity, toolbarOpacity, terminalOpacity, baseOpacity, blurAmount, borderRadius, animationSpeed, enableAnimations, density, enableGlow, fontSize]);
+  }, [sidebarOpacity, toolbarOpacity, terminalOpacity, baseOpacity, blurAmount, borderRadius, animationSpeed, enableAnimations, density, enableGlow, fontSize, fontFamily]);
 
   // Background pattern
   useEffect(() => {

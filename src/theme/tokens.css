@@ -37,6 +37,7 @@
   --bg-pattern: none;
   --bg-pattern-size: auto;
   --bg-opacity: 0.05;
+  --font-family: 'Outfit', sans-serif;
 }
 
 *,
@@ -54,7 +55,7 @@ body,
   overflow: hidden;
   background: transparent;
   color: var(--t1);
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-family);
   font-size: 13px;
 }
 
@@ -104,7 +105,7 @@ body,
 /* Markdown preview */
 .markdown-preview {
   color: var(--t1);
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-family);
   font-size: 13px;
   line-height: 1.7;
 }

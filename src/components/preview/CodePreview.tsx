@@ -1,30 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { readTextFile } from '../../api/filesystem';
-import { createShikiTheme } from '../../theme/shikiTheme';
 
 interface Props {
   path: string;
   language: string;
 }
 
-let highlighterPromise: Promise<any> | null = null;
-
-async function getHighlighter() {
-  if (!highlighterPromise) {
-    highlighterPromise = import('shiki').then(async ({ createHighlighter }) => {
-      const theme = createShikiTheme();
-      const highlighter = await createHighlighter({
-        themes: [theme],
-        langs: [],
-      });
-      return highlighter;
-    });
-  }
-  return highlighterPromise;
-}
-
 export function CodePreview({ path, language }: Props) {
-  const [html, setHtml] = useState<string | null>(null);
   const [raw, setRaw] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,37 +20,12 @@ export function CodePreview({ path, language }: Props) {
     setError(null);
 
     readTextFile(path, 524288)
-      .then(async (content) => {
-        if (cancelled) return;
-        setRaw(content);
-        try {
-          const highlighter = await getHighlighter();
-          const loadedLangs = highlighter.getLoadedLanguages();
-          let lang = language;
-          if (!loadedLangs.includes(language)) {
-            try {
-              await highlighter.loadLanguage(language as any);
-            } catch {
-              lang = 'plaintext';
-              if (!loadedLangs.includes('plaintext')) {
-                await highlighter.loadLanguage('plaintext');
-              }
-            }
-          }
-          const result = highlighter.codeToHtml(content, {
-            lang,
-            theme: 'dotfiles',
-          });
-          if (!cancelled) setHtml(result);
-        } catch {
-          if (!cancelled) setHtml(null);
-        }
-      })
+      .then((content) => { if (!cancelled) setRaw(content); })
       .catch((e) => { if (!cancelled) setError(String(e)); })
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [path, language]);
+  }, [path]);
 
   const handleCopy = () => {
     if (raw) {
@@ -124,23 +81,13 @@ export function CodePreview({ path, language }: Props) {
           fontFamily: "'JetBrains Mono', monospace", fontSize: 12, lineHeight: 1.6,
         }}
       >
-        {html ? (
-          <div
-            dangerouslySetInnerHTML={{ __html: html }}
-            style={{
-              whiteSpace: wordWrap ? 'pre-wrap' : 'pre',
-              wordBreak: wordWrap ? 'break-all' : 'normal',
-            }}
-          />
-        ) : (
-          <pre style={{
-            color: 'var(--t1)', margin: 0,
-            whiteSpace: wordWrap ? 'pre-wrap' : 'pre',
-            wordBreak: wordWrap ? 'break-all' : 'normal',
-          }}>
-            {raw}
-          </pre>
-        )}
+        <pre style={{
+          color: 'var(--t1)', margin: 0,
+          whiteSpace: wordWrap ? 'pre-wrap' : 'pre',
+          wordBreak: wordWrap ? 'break-all' : 'normal',
+        }}>
+          {raw}
+        </pre>
       </div>
     </div>
   );
