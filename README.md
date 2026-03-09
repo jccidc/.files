@@ -117,13 +117,23 @@ No other dependencies. No admin rights needed for per-user install.
 
 ## Screenshots
 
-<!-- Add screenshots here -->
-<!-- ![Explorer](screenshots/explorer.png) -->
-<!-- ![Terminal](screenshots/terminal.png) -->
-<!-- ![Themes](screenshots/themes.png) -->
-<!-- ![Git](screenshots/git.png) -->
-<!-- ![Preview](screenshots/preview.png) -->
-<!-- ![Settings](screenshots/settings.png) -->
+### Explorer
+![Explorer](Exp.png)
+
+### Terminal
+![Terminal](term.png)
+
+### Themes & Customization
+![Themes](theme.png)
+
+### Git Integration
+![Git](git.png)
+
+### Inline Peek
+![Scrolling Peek](scrolling%20peek.png)
+
+### Multi-Pane Split
+![Multi-Pane](Multipane.png)
 
 ---
 
