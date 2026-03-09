@@ -1,5 +1,6 @@
 pub mod cloud;
 pub mod filesystem;
+pub mod fonts;
 pub mod git;
 pub mod search;
 pub mod settings;

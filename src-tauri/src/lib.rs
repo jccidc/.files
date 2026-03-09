@@ -2,7 +2,7 @@ mod commands;
 mod models;
 mod utils;
 
-use commands::{cloud, filesystem, git, registry, search, settings, shell, terminal, watcher};
+use commands::{cloud, filesystem, fonts, git, registry, search, settings, shell, terminal, watcher};
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
@@ -128,6 +128,9 @@ pub fn run() {
             cloud::find_local_repo,
             registry::is_default_folder_handler,
             registry::set_default_folder_handler,
+            fonts::list_system_fonts,
+            fonts::install_custom_font,
+            fonts::remove_custom_font,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
