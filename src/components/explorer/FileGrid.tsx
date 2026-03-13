@@ -21,7 +21,7 @@ interface FileGridProps {
   onRowClick: (entry: FileEntry, idx: number, e: React.MouseEvent) => void;
   onDoubleClick: (entry: FileEntry) => void;
   onContextMenu: (e: React.MouseEvent, entry: FileEntry) => void;
-  onDragStart: (e: React.DragEvent, entry: FileEntry) => void;
+  onPointerDragStart: (e: React.PointerEvent, entry: FileEntry) => void;
 }
 
 function GridCard({
@@ -31,7 +31,7 @@ function GridCard({
   onClick,
   onDoubleClick,
   onContextMenu,
-  onDragStart,
+  onPointerDragStart,
 }: {
   entry: FileEntry;
   idx: number;
@@ -39,16 +39,16 @@ function GridCard({
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
-  onDragStart: (e: React.DragEvent) => void;
+  onPointerDragStart: (e: React.PointerEvent) => void;
 }) {
   return (
     <div
-      draggable={selected}
+      data-drop-folder={entry.is_dir ? entry.path : undefined}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={(e) => e.preventDefault()}
       onMouseDown={(e) => { if (e.button === 2) { e.preventDefault(); e.stopPropagation(); onContextMenu(e); } }}
-      onDragStart={selected ? onDragStart : undefined}
+      onPointerDown={(e) => { if (e.button === 0) onPointerDragStart(e); }}
       style={{
         width: 100,
         padding: '10px 6px 8px',
@@ -57,7 +57,7 @@ function GridCard({
         alignItems: 'center',
         gap: 6,
         borderRadius: 6,
-        cursor: 'pointer',
+        cursor: 'pointer', userSelect: 'none',
         background: selected ? 'var(--active)' : 'transparent',
         border: selected ? '1px solid var(--accent)' : '1px solid transparent',
       }}
@@ -92,7 +92,7 @@ function GridCard({
   );
 }
 
-export function FileGrid({ entries, selectedPaths, onRowClick, onDoubleClick, onContextMenu, onDragStart }: FileGridProps) {
+export function FileGrid({ entries, selectedPaths, onRowClick, onDoubleClick, onContextMenu, onPointerDragStart }: FileGridProps) {
   return (
     <div style={{
       display: 'flex', flexWrap: 'wrap', gap: 4, padding: '8px 12px',
@@ -107,7 +107,7 @@ export function FileGrid({ entries, selectedPaths, onRowClick, onDoubleClick, on
           onClick={(e) => onRowClick(entry, i, e)}
           onDoubleClick={() => onDoubleClick(entry)}
           onContextMenu={(e) => { e.stopPropagation(); onContextMenu(e, entry); }}
-          onDragStart={(e) => onDragStart(e, entry)}
+          onPointerDragStart={(e) => onPointerDragStart(e, entry)}
         />
       ))}
       {entries.length === 0 && (

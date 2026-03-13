@@ -22,6 +22,7 @@ interface ContextMenuProps {
   onPaste?: () => void;
   canPaste?: boolean;
   selectedCount?: number;
+  onProperties?: (path: string) => void;
 }
 
 interface MenuItem {
@@ -33,7 +34,7 @@ interface MenuItem {
   disabled?: boolean;
 }
 
-export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefresh, onNewTerminal, onPreviewInTab, onPinToQuickAccess, isPinned, onGitStage, onGitDiscard, gitFileStatus, onCut, onCopy, onPaste, canPaste }: ContextMenuProps) {
+export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefresh, onNewTerminal, onPreviewInTab, onPinToQuickAccess, isPinned, onGitStage, onGitDiscard, gitFileStatus, onCut, onCopy, onPaste, canPaste, onProperties }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -118,15 +119,21 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
         items.push({ label: 'Discard Changes', danger: true, action: () => { onGitDiscard(entry.path); onClose(); } });
       }
     }
+    // Properties
+    if (onProperties) {
+      items.push({ label: '', action: () => {}, separator: true });
+      items.push({ label: 'Properties', shortcut: 'Alt+Enter', action: () => { onProperties(entry.path); onClose(); } });
+    }
+
     items.push({ label: '', action: () => {}, separator: true });
   }
 
   items.push({ label: 'Refresh', shortcut: 'F5', action: () => { onRefresh(); onClose(); } });
 
   const menuWidth = 220;
-  const menuHeight = items.length * 32;
+  const menuHeight = items.reduce((h, item) => h + (item.separator ? 9 + (item.label ? 18 : 0) : 32), 8);
   const adjustedX = x + menuWidth > window.innerWidth ? x - menuWidth : x;
-  const adjustedY = y + menuHeight > window.innerHeight ? y - menuHeight : y;
+  const adjustedY = y + menuHeight > window.innerHeight ? Math.max(0, y - menuHeight) : y;
 
   return createPortal(
     <div

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useLayoutStore } from '../../stores/layout';
 import { useExplorerStore, useActiveExplorerState } from '../../stores/explorer';
+import { usePanelsStore } from '../../stores/panels';
 import { getDrives, getKnownFolderPaths, readDir } from '../../api/filesystem';
 import { useSettingsStore } from '../../stores/settings';
 import { useGitStore } from '../../stores/git';
@@ -206,9 +207,11 @@ function SectionLabel({ text, collapsed, onToggle, onPointerDown, dragOver, drag
 
 export function Sidebar() {
   const { sidebarWidth, setSidebarWidth } = useLayoutStore();
-  const { currentPath, tabId: activeTabId } = useActiveExplorerState();
+  const { currentPath } = useActiveExplorerState();
   const navigate = (path: string) => {
-    const tid = activeTabId || useExplorerStore.getState().activeTabId;
+    // Use the focused panel's active tab, not explorer store's activeTabId
+    const focusedTab = usePanelsStore.getState().getFocusedActiveTab();
+    const tid = focusedTab?.id || useExplorerStore.getState().activeTabId;
     if (tid) useExplorerStore.getState().navigate(tid, path);
   };
   const pinnedPaths = useSettingsStore((s) => s.settings.pinned_paths) || [];
@@ -575,6 +578,7 @@ export function Sidebar() {
 
   return (
     <div
+      data-sidebar
       style={{
         width: sidebarWidth,
         minWidth: sidebarWidth,

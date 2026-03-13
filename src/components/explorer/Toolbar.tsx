@@ -363,7 +363,7 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
   const segments = currentPath.replace(/\\/g, '/').split('/').filter(Boolean);
 
   return (
-    <div style={{
+    <div data-toolbar style={{
       background: 'var(--toolbar-bg, var(--base))',
       borderBottom: '1px solid var(--border)',
       display: 'flex',
@@ -623,7 +623,7 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
       </div>
 
       {/* Bottom row: breadcrumb / editable path bar */}
-      <div style={{
+      <div data-breadcrumb style={{
         display: 'flex', alignItems: 'center', gap: 2, padding: '4px 8px',
         borderTop: '1px solid var(--border)', fontSize: 12, overflow: 'hidden',
         minHeight: 30,

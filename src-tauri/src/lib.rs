@@ -110,6 +110,7 @@ pub fn run() {
             shell::rename_file,
             shell::resolve_shortcut,
             shell::eject_drive,
+            shell::show_properties,
             git::git_repo_info,
             git::git_status,
             git::git_stage,

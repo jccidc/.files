@@ -744,13 +744,24 @@ export function SettingsPanel({ open, onClose }: Props) {
               </div>
 
               {sectionTitle('Window Effect')}
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 8 }}>
                 <label style={labelStyle}>Native window vibrancy (Windows 11)</label>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {(['none', 'mica', 'mica-alt', 'acrylic', 'tabbed'] as const).map((fx) => (
                     <button
                       key={fx}
-                      onClick={() => update({ window_effect: fx })}
+                      onClick={() => {
+                        const updates: Record<string, any> = { window_effect: fx };
+                        // Auto-lower opacity when enabling an effect for the first time
+                        if (fx !== 'none' && (settings.base_opacity ?? 1) > 0.85) {
+                          updates.base_opacity = fx === 'acrylic' ? 0.6 : 0.75;
+                        }
+                        // Restore opacity when switching back to none
+                        if (fx === 'none' && (settings.base_opacity ?? 1) < 0.9) {
+                          updates.base_opacity = 1.0;
+                        }
+                        update(updates);
+                      }}
                       style={{
                         padding: '6px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
                         border: settings.window_effect === fx ? '1px solid var(--accent)' : '1px solid var(--border)',
@@ -763,9 +774,19 @@ export function SettingsPanel({ open, onClose }: Props) {
                     </button>
                   ))}
                 </div>
+                {settings.window_effect && settings.window_effect !== 'none' && (settings.base_opacity ?? 1) > 0.85 && (
+                  <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 6 }}>
+                    Tip: Lower the Base Opacity below to see the {settings.window_effect} effect through the window.
+                  </div>
+                )}
+                <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 4 }}>
+                  {settings.window_effect === 'mica' ? 'Subtle tint sampled from your desktop wallpaper' :
+                   settings.window_effect === 'mica-alt' ? 'Stronger wallpaper tint with more contrast' :
+                   settings.window_effect === 'acrylic' ? 'Frosted glass blur effect — best with low opacity' :
+                   settings.window_effect === 'tabbed' ? 'System tabbed window style with subtle tinting' :
+                   'Solid background, no transparency'}
+                </div>
               </div>
-
-              {sectionTitle('Window Transparency')}
               <div style={{ marginBottom: 8 }}>
                 <label style={labelStyle}>Base Opacity: {Math.round((settings.base_opacity ?? 1) * 100)}%</label>
                 <input
@@ -773,7 +794,6 @@ export function SettingsPanel({ open, onClose }: Props) {
                   onChange={(e) => update({ base_opacity: Number(e.target.value) / 100 })}
                   style={{ width: '100%', accentColor: 'var(--accent)' }}
                 />
-                <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 2 }}>Controls how much desktop shows through. Works best with Acrylic effect.</div>
               </div>
 
               {sectionTitle('Panel Opacity')}
@@ -840,6 +860,73 @@ export function SettingsPanel({ open, onClose }: Props) {
                   />
                 </div>
               )}
+
+              {sectionTitle('Radical Theming')}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <label style={{ ...labelStyle, marginBottom: 0, flex: 1 }}>Secondary Accent</label>
+                  <input
+                    type="color"
+                    value={settings.accent_secondary || '#A78BFA'}
+                    onChange={(e) => update({ accent_secondary: e.target.value })}
+                    style={{ width: 28, height: 28, border: 'none', cursor: 'pointer', background: 'transparent', padding: 0 }}
+                  />
+                </div>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Gradient Accent</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>Blend primary to secondary accent across selections</div>
+                </div>
+                <button style={toggleStyle(!!settings.gradient_accent)} onClick={() => update({ gradient_accent: !settings.gradient_accent })}>
+                  <div style={toggleDot(!!settings.gradient_accent)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Selection Glow</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>Pulsing glow ring around selected files</div>
+                </div>
+                <button style={toggleStyle(!!settings.selection_glow)} onClick={() => update({ selection_glow: !settings.selection_glow })}>
+                  <div style={toggleDot(!!settings.selection_glow)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Neon Mode</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>Glowing borders and text shadows on active elements</div>
+                </div>
+                <button style={toggleStyle(!!settings.neon_mode)} onClick={() => update({ neon_mode: !settings.neon_mode })}>
+                  <div style={toggleDot(!!settings.neon_mode)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Accent-Tinted Text</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>File names subtly tinted toward accent color</div>
+                </div>
+                <button style={toggleStyle(!!settings.accent_tinted_text)} onClick={() => update({ accent_tinted_text: !settings.accent_tinted_text })}>
+                  <div style={toggleDot(!!settings.accent_tinted_text)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Rainbow Folders</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>Each folder gets a unique color from a palette</div>
+                </div>
+                <button style={toggleStyle(!!settings.rainbow_folders)} onClick={() => update({ rainbow_folders: !settings.rainbow_folders })}>
+                  <div style={toggleDot(!!settings.rainbow_folders)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Adaptive Accent</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>File name color shifts by file extension/type</div>
+                </div>
+                <button style={toggleStyle(!!settings.adaptive_accent)} onClick={() => update({ adaptive_accent: !settings.adaptive_accent })}>
+                  <div style={toggleDot(!!settings.adaptive_accent)} />
+                </button>
+              </div>
 
               {sectionTitle('Layout & Shape')}
               <div style={{ marginBottom: 16 }}>

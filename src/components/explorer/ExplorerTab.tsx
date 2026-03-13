@@ -179,7 +179,7 @@ function PeekRow({ entry, selected, colWidths, columns, onClick, onDoubleClick }
       onDoubleClick={onDoubleClick}
       style={{
         display: 'grid', gridTemplateColumns: colWidths, alignItems: 'center',
-        height: 'var(--row-height)', cursor: 'pointer', borderRadius: 2,
+        height: 'var(--row-height)', cursor: 'pointer', borderRadius: 2, userSelect: 'none',
         background: selected ? 'var(--active)' : 'transparent',
       }}
       onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = 'var(--hover)'; }}
@@ -220,7 +220,7 @@ interface FileRowProps {
   onHover: (entry: FileEntry, x: number, y: number) => void;
   onHoverEnd: () => void;
   onPeekToggle: () => void;
-  onDragStart: (e: React.DragEvent) => void;
+  onPointerDragStart: (e: React.PointerEvent) => void;
 }
 
 const gitStatusColors: Record<string, string> = {
@@ -231,11 +231,13 @@ const gitStatusLetters: Record<string, string> = {
   modified: 'M', added: 'A', deleted: 'D', renamed: 'R', untracked: '?', conflict: '!', typechange: 'T',
 };
 
-function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWidths, columns, gitStatus: gs, onClick, onDoubleClick, onContextMenu, onRenameDone, onHover, onHoverEnd, onPeekToggle, onDragStart }: FileRowProps) {
+function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWidths, columns, gitStatus: gs, onClick, onDoubleClick, onContextMenu, onRenameDone, onHover, onHoverEnd, onPeekToggle, onPointerDragStart }: FileRowProps) {
   return (
     <div
-      draggable={selected}
-      onDragStart={selected ? onDragStart : undefined}
+      className={selected ? 'file-row-selected' : undefined}
+      data-drop-folder={entry.is_dir ? entry.path : undefined}
+      data-ext={entry.is_dir ? undefined : (entry.extension || '').toLowerCase()}
+      onPointerDown={(e) => { if (e.button === 0) onPointerDragStart(e); }}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={(e) => e.preventDefault()}
@@ -251,8 +253,9 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
       onMouseMove={(e) => onHover(entry, e.clientX, e.clientY)}
       style={{
         display: 'grid', gridTemplateColumns: colWidths, alignItems: 'center',
-        height: 'var(--row-height)', background: selected ? 'var(--active)' : even ? 'transparent' : 'rgba(255,255,255,0.01)',
-        cursor: 'pointer', borderRadius: 2,
+        height: 'var(--row-height)',
+        background: selected ? 'var(--active)' : even ? 'transparent' : 'rgba(255,255,255,0.01)',
+        cursor: 'pointer', borderRadius: 2, userSelect: 'none',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--density-gap)', padding: '0 var(--density-pad-x)', overflow: 'hidden' }}>
@@ -270,7 +273,7 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
         {renaming ? (
           <InlineRename entry={entry} onDone={onRenameDone} />
         ) : (
-          <span style={{
+          <span className="file-name" style={{
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             color: entry.is_hidden ? 'var(--t3)' : 'var(--t1)', fontSize: 'var(--file-font-size)',
           }}>
@@ -453,6 +456,142 @@ function ColResizeHandle({ onResize }: { onResize: (delta: number) => void }) {
   );
 }
 
+// ---- Shared drag state (module-level, works across all ExplorerTab instances) ----
+// Using pointer events instead of HTML5 drag-drop because WebView2 intercepts
+// native drag events and prevents cross-pane drops within the app.
+
+interface DragState {
+  paths: string[];
+  sourceDir: string;
+  startX: number;
+  startY: number;
+  active: boolean; // true once mouse has moved past threshold
+}
+
+let _drag: DragState | null = null;
+let _dragGhost: HTMLDivElement | null = null;
+const DRAG_THRESHOLD = 5;
+
+// Global listeners (attached once)
+let _listenersAttached = false;
+// Registry: each ExplorerTab registers its root element + currentPath + refresh callback
+const _dropZones = new Map<string, { el: HTMLDivElement; getPath: () => string; refresh: () => void }>();
+
+function _ensureGlobalListeners() {
+  if (_listenersAttached) return;
+  _listenersAttached = true;
+
+  document.addEventListener('pointermove', (e) => {
+    if (!_drag) return;
+    const dx = e.clientX - _drag.startX;
+    const dy = e.clientY - _drag.startY;
+    if (!_drag.active && Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD) return;
+    if (!_drag.active) {
+      // Suppress text selection and clear any existing selection
+      document.body.style.userSelect = 'none';
+      window.getSelection()?.removeAllRanges();
+    }
+    _drag.active = true;
+
+    // Show/move ghost
+    if (!_dragGhost) {
+      _dragGhost = document.createElement('div');
+      _dragGhost.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;padding:4px 10px;background:var(--surface);border:1px solid var(--accent);border-radius:4px;font-size:12px;color:var(--t1);box-shadow:0 4px 12px rgba(0,0,0,0.4);white-space:nowrap;';
+      const count = _drag.paths.length;
+      _dragGhost.textContent = count === 1
+        ? _drag.paths[0].replace(/.*[\\/]/, '')
+        : `${count} items`;
+      document.body.appendChild(_dragGhost);
+    }
+    _dragGhost.style.left = `${e.clientX + 12}px`;
+    _dragGhost.style.top = `${e.clientY + 12}px`;
+
+    // Highlight drop targets
+    for (const [, zone] of _dropZones) {
+      const rect = zone.el.getBoundingClientRect();
+      const over = e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+      zone.el.style.outline = over ? '2px solid var(--accent)' : '';
+      zone.el.style.outlineOffset = over ? '-2px' : '';
+    }
+  });
+
+  document.addEventListener('pointerup', async (e) => {
+    document.body.style.userSelect = '';
+    if (!_drag || !_drag.active) {
+      _drag = null;
+      return;
+    }
+
+    const paths = _drag.paths;
+    const sourceDir = _drag.sourceDir;
+    _drag = null;
+
+    // Clean up ghost
+    if (_dragGhost) {
+      _dragGhost.remove();
+      _dragGhost = null;
+    }
+
+    // Clear all outlines
+    for (const [, zone] of _dropZones) {
+      zone.el.style.outline = '';
+      zone.el.style.outlineOffset = '';
+    }
+
+    // Find which drop zone we're over
+    let destDir: string | null = null;
+
+    // Check if we're over a folder row (drop INTO that folder)
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    const folderRow = target?.closest?.('[data-drop-folder]') as HTMLElement | null;
+    if (folderRow) {
+      destDir = folderRow.getAttribute('data-drop-folder');
+      // Find which zone this folder is in
+      for (const [, zone] of _dropZones) {
+        if (zone.el.contains(folderRow)) {
+          break;
+        }
+      }
+    }
+
+    // Otherwise check drop zones (pane backgrounds)
+    if (!destDir) {
+      for (const [, zone] of _dropZones) {
+        const rect = zone.el.getBoundingClientRect();
+        if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+          destDir = zone.getPath();
+          break;
+        }
+      }
+    }
+
+    if (!destDir) return;
+
+    // Filter: don't move into the same parent directory
+    const normDest = destDir.replace(/\\/g, '/').replace(/\/$/, '');
+    const validPaths = paths.filter((p) => {
+      const parent = p.replace(/\\/g, '/').replace(/\/[^/]+$/, '');
+      return parent.replace(/\/$/, '') !== normDest;
+    });
+    if (validPaths.length === 0) return;
+
+    const { moveFiles, copyFiles } = await import('./../../api/shell');
+    if (e.ctrlKey) {
+      await copyFiles(validPaths, destDir).catch(() => {});
+    } else {
+      await moveFiles(validPaths, destDir).catch(() => {});
+    }
+
+    // Refresh both source and destination zones
+    for (const [, zone] of _dropZones) {
+      const zPath = zone.getPath().replace(/\\/g, '/').replace(/\/$/, '');
+      if (zPath === normDest || zPath === sourceDir.replace(/\\/g, '/').replace(/\/$/, '')) {
+        zone.refresh();
+      }
+    }
+  });
+}
+
 // ---- Main Component ----
 
 export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
@@ -506,7 +645,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [peekPaths, setPeekPaths] = useState<Set<string>>(new Set());
   const [peekChildren, setPeekChildren] = useState<Record<string, FileEntry[]>>({});
-  const [dropHighlight, setDropHighlight] = useState(false);
+  // dropHighlight removed -- pointer-event drag system handles visuals globally
   const [filterText, setFilterText] = useState('');
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
   const tooltipTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -605,10 +744,11 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
 
   // Build flat list with peek children and group headers
   const PEEK_VISIBLE = 5;
-  type FlatItem = { entry: FileEntry; depth: number; isPeek: boolean; peekParent?: string; groupHeader?: string };
+  type FlatItem = { entry: FileEntry; depth: number; isPeek: boolean; peekParent?: string; groupHeader?: string; sortedIndex?: number };
   const flatList: FlatItem[] = [];
   let lastGroup = '';
-  for (const entry of sortedEntries) {
+  for (let si = 0; si < sortedEntries.length; si++) {
+    const entry = sortedEntries[si];
     if (groupBy !== 'none') {
       const gk = getGroupKey(entry);
       if (gk !== lastGroup) {
@@ -616,7 +756,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         lastGroup = gk;
       }
     }
-    flatList.push({ entry, depth: 0, isPeek: false });
+    flatList.push({ entry, depth: 0, isPeek: false, sortedIndex: si });
     if (peekPaths.has(entry.path) && peekChildren[entry.path]) {
       const children = peekChildren[entry.path];
       for (const child of children) {
@@ -705,6 +845,9 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   // Click handler with shift-range and ctrl-toggle
   const handleRowClick = useCallback(
     (entry: FileEntry, index: number, e: React.MouseEvent) => {
+      // Clear tooltip on any click
+      clearTimeout(tooltipTimer.current);
+      setTooltip(null);
       // Mark this tab as active on interaction
       store.getState().setActiveTab(tabId);
       if (e.shiftKey && lastClickedIndex.current >= 0) {
@@ -722,25 +865,10 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         toggleSelected(entry.path);
         lastClickedIndex.current = index;
       } else {
-        // Plain click
-        if (selectedPaths.size === 1 && selectedPaths.has(entry.path) && !entry.is_dir) {
-          // Already selected - start slow-click rename timer
-          slowClickPath.current = entry.path;
-          clearTimeout(slowClickTimer.current);
-          slowClickTimer.current = setTimeout(() => {
-            if (slowClickPath.current === entry.path) {
-              setRenamingPath(entry.path);
-            }
-            slowClickPath.current = null;
-          }, 600);
-        } else {
-          // Normal select
-          clearTimeout(slowClickTimer.current);
-          slowClickPath.current = null;
-          clearSelection();
-          toggleSelected(entry.path);
-          lastClickedIndex.current = index;
-        }
+        // Plain click - select only (rename via right-click or F2)
+        clearSelection();
+        toggleSelected(entry.path);
+        lastClickedIndex.current = index;
       }
     },
     [tabId, sortedEntries, selectedPaths, setSelected, toggleSelected, clearSelection],
@@ -791,38 +919,25 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     setRenamingPath(null);
   };
 
-  const handleDragStart = (e: React.DragEvent, entry: FileEntry) => {
-    e.dataTransfer.setData('text/plain', entry.path);
-    e.dataTransfer.effectAllowed = 'copyMove';
-  };
+  // Register this tab as a drop zone
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    _ensureGlobalListeners();
+    const el = rootRef.current;
+    if (!el) return;
+    _dropZones.set(tabId, { el, getPath: () => currentPath, refresh });
+    return () => { _dropZones.delete(tabId); };
+  }, [tabId, currentPath, refresh]);
 
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setDropHighlight(false);
-
-    // Check for external files from desktop
-    if (e.dataTransfer.files?.length > 0) {
-      // Tauri handles external file drops via its own event system
-      // For files dragged from within the app:
-      return;
-    }
-
-    const droppedPath = e.dataTransfer.getData('text/plain');
-    if (droppedPath && droppedPath !== currentPath) {
-      const { moveFiles } = await import('../../api/shell');
-      await moveFiles([droppedPath], currentPath).catch(() => {});
-      refresh();
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDropHighlight(true);
-  };
-
-  const handleDragLeave = () => {
-    setDropHighlight(false);
+  const handleFileDragStart = (e: React.PointerEvent, entry: FileEntry) => {
+    // Only start drag on primary button (left click)
+    if (e.button !== 0) return;
+    // Record drag intent — don't touch selection here (onClick handles that)
+    // If the entry is already in the selection, drag all selected; otherwise just this one
+    const paths = selectedPaths.has(entry.path) && selectedPaths.size > 1
+      ? [...selectedPaths]
+      : [entry.path];
+    _drag = { paths, sourceDir: currentPath, startX: e.clientX, startY: e.clientY, active: false };
   };
 
   const handlePeekToggle = async (entry: FileEntry) => {
@@ -866,10 +981,9 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
 
   return (
     <div
+      ref={rootRef}
       style={{
         display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden',
-        outline: dropHighlight ? '2px solid var(--accent)' : 'none',
-        outlineOffset: -2,
       }}
       onContextMenu={(e) => e.preventDefault()}
       onMouseDown={(e) => {
@@ -877,9 +991,6 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         store.getState().setActiveTab(tabId);
         if (e.button === 2) { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, entry: null }); }
       }}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
     >
       <Toolbar
         tabId={tabId}
@@ -984,14 +1095,14 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
                     colWidths={colWidths}
                     columns={activeColumns}
                     gitStatus={gitStatusMap.get(item.entry.name)}
-                    onClick={(e) => handleRowClick(item.entry, i, e)}
+                    onClick={(e) => handleRowClick(item.entry, item.sortedIndex ?? i, e)}
                     onDoubleClick={() => handleDoubleClick(item.entry)}
                     onContextMenu={(e) => { e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, entry: item.entry }); }}
                     onRenameDone={handleRenameDone}
                     onHover={handleHover}
                     onHoverEnd={handleHoverEnd}
                     onPeekToggle={() => handlePeekToggle(item.entry)}
-                    onDragStart={(e) => handleDragStart(e, item.entry)}
+                    onPointerDragStart={(e) => handleFileDragStart(e, item.entry)}
                   />
                 );
                 i++;
@@ -1050,7 +1161,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           onRowClick={handleRowClick}
           onDoubleClick={handleDoubleClick}
           onContextMenu={(e, entry) => { setCtxMenu({ x: e.clientX, y: e.clientY, entry }); }}
-          onDragStart={handleDragStart}
+          onPointerDragStart={handleFileDragStart}
         />
       )}
 
@@ -1096,6 +1207,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           onPaste={() => useExplorerStore.getState().paste(tabId)}
           canPaste={useExplorerStore.getState().clipboardPaths.length > 0}
           selectedCount={selectedPaths.size}
+          onProperties={(path) => { import('../../api/shell').then(({ showProperties }) => showProperties(path)); }}
           gitFileStatus={ctxMenu.entry ? gitStatusMap.get(ctxMenu.entry.name) || null : null}
           onGitStage={gitRepoInfo?.is_repo && gitRepoInfo.root ? (filePath: string) => {
             const getGitRelPath = (p: string, root: string) => {

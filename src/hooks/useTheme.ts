@@ -28,15 +28,23 @@ export function useTheme() {
   const customCss = useSettingsStore((s) => s.settings.custom_css);
   const customFonts = useSettingsStore((s) => s.settings.custom_fonts);
   const fontFamily = useSettingsStore((s) => s.settings.font_family);
+  // Radical theming
+  const accentSecondary = useSettingsStore((s) => s.settings.accent_secondary);
+  const gradientAccent = useSettingsStore((s) => s.settings.gradient_accent);
+  const selectionGlow = useSettingsStore((s) => s.settings.selection_glow);
+  const neonMode = useSettingsStore((s) => s.settings.neon_mode);
+  const accentTintedText = useSettingsStore((s) => s.settings.accent_tinted_text);
+  const adaptiveAccent = useSettingsStore((s) => s.settings.adaptive_accent);
   const customStyleRef = useRef<HTMLStyleElement | null>(null);
   const fontStyleRef = useRef<HTMLStyleElement | null>(null);
+  const radicalStyleRef = useRef<HTMLStyleElement | null>(null);
   const cursorTrailRef = useRef<HTMLCanvasElement | null>(null);
 
   // Theme + accent
   useEffect(() => {
     const tokens = resolveTheme(theme, customThemes || []);
-    applyTheme(tokens, accentColor || undefined);
-  }, [theme, accentColor, customThemes]);
+    applyTheme(tokens, accentColor || undefined, accentSecondary || undefined, gradientAccent || false);
+  }, [theme, accentColor, accentSecondary, gradientAccent, customThemes]);
 
   // UI scale
   useEffect(() => {
@@ -89,6 +97,91 @@ export function useTheme() {
     // Glow
     r.classList.toggle('glow-enabled', enableGlow !== false);
   }, [sidebarOpacity, toolbarOpacity, terminalOpacity, baseOpacity, blurAmount, borderRadius, animationSpeed, enableAnimations, density, enableGlow, fontSize, fontFamily]);
+
+  // Radical theming effects (CSS class toggles + injected styles)
+  useEffect(() => {
+    const r = document.documentElement;
+    r.classList.toggle('neon-mode', neonMode || false);
+    r.classList.toggle('accent-tinted-text', accentTintedText || false);
+    r.classList.toggle('selection-glow', selectionGlow || false);
+    r.classList.toggle('adaptive-accent', adaptiveAccent || false);
+
+    // Inject/update radical styles sheet
+    if (!radicalStyleRef.current) {
+      radicalStyleRef.current = document.createElement('style');
+      radicalStyleRef.current.id = 'dotfiles-radical-css';
+      document.head.appendChild(radicalStyleRef.current);
+    }
+
+    const accent = accentColor || '#3B82F6';
+    const hexR = (hex: string) => parseInt(hex.slice(1, 3), 16) || 0;
+    const hexG = (hex: string) => parseInt(hex.slice(3, 5), 16) || 0;
+    const hexB = (hex: string) => parseInt(hex.slice(5, 7), 16) || 0;
+    const ar = hexR(accent), ag = hexG(accent), ab = hexB(accent);
+    radicalStyleRef.current.textContent = `
+      /* Neon mode */
+      .neon-mode [data-sidebar] { box-shadow: 1px 0 12px rgba(${ar},${ag},${ab},0.2) !important; border-right: 1px solid ${accent} !important; }
+      .neon-mode [data-toolbar] { box-shadow: 0 1px 12px rgba(${ar},${ag},${ab},0.2) !important; border-bottom: 1px solid ${accent} !important; }
+      .neon-mode [data-breadcrumb] { border-top: 1px solid ${accent} !important; box-shadow: 0 0 8px rgba(${ar},${ag},${ab},0.15) !important; }
+      .neon-mode .file-row-selected .file-name { text-shadow: 0 0 8px rgba(${ar},${ag},${ab},0.5) !important; }
+
+      /* Accent-tinted text */
+      .accent-tinted-text .file-name { color: color-mix(in srgb, var(--t2) 70%, ${accent} 30%) !important; }
+      .accent-tinted-text .file-row-selected .file-name { color: color-mix(in srgb, var(--t1) 60%, ${accent} 40%) !important; }
+
+      /* Selection glow */
+      @keyframes dotfiles-sel-glow {
+        0%, 100% { box-shadow: inset 0 0 0 1px ${accent}, 0 0 6px rgba(${ar},${ag},${ab},0.15); }
+        50% { box-shadow: inset 0 0 0 1px ${accent}, 0 0 16px rgba(${ar},${ag},${ab},0.25); }
+      }
+      .selection-glow .file-row-selected { animation: dotfiles-sel-glow 2s ease-in-out infinite !important; border-radius: 3px; }
+
+      /* Adaptive accent: color file names by extension */
+      .adaptive-accent [data-ext="js"] .file-name,
+      .adaptive-accent [data-ext="mjs"] .file-name,
+      .adaptive-accent [data-ext="cjs"] .file-name { color: #FACC15 !important; }
+      .adaptive-accent [data-ext="ts"] .file-name { color: #3B82F6 !important; }
+      .adaptive-accent [data-ext="tsx"] .file-name,
+      .adaptive-accent [data-ext="jsx"] .file-name { color: #38BDF8 !important; }
+      .adaptive-accent [data-ext="json"] .file-name,
+      .adaptive-accent [data-ext="toml"] .file-name,
+      .adaptive-accent [data-ext="yaml"] .file-name,
+      .adaptive-accent [data-ext="yml"] .file-name { color: #E4A853 !important; }
+      .adaptive-accent [data-ext="md"] .file-name,
+      .adaptive-accent [data-ext="txt"] .file-name { color: #9BA3B0 !important; }
+      .adaptive-accent [data-ext="html"] .file-name { color: #F97316 !important; }
+      .adaptive-accent [data-ext="css"] .file-name,
+      .adaptive-accent [data-ext="scss"] .file-name { color: #A78BFA !important; }
+      .adaptive-accent [data-ext="rs"] .file-name { color: #F87171 !important; }
+      .adaptive-accent [data-ext="py"] .file-name { color: #34D399 !important; }
+      .adaptive-accent [data-ext="go"] .file-name { color: #22D3EE !important; }
+      .adaptive-accent [data-ext="sh"] .file-name,
+      .adaptive-accent [data-ext="bash"] .file-name { color: #22C55E !important; }
+      .adaptive-accent [data-ext="png"] .file-name,
+      .adaptive-accent [data-ext="jpg"] .file-name,
+      .adaptive-accent [data-ext="jpeg"] .file-name,
+      .adaptive-accent [data-ext="gif"] .file-name,
+      .adaptive-accent [data-ext="svg"] .file-name,
+      .adaptive-accent [data-ext="webp"] .file-name { color: #4ADE80 !important; }
+      .adaptive-accent [data-ext="zip"] .file-name,
+      .adaptive-accent [data-ext="tar"] .file-name,
+      .adaptive-accent [data-ext="gz"] .file-name,
+      .adaptive-accent [data-ext="rar"] .file-name,
+      .adaptive-accent [data-ext="7z"] .file-name { color: #FB923C !important; }
+      .adaptive-accent [data-ext="exe"] .file-name,
+      .adaptive-accent [data-ext="msi"] .file-name { color: #F87171 !important; }
+      .adaptive-accent [data-ext="gpc"] .file-name { color: #E879F9 !important; }
+      .adaptive-accent [data-ext="xml"] .file-name { color: #818CF8 !important; }
+      .adaptive-accent [data-ext="sql"] .file-name { color: #22D3EE !important; }
+    `;
+
+    return () => {
+      if (radicalStyleRef.current) {
+        radicalStyleRef.current.remove();
+        radicalStyleRef.current = null;
+      }
+    };
+  }, [neonMode, accentTintedText, selectionGlow, adaptiveAccent, accentColor]);
 
   // Background pattern
   useEffect(() => {

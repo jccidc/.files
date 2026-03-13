@@ -43,6 +43,21 @@ pub struct AppSettings {
     pub density: String,
     #[serde(default = "default_icon_theme")]
     pub icon_theme: String,
+    // Radical theming
+    #[serde(default = "default_accent_secondary")]
+    pub accent_secondary: String,
+    #[serde(default)]
+    pub gradient_accent: bool,
+    #[serde(default)]
+    pub selection_glow: bool,
+    #[serde(default)]
+    pub neon_mode: bool,
+    #[serde(default)]
+    pub accent_tinted_text: bool,
+    #[serde(default)]
+    pub rainbow_folders: bool,
+    #[serde(default)]
+    pub adaptive_accent: bool,
     #[serde(default = "default_bg_pattern")]
     pub bg_pattern: String,
     #[serde(default)]
@@ -117,6 +132,7 @@ fn default_animation_speed() -> f32 { 1.0 }
 fn default_border_radius() -> u8 { 8 }
 fn default_density() -> String { "comfortable".to_string() }
 fn default_icon_theme() -> String { "minimal".to_string() }
+fn default_accent_secondary() -> String { "#A78BFA".to_string() }
 fn default_bg_pattern() -> String { "none".to_string() }
 fn default_bg_opacity() -> f32 { 0.05 }
 
@@ -139,6 +155,13 @@ impl Default for AppSettings {
             border_radius: default_border_radius(),
             density: default_density(),
             icon_theme: default_icon_theme(),
+            accent_secondary: default_accent_secondary(),
+            gradient_accent: false,
+            selection_glow: false,
+            neon_mode: false,
+            accent_tinted_text: false,
+            rainbow_folders: false,
+            adaptive_accent: false,
             bg_pattern: default_bg_pattern(),
             bg_custom_url: String::new(),
             bg_opacity: default_bg_opacity(),

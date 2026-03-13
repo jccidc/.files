@@ -170,6 +170,34 @@ pub fn eject_drive(letter: String) -> Result<(), String> {
     }
 }
 
+#[tauri::command]
+pub fn show_properties(path: String) -> Result<(), String> {
+    let p = Path::new(&path);
+    if !p.exists() {
+        return Err(format!("Path does not exist: {}", path));
+    }
+    let parent = p.parent().unwrap_or(p);
+    let name = p.file_name().map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.clone());
+    let parent_str = parent.to_string_lossy().replace('\'', "''");
+    let name_str = name.replace('\'', "''");
+    // InvokeVerb('properties') needs the process to stay alive while the dialog is open.
+    // Use -Command with a sleep loop that exits when the properties window closes.
+    let script = format!(
+        "$shell = New-Object -ComObject Shell.Application; \
+         $folder = $shell.Namespace('{}'); \
+         $item = $folder.ParseName('{}'); \
+         if ($item) {{ $item.InvokeVerb('properties'); Start-Sleep -Seconds 30 }}",
+        parent_str, name_str
+    );
+    std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dst).map_err(|e| e.to_string())?;
     for entry in std::fs::read_dir(src).map_err(|e| e.to_string())? {

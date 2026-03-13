@@ -226,6 +226,81 @@ export const THEMES: Record<string, ThemeTokens> = {
     purple: '#6C71C4',
     cyan: '#2AA198',
   },
+
+  'cyberpunk': {
+    id: 'cyberpunk',
+    name: 'Cyberpunk',
+    void: '#05000A',
+    deepest: '#08010F',
+    deep: '#0C0215',
+    base: '#10041C',
+    surface: '#160824',
+    raised: '#1E0E2E',
+    hover: '#261438',
+    active: '#301A44',
+    border: '#2A1040',
+    t1: '#F0E6FF',
+    t2: '#A78EC0',
+    t3: '#6B4D80',
+    accent: '#FF2E97',
+    aglow: 'rgba(255,46,151,0.12)',
+    warm: '#FF6B2E',
+    green: '#39FF14',
+    red: '#FF1744',
+    yellow: '#FFE500',
+    purple: '#BF00FF',
+    cyan: '#00F0FF',
+  },
+
+  'synthwave': {
+    id: 'synthwave',
+    name: 'Synthwave',
+    void: '#0A0012',
+    deepest: '#0E0218',
+    deep: '#13061F',
+    base: '#1A0B2E',
+    surface: '#221339',
+    raised: '#2B1B44',
+    hover: '#342450',
+    active: '#3E2D5C',
+    border: '#2E1A48',
+    t1: '#F5E6FF',
+    t2: '#B89ACD',
+    t3: '#7A5F8F',
+    accent: '#F834FF',
+    aglow: 'rgba(248,52,255,0.12)',
+    warm: '#FF6E27',
+    green: '#72F1B8',
+    red: '#FE4450',
+    yellow: '#FEDE5D',
+    purple: '#F834FF',
+    cyan: '#36F9F6',
+  },
+
+  'emerald-matrix': {
+    id: 'emerald-matrix',
+    name: 'Emerald Matrix',
+    void: '#000A04',
+    deepest: '#001208',
+    deep: '#00180C',
+    base: '#002010',
+    surface: '#002A18',
+    raised: '#003420',
+    hover: '#004028',
+    active: '#004C30',
+    border: '#003822',
+    t1: '#C8FFD4',
+    t2: '#6ABF7B',
+    t3: '#38804A',
+    accent: '#00FF6A',
+    aglow: 'rgba(0,255,106,0.12)',
+    warm: '#FFB347',
+    green: '#00FF6A',
+    red: '#FF4D4D',
+    yellow: '#D4FF00',
+    purple: '#00FFC8',
+    cyan: '#00E5FF',
+  },
 };
 
 export const ACCENT_PRESETS = [
@@ -239,9 +314,10 @@ export const ACCENT_PRESETS = [
   '#EF4444', // Red
 ];
 
-export function applyTheme(theme: ThemeTokens, accentOverride?: string) {
+export function applyTheme(theme: ThemeTokens, accentOverride?: string, secondaryAccent?: string, gradientAccent?: boolean) {
   const root = document.documentElement;
   const accent = accentOverride || theme.accent;
+  const accent2 = secondaryAccent || accent;
   root.style.setProperty('--void', theme.void);
   root.style.setProperty('--deepest', theme.deepest);
   root.style.setProperty('--deep', theme.deep);
@@ -255,11 +331,26 @@ export function applyTheme(theme: ThemeTokens, accentOverride?: string) {
   root.style.setProperty('--t2', theme.t2);
   root.style.setProperty('--t3', theme.t3);
   root.style.setProperty('--accent', accent);
-  // Recompute aglow from accent
+  // Recompute accent-derived colors
   const r = parseInt(accent.slice(1, 3), 16);
   const g = parseInt(accent.slice(3, 5), 16);
   const b = parseInt(accent.slice(5, 7), 16);
   root.style.setProperty('--aglow', `rgba(${r},${g},${b},0.12)`);
+  // Accent-tinted hover and selection backgrounds
+  root.style.setProperty('--hover', `rgba(${r},${g},${b},0.08)`);
+  root.style.setProperty('--active', `rgba(${r},${g},${b},0.16)`);
+  // Secondary accent + gradient
+  root.style.setProperty('--accent2', accent2);
+  const r2 = parseInt(accent2.slice(1, 3), 16);
+  const g2 = parseInt(accent2.slice(3, 5), 16);
+  const b2 = parseInt(accent2.slice(5, 7), 16);
+  root.style.setProperty('--aglow2', `rgba(${r2},${g2},${b2},0.12)`);
+  if (gradientAccent) {
+    root.style.setProperty('--active', `linear-gradient(90deg, rgba(${r},${g},${b},0.16), rgba(${r2},${g2},${b2},0.16))`);
+    root.style.setProperty('--accent-grad', `linear-gradient(135deg, ${accent}, ${accent2})`);
+  } else {
+    root.style.setProperty('--accent-grad', accent);
+  }
   root.style.setProperty('--warm', theme.warm);
   root.style.setProperty('--green', theme.green);
   root.style.setProperty('--red', theme.red);
