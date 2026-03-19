@@ -1,5 +1,59 @@
+import { useState, useEffect, useRef } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useLayoutStore } from '../../stores/layout';
+
+function VerseMarquee() {
+  const [verse, setVerse] = useState<{ reference: string; text: string } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    import('../../data/dailyVerses').then(({ getDailyVerse }) => {
+      setVerse(getDailyVerse());
+    }).catch(() => {});
+  }, []);
+
+  if (!verse) return null;
+
+  const display = `${verse.text}  —  ${verse.reference}`;
+
+  return (
+    <div
+      ref={containerRef}
+      data-tauri-drag-region
+      style={{
+        flex: 1,
+        overflow: 'hidden',
+        position: 'relative',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        maskImage: 'linear-gradient(to right, transparent, black 40px, black calc(100% - 40px), transparent)',
+        WebkitMaskImage: 'linear-gradient(to right, transparent, black 40px, black calc(100% - 40px), transparent)',
+      }}
+    >
+      <div
+        ref={textRef}
+        style={{
+          whiteSpace: 'nowrap',
+          fontSize: 11,
+          color: 'var(--t3)',
+          fontStyle: 'italic',
+          animation: 'marquee-scroll 45s linear infinite',
+          paddingLeft: '100%',
+        }}
+      >
+        {display}
+      </div>
+      <style>{`
+        @keyframes marquee-scroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-100%); }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 const appWindow = getCurrentWindow();
 
@@ -90,8 +144,8 @@ export function Titlebar({ onOpenSettings }: Props) {
         </span>
       </div>
 
-      {/* Center: drag region spacer */}
-      <div data-tauri-drag-region style={{ flex: 1 }} />
+      {/* Center: daily verse marquee */}
+      <VerseMarquee />
 
       {/* Right: action buttons + window controls */}
       <div style={{ display: 'flex', alignItems: 'center' }}>
