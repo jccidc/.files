@@ -15,7 +15,7 @@ interface Column {
   selectedPath: string | null;
 }
 
-export function MillerColumns({ initialPath, onNavigate, onOpenFile, onContextMenu }: MillerColumnsProps) {
+export function MillerColumns({ initialPath, onNavigate: _onNavigate, onOpenFile, onContextMenu }: MillerColumnsProps) {
   const [columns, setColumns] = useState<Column[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 

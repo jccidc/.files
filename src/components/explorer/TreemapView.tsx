@@ -60,7 +60,7 @@ function getSizeColor(bytes: number): string {
 }
 
 // Folders get a slightly different treatment — same gradient but with more saturation
-function getTypeColor(ext: string | null, isDir: boolean, size: number): string {
+function getTypeColor(_ext: string | null, isDir: boolean, size: number): string {
   if (isDir) {
     // Folders use the size gradient but slightly more muted
     const base = getSizeColor(size);
@@ -70,33 +70,6 @@ function getTypeColor(ext: string | null, isDir: boolean, size: number): string 
   return getSizeColor(size);
 }
 
-// Keep extension colors as a legend overlay option
-const EXT_COLORS: Record<string, string> = {
-  // Code
-  ts: '#3178C6', tsx: '#3178C6', js: '#F7DF1E', jsx: '#F7DF1E',
-  py: '#3776AB', rs: '#DEA584', go: '#00ADD8', java: '#ED8B00',
-  cs: '#239120', cpp: '#00599C', c: '#555555', h: '#555555',
-  // Web
-  html: '#E34F26', css: '#1572B6', scss: '#CC6699', svg: '#FFB13B',
-  // Data
-  json: '#5B5B5B', xml: '#E44D26', yaml: '#CB171E', yml: '#CB171E',
-  csv: '#217346', sql: '#CC6699',
-  // Docs
-  md: '#083FA1', txt: '#888888', pdf: '#FF0000', doc: '#2B579A', docx: '#2B579A',
-  xls: '#217346', xlsx: '#217346', ppt: '#D24726', pptx: '#D24726',
-  // Images
-  png: '#FF6B6B', jpg: '#FF6B6B', jpeg: '#FF6B6B', gif: '#FF6B6B',
-  webp: '#FF6B6B', bmp: '#FF6B6B', ico: '#FF6B6B',
-  // Media
-  mp4: '#9B59B6', avi: '#9B59B6', mkv: '#9B59B6', mov: '#9B59B6',
-  mp3: '#1DB954', wav: '#1DB954', flac: '#1DB954', ogg: '#1DB954',
-  // Archives
-  zip: '#FFA500', '7z': '#FFA500', tar: '#FFA500', gz: '#FFA500', rar: '#FFA500',
-  // Executables
-  exe: '#E74C3C', msi: '#E74C3C', dll: '#95A5A6', sys: '#95A5A6',
-  };
-  return colors[e] || '#6B7280';
-}
 
 function formatSize(bytes: number): string {
   if (bytes === 0) return '0 B';

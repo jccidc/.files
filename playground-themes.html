@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>.files Theme Playground</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --void: #08090C;
+  --deepest: #0D0F14;
+  --deep: #11141A;
+  --base: #161A22;
+  --surface: #1A1F28;
+  --raised: #1F242D;
+  --hover: rgba(59,130,246,0.08);
+  --active: rgba(59,130,246,0.16);
+  --border: #2A2F3A;
+  --t1: #E8EAF0;
+  --t2: #9BA3B0;
+  --t3: #5A6270;
+  --accent: #3B82F6;
+  --aglow: rgba(59,130,246,0.12);
+  --warm: #E4A853;
+  --green: #4ADE80;
+  --red: #F87171;
+  --yellow: #FACC15;
+  --purple: #A78BFA;
+  --cyan: #22D3EE;
+}
+
+body {
+  font-family: -apple-system, 'Segoe UI', sans-serif;
+  background: var(--void);
+  color: var(--t1);
+  height: 100vh;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  grid-template-rows: 1fr auto;
+  gap: 0;
+}
+
+/* ---- CONTROLS PANEL ---- */
+.controls {
+  background: var(--deepest);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 16px;
+  grid-row: 1 / 3;
+}
+.controls::-webkit-scrollbar { width: 6px; }
+.controls::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.controls::-webkit-scrollbar-track { background: transparent; }
+
+.controls h1 { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--t1); }
+.controls .subtitle { font-size: 11px; color: var(--t3); margin-bottom: 16px; }
+
+.section-title {
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px;
+  color: var(--t3); margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid var(--border);
+}
+.section-title:first-of-type { border-top: none; margin-top: 8px; }
+
+.control-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px; gap: 8px;
+}
+.control-row label { font-size: 12px; color: var(--t2); white-space: nowrap; }
+.control-row .value { font-size: 11px; color: var(--t3); font-family: 'Consolas', monospace; min-width: 40px; text-align: right; }
+
+input[type="range"] {
+  flex: 1; max-width: 140px; height: 4px; -webkit-appearance: none; appearance: none;
+  background: var(--border); border-radius: 2px; outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); cursor: pointer; border: 2px solid var(--surface);
+}
+input[type="color"] {
+  width: 32px; height: 24px; border: 1px solid var(--border); border-radius: 4px;
+  background: transparent; cursor: pointer; padding: 0;
+}
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
+
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+}
+.toggle-row label { font-size: 12px; color: var(--t2); }
+.toggle {
+  width: 36px; height: 20px; border-radius: 10px; cursor: pointer;
+  background: var(--border); position: relative; transition: background 0.2s;
+  border: none; padding: 0;
+}
+.toggle.on { background: var(--accent); }
+.toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+  border-radius: 50%; background: white; transition: transform 0.2s;
+}
+.toggle.on::after { transform: translateX(16px); }
+
+/* Presets */
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.preset-btn {
+  padding: 5px 10px; border-radius: 6px; font-size: 11px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--raised); color: var(--t2);
+  transition: all 0.2s;
+}
+.preset-btn:hover { border-color: var(--accent); color: var(--t1); }
+.preset-btn.active { border-color: var(--accent); background: var(--active); color: var(--accent); font-weight: 600; }
+
+/* CSS var display */
+.var-display {
+  background: var(--deep); border-radius: 6px; padding: 8px 10px; margin-top: 12px;
+  font-family: 'Consolas', monospace; font-size: 10px; color: var(--t3);
+  max-height: 160px; overflow-y: auto; line-height: 1.6;
+}
+.var-display .vname { color: var(--cyan); }
+.var-display .vval { color: var(--warm); }
+
+/* ---- PREVIEW ---- */
+.preview {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--void); transition: background 0.3s;
+}
+
+/* Mock Toolbar */
+.mock-toolbar {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+  background: var(--base); border-bottom: 1px solid var(--border);
+  transition: all 0.3s;
+}
+.mock-toolbar .nav-btn {
+  width: 28px; height: 28px; border-radius: 4px; border: none;
+  background: transparent; color: var(--t3); cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+.mock-toolbar .nav-btn:hover { background: var(--hover); color: var(--t2); }
+.mock-toolbar .breadcrumb {
+  flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  padding: 5px 12px; font-size: 12px; color: var(--t2); font-family: 'Consolas', monospace;
+}
+.mock-toolbar .breadcrumb .sep { color: var(--t3); margin: 0 4px; }
+
+/* Mock Explorer Body */
+.mock-body {
+  display: flex; flex: 1; overflow: hidden;
+}
+
+/* Mock Sidebar */
+.mock-sidebar {
+  width: 180px; background: var(--surface); border-right: 1px solid var(--border);
+  padding: 8px 0; overflow-y: auto; flex-shrink: 0; transition: all 0.3s;
+}
+.sidebar-section { font-size: 10px; color: var(--t3); padding: 8px 12px 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.sidebar-item {
+  display: flex; align-items: center; gap: 8px; padding: 5px 12px; cursor: pointer;
+  font-size: 12px; color: var(--t2); transition: all 0.15s;
+}
+.sidebar-item:hover { background: var(--hover); color: var(--t1); }
+.sidebar-item.active { background: var(--active); color: var(--accent); font-weight: 500; }
+.sidebar-icon { font-size: 14px; width: 18px; text-align: center; }
+
+/* Mock File List */
+.mock-files {
+  flex: 1; overflow-y: auto; padding: 4px 0;
+}
+.file-header {
+  display: grid; grid-template-columns: 1fr 80px 120px; padding: 4px 12px;
+  font-size: 10px; color: var(--t3); text-transform: uppercase; letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border); user-select: none;
+}
+.file-row {
+  display: grid; grid-template-columns: 1fr 80px 120px; padding: 0 12px;
+  align-items: center; height: 30px; cursor: pointer; border-radius: 2px;
+  transition: background 0.1s;
+}
+.file-row:hover { background: var(--hover); }
+.file-row.selected { background: var(--active); }
+.file-row.selected .fname { color: var(--t1); }
+.file-row .fname {
+  display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--t2);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.file-row .fsize { font-size: 11px; color: var(--t3); }
+.file-row .fdate { font-size: 11px; color: var(--t3); }
+
+/* File icons */
+.ficon { width: 16px; height: 16px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+.ficon.folder svg { fill: var(--warm); }
+.ficon.file svg { stroke: var(--t3); fill: none; }
+
+/* Selection glow effect */
+.file-row.selected.glow-selection {
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 8px var(--aglow);
+  animation: selectionPulse 2s ease-in-out infinite;
+}
+@keyframes selectionPulse {
+  0%, 100% { box-shadow: inset 0 0 0 1px var(--accent), 0 0 6px var(--aglow); }
+  50% { box-shadow: inset 0 0 0 1px var(--accent), 0 0 16px var(--aglow), 0 0 24px var(--aglow); }
+}
+
+/* Neon mode */
+.neon .mock-sidebar { border-right-color: var(--accent); box-shadow: 1px 0 12px var(--aglow); }
+.neon .mock-toolbar { border-bottom-color: var(--accent); box-shadow: 0 1px 12px var(--aglow); }
+.neon .file-row.selected .fname { text-shadow: 0 0 8px var(--aglow); }
+.neon .sidebar-item.active { text-shadow: 0 0 8px var(--aglow); }
+.neon .mock-toolbar .breadcrumb { border-color: var(--accent); box-shadow: 0 0 8px var(--aglow); }
+
+/* Border pulse */
+@keyframes borderPulse {
+  0%, 100% { border-color: var(--border); }
+  50% { border-color: var(--accent); }
+}
+.pulse-borders .mock-sidebar { animation: borderPulse 3s ease-in-out infinite; }
+.pulse-borders .mock-toolbar { animation: borderPulse 3s ease-in-out infinite 0.5s; }
+
+/* Accent tinted text */
+.accent-text .file-row .fname { color: color-mix(in srgb, var(--t2) 70%, var(--accent) 30%); }
+.accent-text .file-row.selected .fname { color: color-mix(in srgb, var(--t1) 60%, var(--accent) 40%); }
+.accent-text .sidebar-item { color: color-mix(in srgb, var(--t2) 80%, var(--accent) 20%); }
+
+/* Rainbow folders */
+.rainbow-folders .ficon.folder:nth-child(1) svg { fill: #F87171; }
+
+/* Frosted panels */
+.frosted .mock-sidebar { backdrop-filter: blur(20px); background: rgba(26,31,40,0.6); }
+.frosted .mock-toolbar { backdrop-filter: blur(12px); background: rgba(22,26,34,0.7); }
+
+/* Gradient accent - applied via JS */
+
+/* ---- PROMPT OUTPUT ---- */
+.prompt-bar {
+  background: var(--deep); border-top: 1px solid var(--border); padding: 12px 16px;
+  display: flex; align-items: flex-start; gap: 12px;
+}
+.prompt-text {
+  flex: 1; font-size: 12px; color: var(--t2); line-height: 1.5;
+  max-height: 80px; overflow-y: auto; font-family: -apple-system, 'Segoe UI', sans-serif;
+}
+.copy-btn {
+  padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--accent); background: var(--active);
+  color: var(--accent); white-space: nowrap; transition: all 0.2s; flex-shrink: 0;
+}
+.copy-btn:hover { background: var(--accent); color: var(--void); }
+.copy-btn.copied { background: var(--green); border-color: var(--green); color: var(--void); }
+</style>
+</head>
+<body>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <h1>.files Theme Lab</h1>
+  <div class="subtitle">Radical theming ideas playground</div>
+
+  <div class="section-title">Presets</div>
+  <div class="presets" id="presets"></div>
+
+  <div class="section-title">Accent Color</div>
+  <div class="control-row">
+    <label>Primary</label>
+    <input type="color" id="accent" value="#3B82F6">
+  </div>
+  <div class="control-row">
+    <label>Secondary (gradient)</label>
+    <input type="color" id="accent2" value="#A78BFA">
+  </div>
+  <div class="toggle-row">
+    <label>Gradient Accent</label>
+    <button class="toggle" id="gradientAccent" onclick="toggleCtrl(this)"></button>
+  </div>
+
+  <div class="section-title">Hover & Selection</div>
+  <div class="control-row">
+    <label>Hover Opacity</label>
+    <input type="range" id="hoverOpacity" min="2" max="30" value="8">
+    <span class="value" id="hoverOpacity_v">8%</span>
+  </div>
+  <div class="control-row">
+    <label>Selection Opacity</label>
+    <input type="range" id="activeOpacity" min="5" max="50" value="16">
+    <span class="value" id="activeOpacity_v">16%</span>
+  </div>
+  <div class="toggle-row">
+    <label>Selection Glow</label>
+    <button class="toggle" id="selectionGlow" onclick="toggleCtrl(this)"></button>
+  </div>
+
+  <div class="section-title">Radical Effects</div>
+  <div class="toggle-row">
+    <label>Neon Mode</label>
+    <button class="toggle" id="neonMode" onclick="toggleCtrl(this)"></button>
+  </div>
+  <div class="toggle-row">
+    <label>Frosted Panels</label>
+    <button class="toggle" id="frostedPanels" onclick="toggleCtrl(this)"></button>
+  </div>
+  <div class="toggle-row">
+    <label>Accent-Tinted Text</label>
+    <button class="toggle" id="accentText" onclick="toggleCtrl(this)"></button>
+  </div>
+  <div class="toggle-row">
+    <label>Border Pulse</label>
+    <button class="toggle" id="borderPulse" onclick="toggleCtrl(this)"></button>
+  </div>
+  <div class="toggle-row">
+    <label>Rainbow Folders</label>
+    <button class="toggle" id="rainbowFolders" onclick="toggleCtrl(this)"></button>
+  </div>
+  <div class="toggle-row">
+    <label>Adaptive Accent (by type)</label>
+    <button class="toggle" id="adaptiveAccent" onclick="toggleCtrl(this)"></button>
+  </div>
+
+  <div class="section-title">Surface Layers</div>
+  <div class="control-row">
+    <label>Void</label>
+    <input type="color" id="colorVoid" value="#08090C">
+  </div>
+  <div class="control-row">
+    <label>Base</label>
+    <input type="color" id="colorBase" value="#161A22">
+  </div>
+  <div class="control-row">
+    <label>Surface</label>
+    <input type="color" id="colorSurface" value="#1A1F28">
+  </div>
+  <div class="control-row">
+    <label>Raised</label>
+    <input type="color" id="colorRaised" value="#1F242D">
+  </div>
+  <div class="control-row">
+    <label>Border</label>
+    <input type="color" id="colorBorder" value="#2A2F3A">
+  </div>
+
+  <div class="section-title">Text</div>
+  <div class="control-row">
+    <label>Primary (t1)</label>
+    <input type="color" id="colorT1" value="#E8EAF0">
+  </div>
+  <div class="control-row">
+    <label>Secondary (t2)</label>
+    <input type="color" id="colorT2" value="#9BA3B0">
+  </div>
+  <div class="control-row">
+    <label>Muted (t3)</label>
+    <input type="color" id="colorT3" value="#5A6270">
+  </div>
+
+  <div class="section-title">Semantic Colors</div>
+  <div class="control-row">
+    <label>Warm (folders)</label>
+    <input type="color" id="colorWarm" value="#E4A853">
+  </div>
+  <div class="control-row">
+    <label>Green</label>
+    <input type="color" id="colorGreen" value="#4ADE80">
+  </div>
+  <div class="control-row">
+    <label>Red</label>
+    <input type="color" id="colorRed" value="#F87171">
+  </div>
+
+  <div class="section-title">Transparency</div>
+  <div class="control-row">
+    <label>Base Opacity</label>
+    <input type="range" id="baseOpacity" min="0" max="100" value="100">
+    <span class="value" id="baseOpacity_v">100%</span>
+  </div>
+  <div class="control-row">
+    <label>Sidebar Opacity</label>
+    <input type="range" id="sidebarOpacity" min="0" max="100" value="100">
+    <span class="value" id="sidebarOpacity_v">100%</span>
+  </div>
+
+  <div class="section-title">Live CSS Variables</div>
+  <div class="var-display" id="varDisplay"></div>
+</div>
+
+<!-- PREVIEW -->
+<div class="preview" id="preview">
+  <!-- Mock Toolbar -->
+  <div class="mock-toolbar" id="mockToolbar">
+    <button class="nav-btn">&#9664;</button>
+    <button class="nav-btn">&#9654;</button>
+    <button class="nav-btn">&#8593;</button>
+    <div class="breadcrumb">
+      C:<span class="sep">/</span>Users<span class="sep">/</span>jimmy<span class="sep">/</span>Documents
+    </div>
+  </div>
+
+  <!-- Mock Body -->
+  <div class="mock-body">
+    <!-- Sidebar -->
+    <div class="mock-sidebar" id="mockSidebar">
+      <div class="sidebar-section">Quick Access</div>
+      <div class="sidebar-item active"><span class="sidebar-icon">&#128196;</span> Documents</div>
+      <div class="sidebar-item"><span class="sidebar-icon">&#128229;</span> Downloads</div>
+      <div class="sidebar-item"><span class="sidebar-icon">&#127912;</span> Pictures</div>
+      <div class="sidebar-item"><span class="sidebar-icon">&#127925;</span> Music</div>
+      <div class="sidebar-item"><span class="sidebar-icon">&#127916;</span> Videos</div>
+      <div class="sidebar-section">Drives</div>
+      <div class="sidebar-item"><span class="sidebar-icon">&#128430;</span> C: Drive</div>
+      <div class="sidebar-item"><span class="sidebar-icon">&#128430;</span> D: Drive</div>
+    </div>
+
+    <!-- File List -->
+    <div class="mock-files" id="mockFiles">
+      <div class="file-header">
+        <span>Name</span><span>Size</span><span>Modified</span>
+      </div>
+      <!-- Populated by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- PROMPT OUTPUT -->
+<div class="prompt-bar">
+  <div class="prompt-text" id="promptText">Adjust the controls to generate a theme prompt...</div>
+  <button class="copy-btn" id="copyBtn" onclick="copyPrompt()">Copy Prompt</button>
+</div>
+
+<script>
+// ---- STATE ----
+const DEFAULTS = {
+  accent: '#3B82F6', accent2: '#A78BFA', gradientAccent: false,
+  hoverOpacity: 8, activeOpacity: 16, selectionGlow: false,
+  neonMode: false, frostedPanels: false, accentText: false,
+  borderPulse: false, rainbowFolders: false, adaptiveAccent: false,
+  colorVoid: '#08090C', colorBase: '#161A22', colorSurface: '#1A1F28',
+  colorRaised: '#1F242D', colorBorder: '#2A2F3A',
+  colorT1: '#E8EAF0', colorT2: '#9BA3B0', colorT3: '#5A6270',
+  colorWarm: '#E4A853', colorGreen: '#4ADE80', colorRed: '#F87171',
+  baseOpacity: 100, sidebarOpacity: 100,
+};
+
+const state = { ...DEFAULTS };
+
+// ---- PRESETS ----
+const PRESETS = {
+  'Default': { ...DEFAULTS },
+  'Neon Cyber': {
+    accent: '#00FFD1', accent2: '#FF006E', gradientAccent: true,
+    hoverOpacity: 12, activeOpacity: 24, selectionGlow: true,
+    neonMode: true, frostedPanels: false, accentText: true,
+    borderPulse: true, rainbowFolders: false, adaptiveAccent: false,
+    colorVoid: '#050508', colorBase: '#0A0C12', colorSurface: '#0E1118',
+    colorRaised: '#141820', colorBorder: '#1A2030',
+    colorT1: '#F0F4FF', colorT2: '#8899BB', colorT3: '#445566',
+    colorWarm: '#FFB347', colorGreen: '#00FF88', colorRed: '#FF4466',
+    baseOpacity: 90, sidebarOpacity: 80,
+  },
+  'Sunset Warm': {
+    accent: '#F97316', accent2: '#EC4899', gradientAccent: true,
+    hoverOpacity: 10, activeOpacity: 20, selectionGlow: false,
+    neonMode: false, frostedPanels: true, accentText: true,
+    borderPulse: false, rainbowFolders: true, adaptiveAccent: false,
+    colorVoid: '#0C0807', colorBase: '#1A1410', colorSurface: '#221A14',
+    colorRaised: '#2A2018', colorBorder: '#3A2E22',
+    colorT1: '#FFF0E0', colorT2: '#BBA080', colorT3: '#776050',
+    colorWarm: '#F97316', colorGreen: '#84CC16', colorRed: '#EF4444',
+    baseOpacity: 95, sidebarOpacity: 85,
+  },
+  'Arctic': {
+    accent: '#38BDF8', accent2: '#818CF8', gradientAccent: false,
+    hoverOpacity: 6, activeOpacity: 14, selectionGlow: true,
+    neonMode: false, frostedPanels: true, accentText: false,
+    borderPulse: false, rainbowFolders: false, adaptiveAccent: false,
+    colorVoid: '#060A10', colorBase: '#0C1220', colorSurface: '#101828',
+    colorRaised: '#162030', colorBorder: '#1E3048',
+    colorT1: '#E0F0FF', colorT2: '#7CA0C0', colorT3: '#4A6880',
+    colorWarm: '#60A5FA', colorGreen: '#34D399', colorRed: '#FB7185',
+    baseOpacity: 85, sidebarOpacity: 70,
+  },
+  'Hacker': {
+    accent: '#22C55E', accent2: '#10B981', gradientAccent: false,
+    hoverOpacity: 6, activeOpacity: 18, selectionGlow: true,
+    neonMode: true, frostedPanels: false, accentText: true,
+    borderPulse: false, rainbowFolders: false, adaptiveAccent: true,
+    colorVoid: '#000000', colorBase: '#0A0A0A', colorSurface: '#111111',
+    colorRaised: '#1A1A1A', colorBorder: '#222222',
+    colorT1: '#33FF33', colorT2: '#22AA22', colorT3: '#116611',
+    colorWarm: '#44DD44', colorGreen: '#22FF22', colorRed: '#FF3333',
+    baseOpacity: 100, sidebarOpacity: 100,
+  },
+  'Purple Haze': {
+    accent: '#A855F7', accent2: '#EC4899', gradientAccent: true,
+    hoverOpacity: 10, activeOpacity: 22, selectionGlow: true,
+    neonMode: false, frostedPanels: true, accentText: true,
+    borderPulse: true, rainbowFolders: true, adaptiveAccent: false,
+    colorVoid: '#08060C', colorBase: '#140E1E', colorSurface: '#1A1428',
+    colorRaised: '#221A32', colorBorder: '#302640',
+    colorT1: '#F0E8FF', colorT2: '#A090C0', colorT3: '#605070',
+    colorWarm: '#F59E0B', colorGreen: '#34D399', colorRed: '#F87171',
+    baseOpacity: 88, sidebarOpacity: 75,
+  },
+  'Minimal Mono': {
+    accent: '#FFFFFF', accent2: '#888888', gradientAccent: false,
+    hoverOpacity: 5, activeOpacity: 10, selectionGlow: false,
+    neonMode: false, frostedPanels: false, accentText: false,
+    borderPulse: false, rainbowFolders: false, adaptiveAccent: false,
+    colorVoid: '#0A0A0A', colorBase: '#141414', colorSurface: '#1A1A1A',
+    colorRaised: '#222222', colorBorder: '#333333',
+    colorT1: '#E0E0E0', colorT2: '#888888', colorT3: '#555555',
+    colorWarm: '#999999', colorGreen: '#AAAAAA', colorRed: '#CC6666',
+    baseOpacity: 100, sidebarOpacity: 100,
+  },
+};
+
+// ---- MOCK FILES ----
+const FILES = [
+  { name: 'src', isDir: true, size: '--', date: 'Mar 12, 2026' },
+  { name: 'node_modules', isDir: true, size: '--', date: 'Mar 10, 2026' },
+  { name: 'docs', isDir: true, size: '--', date: 'Mar 11, 2026' },
+  { name: '.git', isDir: true, size: '--', date: 'Mar 13, 2026' },
+  { name: 'assets', isDir: true, size: '--', date: 'Mar 09, 2026' },
+  { name: 'package.json', isDir: false, ext: 'json', size: '2.4 KB', date: 'Mar 12, 2026' },
+  { name: 'tsconfig.json', isDir: false, ext: 'json', size: '1.1 KB', date: 'Mar 10, 2026' },
+  { name: 'README.md', isDir: false, ext: 'md', size: '4.8 KB', date: 'Mar 08, 2026' },
+  { name: 'index.html', isDir: false, ext: 'html', size: '1.2 KB', date: 'Mar 12, 2026' },
+  { name: 'App.tsx', isDir: false, ext: 'tsx', size: '8.3 KB', date: 'Mar 13, 2026' },
+  { name: 'main.rs', isDir: false, ext: 'rs', size: '5.1 KB', date: 'Mar 13, 2026' },
+  { name: 'styles.css', isDir: false, ext: 'css', size: '3.2 KB', date: 'Mar 11, 2026' },
+  { name: 'vite.config.ts', isDir: false, ext: 'ts', size: '0.8 KB', date: 'Mar 09, 2026' },
+  { name: 'Cargo.toml', isDir: false, ext: 'toml', size: '1.5 KB', date: 'Mar 12, 2026' },
+  { name: 'screenshot.png', isDir: false, ext: 'png', size: '248 KB', date: 'Mar 07, 2026' },
+  { name: 'deploy.sh', isDir: false, ext: 'sh', size: '0.6 KB', date: 'Mar 06, 2026' },
+];
+
+const RAINBOW_COLORS = ['#F87171', '#FB923C', '#FACC15', '#4ADE80', '#22D3EE', '#818CF8', '#E879F9'];
+const TYPE_COLORS = {
+  json: '#FACC15', md: '#9BA3B0', html: '#F97316', tsx: '#38BDF8', ts: '#3B82F6',
+  rs: '#F87171', css: '#A78BFA', toml: '#E4A853', png: '#4ADE80', sh: '#22C55E',
+};
+
+let selectedIndices = new Set([5, 9]); // package.json and App.tsx selected
+
+// ---- HELPERS ----
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return { r, g, b };
+}
+
+function toggleCtrl(btn) {
+  const id = btn.id;
+  state[id] = !state[id];
+  btn.classList.toggle('on', state[id]);
+  updateAll();
+}
+
+function syncControlsFromState() {
+  // Colors
+  ['accent','accent2','colorVoid','colorBase','colorSurface','colorRaised','colorBorder',
+   'colorT1','colorT2','colorT3','colorWarm','colorGreen','colorRed'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = state[id];
+  });
+  // Ranges
+  ['hoverOpacity','activeOpacity','baseOpacity','sidebarOpacity'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = state[id];
+    const v = document.getElementById(id + '_v');
+    if (v) v.textContent = state[id] + '%';
+  });
+  // Toggles
+  ['gradientAccent','selectionGlow','neonMode','frostedPanels','accentText',
+   'borderPulse','rainbowFolders','adaptiveAccent'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('on', !!state[id]);
+  });
+}
+
+// ---- RENDER ----
+function updateAll() {
+  const root = document.documentElement;
+  const { r, g, b } = hexToRgb(state.accent);
+
+  // Core vars
+  root.style.setProperty('--void', state.colorVoid);
+  root.style.setProperty('--base', state.colorBase);
+  root.style.setProperty('--surface', state.colorSurface);
+  root.style.setProperty('--raised', state.colorRaised);
+  root.style.setProperty('--border', state.colorBorder);
+  root.style.setProperty('--t1', state.colorT1);
+  root.style.setProperty('--t2', state.colorT2);
+  root.style.setProperty('--t3', state.colorT3);
+  root.style.setProperty('--accent', state.accent);
+  root.style.setProperty('--warm', state.colorWarm);
+  root.style.setProperty('--green', state.colorGreen);
+  root.style.setProperty('--red', state.colorRed);
+  root.style.setProperty('--hover', `rgba(${r},${g},${b},${state.hoverOpacity / 100})`);
+  root.style.setProperty('--active', `rgba(${r},${g},${b},${state.activeOpacity / 100})`);
+  root.style.setProperty('--aglow', `rgba(${r},${g},${b},0.15)`);
+
+  // Classes on preview
+  const pv = document.getElementById('preview');
+  pv.classList.toggle('neon', state.neonMode);
+  pv.classList.toggle('frosted', state.frostedPanels);
+  pv.classList.toggle('accent-text', state.accentText);
+  pv.classList.toggle('pulse-borders', state.borderPulse);
+
+  // Sidebar opacity
+  const sb = document.getElementById('mockSidebar');
+  if (state.frostedPanels) {
+    sb.style.background = `rgba(${hexToRgb(state.colorSurface).r},${hexToRgb(state.colorSurface).g},${hexToRgb(state.colorSurface).b},${state.sidebarOpacity/100})`;
+    sb.style.backdropFilter = 'blur(20px)';
+  } else {
+    sb.style.background = '';
+    sb.style.backdropFilter = '';
+  }
+
+  // Base opacity on void bg
+  const vRgb = hexToRgb(state.colorVoid);
+  pv.style.background = `rgba(${vRgb.r},${vRgb.g},${vRgb.b},${state.baseOpacity/100})`;
+
+  // Render files
+  renderFiles();
+  // Gradient accent
+  applyGradient();
+  // Update var display
+  updateVarDisplay();
+  // Update prompt
+  updatePrompt();
+  // Update preset highlights
+  updatePresetHighlights();
+}
+
+function renderFiles() {
+  const container = document.getElementById('mockFiles');
+  let html = `<div class="file-header"><span>Name</span><span>Size</span><span>Modified</span></div>`;
+
+  FILES.forEach((f, i) => {
+    const sel = selectedIndices.has(i);
+    const glowClass = sel && state.selectionGlow ? ' glow-selection' : '';
+    let iconColor = '';
+
+    if (f.isDir) {
+      if (state.rainbowFolders) {
+        iconColor = RAINBOW_COLORS[i % RAINBOW_COLORS.length];
+      } else {
+        iconColor = state.colorWarm;
+      }
+    }
+
+    // Adaptive accent: tint file icon by extension
+    let nameStyle = '';
+    if (state.adaptiveAccent && !f.isDir && f.ext && TYPE_COLORS[f.ext]) {
+      nameStyle = `color: ${TYPE_COLORS[f.ext]}`;
+    }
+
+    const icon = f.isDir
+      ? `<span class="ficon folder"><svg width="16" height="16" viewBox="0 0 16 16" style="fill:${iconColor}"><path d="M1.5 3a1 1 0 011-1H6l1.5 1.5H13.5a1 1 0 011 1V13a1 1 0 01-1 1h-12a1 1 0 01-1-1V3z"/></svg></span>`
+      : `<span class="ficon file"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="${state.colorT3}" stroke-width="1.2"><path d="M4 1.5h5l3.5 3.5V14a1 1 0 01-1 1H4a1 1 0 01-1-1V2.5a1 1 0 011-1z"/><polyline points="9,1.5 9,5.5 12.5,5.5" fill="none"/></svg></span>`;
+
+    html += `<div class="file-row${sel ? ' selected' : ''}${glowClass}" data-idx="${i}" onclick="toggleFile(${i})" style="${state.gradientAccent && sel ? gradientSelBg() : ''}">
+      <span class="fname" style="${nameStyle}">${icon} ${f.name}</span>
+      <span class="fsize">${f.size}</span>
+      <span class="fdate">${f.date}</span>
+    </div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function toggleFile(i) {
+  if (selectedIndices.has(i)) selectedIndices.delete(i);
+  else selectedIndices.add(i);
+  renderFiles();
+}
+
+function gradientSelBg() {
+  const { r: r1, g: g1, b: b1 } = hexToRgb(state.accent);
+  const { r: r2, g: g2, b: b2 } = hexToRgb(state.accent2);
+  const o = state.activeOpacity / 100;
+  return `background: linear-gradient(90deg, rgba(${r1},${g1},${b1},${o}), rgba(${r2},${g2},${b2},${o}))`;
+}
+
+function applyGradient() {
+  if (!state.gradientAccent) return;
+  // Apply gradient to active sidebar item
+  const activeItem = document.querySelector('.sidebar-item.active');
+  if (activeItem) {
+    const { r: r1, g: g1, b: b1 } = hexToRgb(state.accent);
+    const { r: r2, g: g2, b: b2 } = hexToRgb(state.accent2);
+    activeItem.style.background = `linear-gradient(90deg, rgba(${r1},${g1},${b1},0.16), rgba(${r2},${g2},${b2},0.16))`;
+    activeItem.style.color = state.accent;
+  }
+}
+
+function updateVarDisplay() {
+  const { r, g, b } = hexToRgb(state.accent);
+  const vars = [
+    ['--accent', state.accent],
+    ['--hover', `rgba(${r},${g},${b},${(state.hoverOpacity/100).toFixed(2)})`],
+    ['--active', `rgba(${r},${g},${b},${(state.activeOpacity/100).toFixed(2)})`],
+    ['--aglow', `rgba(${r},${g},${b},0.15)`],
+    ['--void', state.colorVoid],
+    ['--base', state.colorBase],
+    ['--surface', state.colorSurface],
+    ['--border', state.colorBorder],
+    ['--t1', state.colorT1],
+    ['--t2', state.colorT2],
+    ['--warm', state.colorWarm],
+  ];
+  document.getElementById('varDisplay').innerHTML = vars.map(
+    ([n, v]) => `<span class="vname">${n}</span>: <span class="vval">${v}</span>`
+  ).join('<br>');
+}
+
+function updatePrompt() {
+  const parts = [];
+  const d = DEFAULTS;
+
+  if (state.accent !== d.accent) parts.push(`accent color ${state.accent}`);
+  if (state.gradientAccent) parts.push(`gradient accent from ${state.accent} to ${state.accent2}`);
+  if (state.hoverOpacity !== d.hoverOpacity) parts.push(`hover opacity at ${state.hoverOpacity}%`);
+  if (state.activeOpacity !== d.activeOpacity) parts.push(`selection opacity at ${state.activeOpacity}%`);
+  if (state.selectionGlow) parts.push('pulsing glow ring on selected files');
+  if (state.neonMode) parts.push('neon mode with glowing borders and text shadows on active elements');
+  if (state.frostedPanels) parts.push('frosted glass effect on sidebar and toolbar with backdrop-blur');
+  if (state.accentText) parts.push('accent-tinted text colors (mix accent into t1/t2 at 20-40%)');
+  if (state.borderPulse) parts.push('subtle border pulse animation between panels');
+  if (state.rainbowFolders) parts.push('rainbow folder colors cycling through a palette');
+  if (state.adaptiveAccent) parts.push('file names colored by extension/type');
+  if (state.colorVoid !== d.colorVoid) parts.push(`void background ${state.colorVoid}`);
+  if (state.colorBase !== d.colorBase) parts.push(`base layer ${state.colorBase}`);
+  if (state.colorSurface !== d.colorSurface) parts.push(`surface ${state.colorSurface}`);
+  if (state.colorBorder !== d.colorBorder) parts.push(`border color ${state.colorBorder}`);
+  if (state.colorT1 !== d.colorT1) parts.push(`primary text ${state.colorT1}`);
+  if (state.colorT2 !== d.colorT2) parts.push(`secondary text ${state.colorT2}`);
+  if (state.colorWarm !== d.colorWarm) parts.push(`folder/warm color ${state.colorWarm}`);
+  if (state.baseOpacity !== 100) parts.push(`base opacity ${state.baseOpacity}% for native vibrancy`);
+  if (state.sidebarOpacity !== 100) parts.push(`sidebar opacity ${state.sidebarOpacity}%`);
+
+  const el = document.getElementById('promptText');
+  if (parts.length === 0) {
+    el.textContent = 'Default theme -- adjust controls to generate a prompt.';
+  } else {
+    el.textContent = `Update the .files theme to use: ${parts.join(', ')}.`;
+  }
+}
+
+function updatePresetHighlights() {
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    const preset = PRESETS[btn.textContent];
+    if (!preset) return;
+    const match = Object.keys(preset).every(k => state[k] === preset[k]);
+    btn.classList.toggle('active', match);
+  });
+}
+
+function copyPrompt() {
+  const text = document.getElementById('promptText').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy Prompt'; btn.classList.remove('copied'); }, 1500);
+  });
+}
+
+// ---- INIT ----
+function init() {
+  // Build preset buttons
+  const container = document.getElementById('presets');
+  Object.keys(PRESETS).forEach(name => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.textContent = name;
+    btn.onclick = () => {
+      Object.assign(state, PRESETS[name]);
+      syncControlsFromState();
+      updateAll();
+    };
+    container.appendChild(btn);
+  });
+
+  // Wire up color inputs
+  ['accent','accent2','colorVoid','colorBase','colorSurface','colorRaised','colorBorder',
+   'colorT1','colorT2','colorT3','colorWarm','colorGreen','colorRed'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => { state[id] = el.value; updateAll(); });
+  });
+
+  // Wire up range inputs
+  ['hoverOpacity','activeOpacity','baseOpacity','sidebarOpacity'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => {
+      state[id] = parseInt(el.value);
+      const v = document.getElementById(id + '_v');
+      if (v) v.textContent = el.value + '%';
+      updateAll();
+    });
+  });
+
+  // Sidebar click
+  document.querySelectorAll('.sidebar-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+      if (state.gradientAccent) applyGradient();
+    });
+  });
+
+  syncControlsFromState();
+  updateAll();
+}
+
+init();
+</script>
+</body>
+</html>
