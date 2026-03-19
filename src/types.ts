@@ -30,6 +30,8 @@ export interface DriveInfo {
   drive_type: 'fixed' | 'removable' | 'network' | 'cdrom' | 'ramdisk' | 'unknown';
   label: string;
   is_cloud: boolean;
+  total_bytes: number;
+  free_bytes: number;
 }
 
 export interface CloudSource {

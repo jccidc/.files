@@ -34,6 +34,8 @@ pub struct DriveInfo {
     pub drive_type: String, // "fixed", "removable", "network", "cdrom", "ramdisk", "unknown"
     pub label: String,
     pub is_cloud: bool,
+    pub total_bytes: u64,
+    pub free_bytes: u64,
 }
 
 #[cfg(windows)]
@@ -48,6 +50,12 @@ extern "system" {
         lpFileSystemFlags: *mut u32,
         lpFileSystemNameBuffer: *mut u16,
         nFileSystemNameSize: u32,
+    ) -> i32;
+    fn GetDiskFreeSpaceExW(
+        lpDirectoryName: *const u16,
+        lpFreeBytesAvailableToCaller: *mut u64,
+        lpTotalNumberOfBytes: *mut u64,
+        lpTotalNumberOfFreeBytes: *mut u64,
     ) -> i32;
 }
 
@@ -79,6 +87,26 @@ fn get_volume_label(root: &str) -> String {
         String::new()
     }
 }
+
+#[cfg(windows)]
+fn get_disk_space(root: &str) -> (u64, u64) {
+    let wide = to_wide(root);
+    let mut free_caller: u64 = 0;
+    let mut total: u64 = 0;
+    let mut free_total: u64 = 0;
+    let ok = unsafe {
+        GetDiskFreeSpaceExW(
+            wide.as_ptr(),
+            &mut free_caller,
+            &mut total,
+            &mut free_total,
+        )
+    };
+    if ok != 0 { (total, free_total) } else { (0, 0) }
+}
+
+#[cfg(not(windows))]
+fn get_disk_space(_root: &str) -> (u64, u64) { (0, 0) }
 
 /// Return available Windows drives with type classification.
 /// `cloud_mount_paths` is an optional list of known cloud mount paths;
@@ -136,11 +164,16 @@ pub fn get_drives_with_cloud_filter(cloud_paths: &[String]) -> Vec<DriveInfo> {
             format!("{} ({})", label, &root[..2])
         };
 
+        // Get capacity using Win32 API (instant, no PowerShell)
+        let (total_bytes, free_bytes) = get_disk_space(&root);
+
         drives.push(DriveInfo {
             letter: root,
             drive_type,
             label: display_label,
             is_cloud,
+            total_bytes,
+            free_bytes,
         });
     }
     drives

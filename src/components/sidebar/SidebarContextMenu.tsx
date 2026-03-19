@@ -14,6 +14,10 @@ interface SidebarContextMenuProps {
   onDelete?: (path: string) => void;
   onPinToggle?: (path: string) => void;
   isPinned?: boolean;
+  onProperties?: (path: string) => void;
+  onNewFolder?: (parentPath: string) => void;
+  onNewTerminal?: (path: string) => void;
+  onCompressZip?: (path: string) => void;
 }
 
 interface MenuItem {
@@ -24,7 +28,7 @@ interface MenuItem {
   disabled?: boolean;
 }
 
-export function SidebarContextMenu({ x, y, path, isDir, onClose, onOpen, onOpenInTerminal, onCopyPath, onRename, onDelete, onPinToggle, isPinned }: SidebarContextMenuProps) {
+export function SidebarContextMenu({ x, y, path, isDir, onClose, onOpen, onOpenInTerminal, onCopyPath, onRename, onDelete, onPinToggle, isPinned, onProperties, onNewFolder, onNewTerminal, onCompressZip }: SidebarContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,6 +60,22 @@ export function SidebarContextMenu({ x, y, path, isDir, onClose, onOpen, onOpenI
     onClose();
   }});
 
+  // Open in Terminal
+  if (isDir && onNewTerminal) {
+    items.push({ label: 'Open in Terminal', action: () => { onNewTerminal(path); onClose(); } });
+  }
+
+  // New Folder
+  if (isDir && onNewFolder) {
+    items.push({ label: '', action: () => {}, separator: true });
+    items.push({ label: 'New Folder', action: () => { onNewFolder(path); onClose(); } });
+  }
+
+  // Compress
+  if (onCompressZip) {
+    items.push({ label: 'Compress to ZIP', action: () => { onCompressZip(path); onClose(); } });
+  }
+
   if (isDir && onPinToggle) {
     items.push({
       label: isPinned ? 'Unpin from Quick Access' : 'Pin to Quick Access',
@@ -71,6 +91,12 @@ export function SidebarContextMenu({ x, y, path, isDir, onClose, onOpen, onOpenI
     if (onDelete) {
       items.push({ label: 'Delete', danger: true, action: () => { onDelete(path); onClose(); } });
     }
+  }
+
+  // Properties
+  if (onProperties) {
+    items.push({ label: '', action: () => {}, separator: true });
+    items.push({ label: 'Properties', action: () => { onProperties(path); onClose(); } });
   }
 
   const menuWidth = 200;

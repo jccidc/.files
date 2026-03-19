@@ -1268,6 +1268,27 @@ export function SettingsPanel({ open, onClose }: Props) {
                   <div style={toggleDot(isDefaultHandler)} />
                 </button>
               </div>
+              {sectionTitle('Sidebar Folders')}
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>Choose which folders appear in the sidebar</div>
+              {['Desktop', 'Documents', 'Downloads', 'Pictures', 'Music', 'Videos', 'Recycle Bin'].map((folder) => {
+                const hidden: string[] = (settings as any).hidden_sidebar_folders || [];
+                const isVisible = !hidden.includes(folder);
+                return (
+                  <div key={folder} style={rowStyle}>
+                    <span style={{ fontSize: 12, color: 'var(--t1)' }}>{folder}</span>
+                    <button style={toggleStyle(isVisible)} onClick={() => {
+                      const current: string[] = (settings as any).hidden_sidebar_folders || [];
+                      if (isVisible) {
+                        update({ hidden_sidebar_folders: [...current, folder] } as any);
+                      } else {
+                        update({ hidden_sidebar_folders: current.filter((f: string) => f !== folder) } as any);
+                      }
+                    }}>
+                      <div style={toggleDot(isVisible)} />
+                    </button>
+                  </div>
+                );
+              })}
             </>
           )}
 

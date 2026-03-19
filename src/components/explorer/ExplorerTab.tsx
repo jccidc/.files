@@ -7,6 +7,9 @@ import { watchDir, unwatchDir, onFsChange } from '../../api/watcher';
 import { deleteToTrash, renameFile, resolveShortcut, openFile } from '../../api/shell';
 import { readDir } from '../../api/filesystem';
 import { ContextMenu } from './ContextMenu';
+import { ConflictDialog } from './ConflictDialog';
+import { ThisPcView } from './ThisPcView';
+import { PropertiesPanel } from './PropertiesPanel';
 import { FileGrid } from './FileGrid';
 import { BatchRename } from './BatchRename';
 import { Toolbar, type GroupBy } from './Toolbar';
@@ -231,17 +234,21 @@ const gitStatusLetters: Record<string, string> = {
   modified: 'M', added: 'A', deleted: 'D', renamed: 'R', untracked: '?', conflict: '!', typechange: 'T',
 };
 
-function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWidths, columns, gitStatus: gs, onClick, onDoubleClick, onContextMenu, onRenameDone, onHover, onHoverEnd, onPeekToggle, onPointerDragStart }: FileRowProps) {
+function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWidths, columns, gitStatus: gs, onClick, onDoubleClick, onContextMenu, onRenameDone, onHover, onHoverEnd, onPeekToggle, onPointerDragStart, onMiddleClick }: FileRowProps & { onMiddleClick?: (entry: FileEntry) => void }) {
   return (
     <div
       className={selected ? 'file-row-selected' : undefined}
       data-drop-folder={entry.is_dir ? entry.path : undefined}
+      data-filepath={entry.path}
       data-ext={entry.is_dir ? undefined : (entry.extension || '').toLowerCase()}
       onPointerDown={(e) => { if (e.button === 0) onPointerDragStart(e); }}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={(e) => e.preventDefault()}
-      onMouseDown={(e) => { if (e.button === 2) { e.preventDefault(); e.stopPropagation(); onContextMenu(e); } }}
+      onMouseDown={(e) => {
+        if (e.button === 1 && entry.is_dir) { e.preventDefault(); onMiddleClick?.(entry); }
+        if (e.button === 2) { e.preventDefault(); e.stopPropagation(); onContextMenu(e); }
+      }}
       onMouseEnter={(e) => {
         if (!selected) e.currentTarget.style.background = 'var(--hover)';
         onHover(entry, e.clientX, e.clientY);
@@ -513,6 +520,27 @@ function _ensureGlobalListeners() {
       zone.el.style.outline = over ? '2px solid var(--accent)' : '';
       zone.el.style.outlineOffset = over ? '-2px' : '';
     }
+
+    // Detect cursor near window edge → switch to native OS drag
+    const EDGE = 8;
+    const nearEdge = e.clientX <= EDGE || e.clientY <= EDGE ||
+      e.clientX >= window.innerWidth - EDGE || e.clientY >= window.innerHeight - EDGE;
+    if (nearEdge && _drag.active && !(_drag as any)._nativeDragStarted) {
+      ((_drag as any)._nativeDragStarted) = true;
+      const paths = [..._drag.paths];
+      // Clean up internal drag UI
+      if (_dragGhost) { _dragGhost.remove(); _dragGhost = null; }
+      for (const [, zone] of _dropZones) {
+        zone.el.style.outline = '';
+        zone.el.style.outlineOffset = '';
+      }
+      document.body.style.userSelect = '';
+      _drag = null;
+      // Trigger native OS drag
+      import('./../../api/dragdrop').then(({ startNativeDrag }) => {
+        startNativeDrag(paths).catch((err: unknown) => console.error('[.files] Native drag failed:', err));
+      });
+    }
   });
 
   document.addEventListener('pointerup', async (e) => {
@@ -629,6 +657,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const peekEnabled = useSettingsStore((s) => s.settings.peek_enabled);
   const showHidden = useSettingsStore((s) => s.settings.show_hidden);
   const [batchRenameOpen, setBatchRenameOpen] = useState(false);
+  const [propertiesPath, setPropertiesPath] = useState<string | null>(null);
   const { updateTab: panelUpdateTab, addTab: panelAddTab } = usePanelsStore();
   const followSelection = usePreviewStore((s) => s.followSelection);
   const pinnedPaths = useSettingsStore((s) => s.settings.pinned_paths);
@@ -785,15 +814,58 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     }
   }, [currentPath]);
 
-  // File watcher (debounced to avoid OneDrive/cloud sync spam)
-  const watcherDebounce = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // External drop handler (files dragged from Explorer/other apps INTO .files)
   useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    import('../../api/dragdrop').then(({ onExternalDrop }) => {
+      onExternalDrop((event) => {
+        if (event.type === 'drop' && event.paths.length > 0) {
+          // Copy dropped files into current directory
+          import('../../api/shell').then(({ copyFiles }) => {
+            copyFiles(event.paths, currentPath).then(() => refresh()).catch(() => {});
+          });
+        }
+      }).then((fn) => { unlisten = fn; });
+    });
+    return () => { if (unlisten) unlisten(); };
+  }, [currentPath]);
+
+  // File watcher (debounced heavily to avoid OneDrive/cloud sync blinking)
+  const watcherDebounce = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const silentRefresh = useCallback(async () => {
+    // Refresh entries without setting loading:true (prevents UI blink)
+    // Read the CURRENT path from the store, not from the closure (which may be stale)
+    const tab = useExplorerStore.getState().tabStates[tabId];
+    if (!tab) return;
+    const pathToRefresh = tab.currentPath;
+    const showHidden = useSettingsStore.getState().settings.show_hidden;
+    try {
+      const listing = await readDir(pathToRefresh, showHidden);
+      // Only update if we're still on the same path (user might have navigated away)
+      const currentTab = useExplorerStore.getState().tabStates[tabId];
+      if (currentTab?.currentPath !== pathToRefresh) return;
+      useExplorerStore.setState((s) => {
+        const t = s.tabStates[tabId];
+        if (!t || t.currentPath !== pathToRefresh) return s;
+        return {
+          tabStates: {
+            ...s.tabStates,
+            [tabId]: { ...t, entries: listing.entries },
+          },
+        };
+      });
+    } catch {}
+  }, [tabId]);
+
+  useEffect(() => {
+    // Don't watch special paths or drive roots (causes excessive events)
+    if (currentPath === 'this-pc' || currentPath.length <= 3) return;
     const id = watcherIdRef.current;
     let unlisten: (() => void) | undefined;
     watchDir(id, currentPath).catch(() => {});
     onFsChange(id, () => {
       clearTimeout(watcherDebounce.current);
-      watcherDebounce.current = setTimeout(() => refresh(), 500);
+      watcherDebounce.current = setTimeout(() => silentRefresh(), 1500);
     }).then((fn) => { unlisten = fn; });
     return () => {
       clearTimeout(watcherDebounce.current);
@@ -825,22 +897,161 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     }
   }, [selectedPaths, entries, followSelection]);
 
-  // Delete key + F2
+  // Keyboard shortcuts: Delete, F2, Ctrl+A, Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+N, Shift+Delete
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Don't intercept if user is typing in an input/textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      // Ctrl+A — select all
+      if (e.ctrlKey && !e.shiftKey && e.key === 'a') {
+        e.preventDefault();
+        store.getState().selectAll(tabId);
+        return;
+      }
+
+      // Ctrl+C — copy selected to system clipboard
+      if (e.ctrlKey && !e.shiftKey && (e.key === 'c' || e.key === 'C')) {
+        if (selectedPaths.size > 0) {
+          e.preventDefault();
+          const paths = [...selectedPaths];
+          store.getState().copyPaths(paths);
+          import('../../api/clipboard').then(({ clipboardCopyFiles }) => {
+            clipboardCopyFiles(paths).catch(() => {});
+          });
+        }
+        return;
+      }
+
+      // Ctrl+X — cut selected to system clipboard
+      if (e.ctrlKey && !e.shiftKey && (e.key === 'x' || e.key === 'X')) {
+        if (selectedPaths.size > 0) {
+          e.preventDefault();
+          const paths = [...selectedPaths];
+          store.getState().cutPaths(paths);
+          import('../../api/clipboard').then(({ clipboardCutFiles }) => {
+            clipboardCutFiles(paths).catch(() => {});
+          });
+        }
+        return;
+      }
+
+      // Ctrl+V — paste with conflict detection + progress
+      if (e.ctrlKey && !e.shiftKey && (e.key === 'v' || e.key === 'V')) {
+        e.preventDefault();
+        handlePasteWithConflicts();
+        return;
+      }
+
+      // Ctrl+Z — undo last file operation
+      if (e.ctrlKey && !e.shiftKey && e.key === 'z') {
+        e.preventDefault();
+        import('../../stores/undo').then(async ({ useUndoStore }) => {
+          const op = useUndoStore.getState().pop();
+          if (!op) return;
+          const { deleteToTrash: trash } = await import('../../api/shell');
+          const { moveFiles: mv } = await import('../../api/shell');
+          try {
+            if (op.type === 'copy' || op.type === 'create') {
+              // Undo copy/create = delete the created files
+              await trash(op.createdPaths);
+            } else if (op.type === 'move') {
+              // Undo move = move them back
+              await mv(op.createdPaths, op.originalSources[0]?.replace(/[/\\][^/\\]+$/, '') || 'C:\\');
+            }
+            refresh();
+          } catch {}
+        });
+        return;
+      }
+
+      // Ctrl+Shift+C — copy path
+      if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+        if (selectedPaths.size === 1) {
+          e.preventDefault();
+          navigator.clipboard.writeText([...selectedPaths][0]);
+        }
+        return;
+      }
+
+      // Ctrl+Shift+N — new folder
+      if (e.ctrlKey && e.shiftKey && e.key === 'N') {
+        e.preventDefault();
+        handleNewFolder();
+        return;
+      }
+
+      // Shift+Delete — permanent delete (bypass recycle bin)
+      if (e.shiftKey && !e.ctrlKey && e.key === 'Delete') {
+        if (selectedPaths.size > 0) {
+          e.preventDefault();
+          const paths = [...selectedPaths];
+          import('../../api/extras').then(({ permanentDelete }) => {
+            permanentDelete(paths).then(() => refresh()).catch(() => {});
+          });
+        }
+        return;
+      }
+
+      // F11 — toggle fullscreen
+      if (e.key === 'F11') {
+        e.preventDefault();
+        import('../../api/extras').then(({ toggleFullscreen }) => {
+          toggleFullscreen().catch(() => {});
+        });
+        return;
+      }
+
+      // Delete — recycle bin
       if (e.key === 'Delete' && selectedPaths.size > 0) {
         e.preventDefault();
         const paths = [...selectedPaths];
         deleteToTrash(paths).then(() => refresh()).catch(() => {});
       }
+
+      // F2 — rename
       if (e.key === 'F2' && selectedPaths.size === 1) {
         e.preventDefault();
         setRenamingPath([...selectedPaths][0]);
       }
     };
+    // Use capture phase to intercept before WebView2 eats Ctrl+V
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [selectedPaths, tabId]);
+
+  // Type-ahead: start typing to jump to matching file
+  useEffect(() => {
+    let typeBuffer = '';
+    let typeTimer: ReturnType<typeof setTimeout>;
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (e.key.length !== 1) return; // Only printable characters
+
+      clearTimeout(typeTimer);
+      typeBuffer += e.key.toLowerCase();
+      typeTimer = setTimeout(() => { typeBuffer = ''; }, 800);
+
+      const match = sortedEntries.find((entry) =>
+        entry.name.toLowerCase().startsWith(typeBuffer)
+      );
+      if (match) {
+        clearSelection();
+        toggleSelected(match.path);
+        // Scroll into view
+        const el = document.querySelector(`[data-filepath="${CSS.escape(match.path)}"]`);
+        if (el) el.scrollIntoView({ block: 'nearest' });
+      }
+    };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [selectedPaths]);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      clearTimeout(typeTimer);
+    };
+  }, [sortedEntries, clearSelection, toggleSelected]);
 
   // Click handler with shift-range and ctrl-toggle
   const handleRowClick = useCallback(
@@ -879,6 +1090,9 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     slowClickPath.current = null;
     if (entry.is_dir) {
       navigate(entry.path);
+      import('../../stores/recents').then(({ useRecentsStore }) => {
+        useRecentsStore.getState().addRecentFolder(entry.path);
+      });
     } else if (entry.extension?.toLowerCase() === 'lnk') {
       // Resolve Windows shortcut and navigate to target
       try {
@@ -889,6 +1103,9 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       // Open file with system default application
       try {
         await openFile(entry.path);
+        import('../../stores/recents').then(({ useRecentsStore }) => {
+          useRecentsStore.getState().addRecentFile(entry.path);
+        });
       } catch (e) {
         console.error('Failed to open file:', e);
       }
@@ -972,6 +1189,110 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     }
   };
 
+  const handleNewFolder = useCallback(async () => {
+    const { createFolder } = await import('../../api/filesystem');
+    const baseName = 'New folder';
+    let name = baseName;
+    let i = 2;
+    // Find unique name
+    while (entries.some((e) => e.name === name)) {
+      name = `${baseName} (${i++})`;
+    }
+    try {
+      await createFolder(currentPath, name);
+      await refresh();
+      // Auto-select and start rename on the new folder
+      const newPath = currentPath.replace(/\\?$/, '\\') + name;
+      setSelected(new Set([newPath]));
+      // Small delay to let the refresh finish, then trigger rename
+      setTimeout(() => setRenamingPath(newPath), 100);
+    } catch (e) {
+      console.error('Failed to create folder:', e);
+    }
+  }, [currentPath, entries, refresh, setSelected]);
+
+  // Conflict dialog state
+  const [pendingConflicts, setPendingConflicts] = useState<{ conflicts: any[]; files: string[]; isCut: boolean } | null>(null);
+
+  const handlePasteWithConflicts = useCallback(async () => {
+    let files: string[] = [];
+    let isCut = false;
+    try {
+      const { clipboardReadFiles } = await import('../../api/clipboard');
+      const [clipFiles, clipIsCut] = await clipboardReadFiles();
+      if (clipFiles.length > 0) {
+        files = clipFiles;
+        isCut = clipIsCut;
+      }
+    } catch {}
+
+    // Fall back to internal clipboard
+    if (files.length === 0) {
+      const state = store.getState();
+      if (state.clipboardPaths.length > 0) {
+        files = [...state.clipboardPaths];
+        isCut = state.clipboardMode === 'cut';
+      }
+    }
+
+    if (files.length === 0) return;
+
+    // Check for conflicts
+    try {
+      const { checkConflicts } = await import('../../api/fileOps');
+      const conflicts = await checkConflicts(files, currentPath);
+      if (conflicts.length > 0) {
+        setPendingConflicts({ conflicts, files, isCut });
+        return; // Wait for user to resolve via ConflictDialog
+      }
+    } catch {}
+
+    // No conflicts — proceed directly with progress
+    executePaste(files, isCut, 'replace_all');
+  }, [currentPath]);
+
+  const executePaste = useCallback(async (files: string[], isCut: boolean, resolution: string) => {
+    const opId = crypto.randomUUID();
+    try {
+      const { copyFilesWithProgress, moveFilesWithProgress } = await import('../../api/fileOps');
+      const result = isCut
+        ? await moveFilesWithProgress(opId, files, currentPath, resolution)
+        : await copyFilesWithProgress(opId, files, currentPath, resolution);
+
+      // Record for undo
+      const { useUndoStore } = await import('../../stores/undo');
+      useUndoStore.getState().push({
+        id: opId,
+        type: isCut ? 'move' : 'copy',
+        description: `${isCut ? 'Moved' : 'Copied'} ${files.length} item(s)`,
+        createdPaths: result.created_paths,
+        originalSources: files,
+        dest: currentPath,
+        timestamp: Date.now(),
+      });
+
+      // Clear internal clipboard if it was a cut
+      if (isCut) {
+        store.getState().copyPaths([]);
+      }
+      refresh();
+    } catch (e) {
+      console.error('Paste failed:', e);
+    }
+  }, [currentPath, refresh]);
+
+  // Ctrl+V paste — WebView2 swallows keydown for Ctrl+V, so listen for the 'paste' event instead
+  useEffect(() => {
+    const pasteHandler = (e: ClipboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      handlePasteWithConflicts();
+    };
+    document.addEventListener('paste', pasteHandler, true);
+    return () => document.removeEventListener('paste', pasteHandler, true);
+  }, [handlePasteWithConflicts]);
+
   const colHeaderStyle = (field?: SortField): React.CSSProperties => ({
     padding: 'var(--density-pad-y) var(--density-pad-x)', fontSize: 'var(--file-font-size-sm)', fontWeight: 500,
     color: field && sortField === field ? 'var(--accent)' : 'var(--t3)',
@@ -1054,10 +1375,15 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         />
       )}
 
+      {/* This PC special view */}
+      {currentPath === 'this-pc' && (
+        <ThisPcView onNavigate={(path) => navigate(path)} />
+      )}
+
       {/* File list */}
-      {loading && <div style={{ padding: 24, color: 'var(--t3)', textAlign: 'center', flex: 1 }}>Loading...</div>}
-      {error && <div style={{ padding: 24, color: 'var(--red)', textAlign: 'center', flex: 1 }}>{error}</div>}
-      {!loading && !error && viewMode === 'list' && (
+      {currentPath !== 'this-pc' && loading && <div style={{ padding: 24, color: 'var(--t3)', textAlign: 'center', flex: 1 }}>Loading...</div>}
+      {currentPath !== 'this-pc' && error && <div style={{ padding: 24, color: 'var(--red)', textAlign: 'center', flex: 1 }}>{error}</div>}
+      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'list' && (
         <div
           ref={containerRef}
           style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
@@ -1103,6 +1429,17 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
                     onHoverEnd={handleHoverEnd}
                     onPeekToggle={() => handlePeekToggle(item.entry)}
                     onPointerDragStart={(e) => handleFileDragStart(e, item.entry)}
+                    onMiddleClick={(entry) => {
+                      if (panelId) {
+                        panelAddTab(panelId, {
+                          id: crypto.randomUUID(),
+                          type: 'explorer',
+                          title: entry.name,
+                          path: entry.path,
+                          pinned: false,
+                        });
+                      }
+                    }}
                   />
                 );
                 i++;
@@ -1154,7 +1491,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           )}
         </div>
       )}
-      {!loading && !error && viewMode === 'grid' && (
+      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'grid' && (
         <FileGrid
           entries={sortedEntries}
           selectedPaths={selectedPaths}
@@ -1162,6 +1499,17 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           onDoubleClick={handleDoubleClick}
           onContextMenu={(e, entry) => { setCtxMenu({ x: e.clientX, y: e.clientY, entry }); }}
           onPointerDragStart={handleFileDragStart}
+          onMiddleClick={(entry) => {
+            if (panelId) {
+              panelAddTab(panelId, {
+                id: crypto.randomUUID(),
+                type: 'explorer',
+                title: entry.name,
+                path: entry.path,
+                pinned: false,
+              });
+            }
+          }}
         />
       )}
 
@@ -1189,6 +1537,16 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           onCopyPath={handleCopyPath}
           onRefresh={refresh}
           onNewTerminal={handleNewTerminal}
+          onNewFolder={handleNewFolder}
+          onNewFile={async () => {
+            const { createFile } = await import('../../api/filesystem');
+            try {
+              await createFile(currentPath, 'New Text Document.txt');
+              await refresh();
+            } catch (e) {
+              console.error('Failed to create file:', e);
+            }
+          }}
           onPreviewInTab={(entry) => {
             if (panelId) {
               panelAddTab(panelId, {
@@ -1202,12 +1560,18 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           }}
           onPinToQuickAccess={handlePinToggle}
           isPinned={isPathPinned}
-          onCut={(paths) => useExplorerStore.getState().cutPaths(paths)}
-          onCopy={(paths) => useExplorerStore.getState().copyPaths(paths)}
-          onPaste={() => useExplorerStore.getState().paste(tabId)}
+          onCut={(paths) => {
+            useExplorerStore.getState().cutPaths(paths);
+            import('../../api/clipboard').then(({ clipboardCutFiles }) => clipboardCutFiles(paths).catch(() => {}));
+          }}
+          onCopy={(paths) => {
+            useExplorerStore.getState().copyPaths(paths);
+            import('../../api/clipboard').then(({ clipboardCopyFiles }) => clipboardCopyFiles(paths).catch(() => {}));
+          }}
+          onPaste={() => handlePasteWithConflicts()}
           canPaste={useExplorerStore.getState().clipboardPaths.length > 0}
           selectedCount={selectedPaths.size}
-          onProperties={(path) => { import('../../api/shell').then(({ showProperties }) => showProperties(path)); }}
+          onProperties={(path) => setPropertiesPath(path)}
           gitFileStatus={ctxMenu.entry ? gitStatusMap.get(ctxMenu.entry.name) || null : null}
           onGitStage={gitRepoInfo?.is_repo && gitRepoInfo.root ? (filePath: string) => {
             const getGitRelPath = (p: string, root: string) => {
@@ -1217,6 +1581,34 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
             const relPath = getGitRelPath(filePath, gitRepoInfo.root!);
             useGitStore.getState().stage(gitRepoInfo.root!, [relPath]);
           } : undefined}
+          onOpenWith={async (path) => {
+            const { openWithDialog } = await import('../../api/contextOps');
+            openWithDialog(path);
+          }}
+          onCompressZip={async (paths) => {
+            const { compressToZip } = await import('../../api/contextOps');
+            // Generate zip name from first item
+            const firstName = paths[0].replace(/.*[\\/]/, '').replace(/\.[^.]+$/, '');
+            const zipName = paths.length > 1 ? 'Archive.zip' : `${firstName}.zip`;
+            const zipPath = currentPath.replace(/\\?$/, '\\') + zipName;
+            await compressToZip(paths, zipPath);
+            refresh();
+          }}
+          onExtractZip={async (path) => {
+            const { extractZip } = await import('../../api/contextOps');
+            const folderName = path.replace(/.*[\\/]/, '').replace(/\.zip$/i, '');
+            const destDir = currentPath.replace(/\\?$/, '\\') + folderName;
+            await extractZip(path, destDir);
+            refresh();
+          }}
+          onCreateShortcut={async (path) => {
+            const { createShortcut } = await import('../../api/contextOps');
+            const name = path.replace(/.*[\\/]/, '');
+            const shortcutPath = currentPath.replace(/\\?$/, '\\') + name + ' - Shortcut.lnk';
+            await createShortcut(path, shortcutPath);
+            refresh();
+          }}
+          selectedPaths={[...selectedPaths]}
           onGitDiscard={gitRepoInfo?.is_repo && gitRepoInfo.root ? (filePath: string) => {
             const getGitRelPath = (p: string, root: string) => {
               const norm = (s: string) => s.replace(/\\/g, '/').replace(/\/$/, '');
@@ -1226,6 +1618,24 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
             useGitStore.getState().discard(gitRepoInfo.root!, [relPath]);
           } : undefined}
         />
+      )}
+
+      {/* Conflict Dialog */}
+      {pendingConflicts && (
+        <ConflictDialog
+          conflicts={pendingConflicts.conflicts}
+          onResolve={(resolution) => {
+            const { files, isCut } = pendingConflicts;
+            setPendingConflicts(null);
+            executePaste(files, isCut, resolution);
+          }}
+          onCancel={() => setPendingConflicts(null)}
+        />
+      )}
+
+      {/* Properties Panel */}
+      {propertiesPath && (
+        <PropertiesPanel path={propertiesPath} onClose={() => setPropertiesPath(null)} />
       )}
     </div>
   );

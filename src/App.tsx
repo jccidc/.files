@@ -15,6 +15,7 @@ import { useSettingsStore } from './stores/settings';
 import { useExplorerStore } from './stores/explorer';
 import { usePanelsStore } from './stores/panels';
 import { usePreviewStore } from './stores/preview';
+import { ProgressPanel } from './components/common/ProgressPanel';
 
 function App() {
   const sidebarVisible = useLayoutStore((s) => s.sidebarVisible);
@@ -258,6 +259,7 @@ function App() {
       </div>
       <FuzzySearch open={searchOpen} onClose={() => setSearchOpen(false)} />
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <ProgressPanel />
     </div>
   );
 }

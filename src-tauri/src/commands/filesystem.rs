@@ -190,6 +190,34 @@ pub fn read_file_bytes(path: String) -> Result<String, String> {
     Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
 }
 
+#[tauri::command]
+pub fn create_folder(parent: String, name: String) -> Result<String, String> {
+    let parent_path = Path::new(&parent);
+    if !parent_path.is_dir() {
+        return Err(format!("Parent is not a directory: {}", parent));
+    }
+    let target = parent_path.join(&name);
+    if target.exists() {
+        return Err(format!("Already exists: {}", target.display()));
+    }
+    std::fs::create_dir(&target).map_err(|e| e.to_string())?;
+    Ok(target.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn create_file(parent: String, name: String) -> Result<String, String> {
+    let parent_path = Path::new(&parent);
+    if !parent_path.is_dir() {
+        return Err(format!("Parent is not a directory: {}", parent));
+    }
+    let target = parent_path.join(&name);
+    if target.exists() {
+        return Err(format!("Already exists: {}", target.display()));
+    }
+    std::fs::File::create(&target).map_err(|e| e.to_string())?;
+    Ok(target.to_string_lossy().to_string())
+}
+
 /// Returns the real paths for Desktop, Documents, Downloads --
 /// accounting for OneDrive folder backup redirects.
 #[tauri::command]

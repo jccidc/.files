@@ -50,6 +50,15 @@ pub fn open_in_explorer(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn open_shell_folder(folder: String) -> Result<(), String> {
+    std::process::Command::new("explorer")
+        .arg(&folder)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn open_file(path: String) -> Result<(), String> {
     std::process::Command::new("cmd")
         .args(["/C", "start", "", &path])
@@ -176,20 +185,39 @@ pub fn show_properties(path: String) -> Result<(), String> {
     if !p.exists() {
         return Err(format!("Path does not exist: {}", path));
     }
-    let parent = p.parent().unwrap_or(p);
-    let name = p.file_name().map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| path.clone());
-    let parent_str = parent.to_string_lossy().replace('\'', "''");
-    let name_str = name.replace('\'', "''");
-    // InvokeVerb('properties') needs the process to stay alive while the dialog is open.
-    // Use -Command with a sleep loop that exits when the properties window closes.
-    let script = format!(
-        "$shell = New-Object -ComObject Shell.Application; \
-         $folder = $shell.Namespace('{}'); \
-         $item = $folder.ParseName('{}'); \
-         if ($item) {{ $item.InvokeVerb('properties'); Start-Sleep -Seconds 30 }}",
-        parent_str, name_str
-    );
+
+    // Check if this is a drive root (e.g. "C:\")
+    let is_drive_root = p.parent().is_none() || p.to_string_lossy().len() <= 3;
+
+    let script = if is_drive_root {
+        // Drive roots: use Namespace(17) = "My Computer", then ParseName the drive
+        let drive_str = path.replace('\'', "''").trim_end_matches('\\').to_string();
+        format!(
+            "$shell = New-Object -ComObject Shell.Application; \
+             $mypc = $shell.Namespace(17); \
+             $item = $mypc.ParseName('{}'); \
+             if ($item) {{ $item.InvokeVerb('properties'); Start-Sleep -Seconds 30 }} \
+             else {{ \
+               $item2 = $mypc.ParseName('{}\\'); \
+               if ($item2) {{ $item2.InvokeVerb('properties'); Start-Sleep -Seconds 30 }} \
+             }}",
+            drive_str, drive_str
+        )
+    } else {
+        let parent = p.parent().unwrap_or(p);
+        let name = p.file_name().map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.clone());
+        let parent_str = parent.to_string_lossy().replace('\'', "''");
+        let name_str = name.replace('\'', "''");
+        format!(
+            "$shell = New-Object -ComObject Shell.Application; \
+             $folder = $shell.Namespace('{}'); \
+             $item = $folder.ParseName('{}'); \
+             if ($item) {{ $item.InvokeVerb('properties'); Start-Sleep -Seconds 30 }}",
+            parent_str, name_str
+        )
+    };
+
     std::process::Command::new("powershell")
         .args(["-NoProfile", "-Command", &script])
         .creation_flags(CREATE_NO_WINDOW)

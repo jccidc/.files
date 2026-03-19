@@ -22,6 +22,7 @@ interface FileGridProps {
   onDoubleClick: (entry: FileEntry) => void;
   onContextMenu: (e: React.MouseEvent, entry: FileEntry) => void;
   onPointerDragStart: (e: React.PointerEvent, entry: FileEntry) => void;
+  onMiddleClick?: (entry: FileEntry) => void;
 }
 
 function GridCard({
@@ -32,6 +33,7 @@ function GridCard({
   onDoubleClick,
   onContextMenu,
   onPointerDragStart,
+  onMiddleClick,
 }: {
   entry: FileEntry;
   idx: number;
@@ -40,14 +42,19 @@ function GridCard({
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
   onPointerDragStart: (e: React.PointerEvent) => void;
+  onMiddleClick?: (entry: FileEntry) => void;
 }) {
   return (
     <div
       data-drop-folder={entry.is_dir ? entry.path : undefined}
+      data-filepath={entry.path}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       onContextMenu={(e) => e.preventDefault()}
-      onMouseDown={(e) => { if (e.button === 2) { e.preventDefault(); e.stopPropagation(); onContextMenu(e); } }}
+      onMouseDown={(e) => {
+        if (e.button === 1 && entry.is_dir) { e.preventDefault(); onMiddleClick?.(entry); }
+        if (e.button === 2) { e.preventDefault(); e.stopPropagation(); onContextMenu(e); }
+      }}
       onPointerDown={(e) => { if (e.button === 0) onPointerDragStart(e); }}
       style={{
         width: 100,
@@ -92,7 +99,7 @@ function GridCard({
   );
 }
 
-export function FileGrid({ entries, selectedPaths, onRowClick, onDoubleClick, onContextMenu, onPointerDragStart }: FileGridProps) {
+export function FileGrid({ entries, selectedPaths, onRowClick, onDoubleClick, onContextMenu, onPointerDragStart, onMiddleClick }: FileGridProps) {
   return (
     <div style={{
       display: 'flex', flexWrap: 'wrap', gap: 4, padding: '8px 12px',
@@ -108,6 +115,7 @@ export function FileGrid({ entries, selectedPaths, onRowClick, onDoubleClick, on
           onDoubleClick={() => onDoubleClick(entry)}
           onContextMenu={(e) => { e.stopPropagation(); onContextMenu(e, entry); }}
           onPointerDragStart={(e) => onPointerDragStart(e, entry)}
+          onMiddleClick={onMiddleClick}
         />
       ))}
       {entries.length === 0 && (
