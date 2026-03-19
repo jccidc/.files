@@ -9,6 +9,11 @@ import { readDir } from '../../api/filesystem';
 import { ContextMenu } from './ContextMenu';
 import { ConflictDialog } from './ConflictDialog';
 import { ThisPcView } from './ThisPcView';
+import { MillerColumns } from './MillerColumns';
+import { GalleryView } from './GalleryView';
+import { TilesView } from './TilesView';
+import { FlatView } from './FlatView';
+import { TreemapView } from './TreemapView';
 import { PropertiesPanel } from './PropertiesPanel';
 import { FileGrid } from './FileGrid';
 import { BatchRename } from './BatchRename';
@@ -147,12 +152,32 @@ function InlineRename({ entry, onDone }: { entry: FileEntry; onDone: (newName: s
 
 const cellStyle: React.CSSProperties = { fontSize: 'var(--file-font-size-sm)', color: 'var(--t3)', padding: '0 var(--density-pad-x)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
-function CellValue({ col, entry, gitStatus }: { col: ColumnId; entry: FileEntry; gitStatus?: string }) {
+function getAgeColor(iso: string): string {
+  if (!iso) return 'var(--t3)';
+  try {
+    const now = Date.now();
+    const modified = new Date(iso).getTime();
+    const daysAgo = (now - modified) / (1000 * 60 * 60 * 24);
+    if (daysAgo < 1) return 'var(--green)';        // Today — fresh green
+    if (daysAgo < 7) return 'var(--cyan)';          // This week — cyan
+    if (daysAgo < 30) return 'var(--t2)';           // This month — normal
+    if (daysAgo < 90) return 'var(--t3)';           // Last quarter — dimmed
+    return 'color-mix(in srgb, var(--t3) 60%, transparent)'; // Old — faded
+  } catch { return 'var(--t3)'; }
+}
+
+function CellValue({ col, entry, gitStatus, folderSize }: { col: ColumnId; entry: FileEntry; gitStatus?: string; folderSize?: number }) {
   switch (col) {
     case 'size':
-      return <div style={cellStyle}>{entry.is_dir ? '--' : formatSize(entry.size)}</div>;
+      if (entry.is_dir) {
+        if (folderSize !== undefined && folderSize > 0) {
+          return <div style={{ ...cellStyle, color: 'var(--t3)', fontStyle: 'italic' }}>{formatSize(folderSize)}</div>;
+        }
+        return <div style={{ ...cellStyle, opacity: 0.3 }}>--</div>;
+      }
+      return <div style={cellStyle}>{formatSize(entry.size)}</div>;
     case 'modified':
-      return <div style={cellStyle}>{formatDate(entry.modified)}</div>;
+      return <div style={{ ...cellStyle, color: getAgeColor(entry.modified) }}>{formatDate(entry.modified)}</div>;
     case 'created':
       return <div style={cellStyle}>{formatDate(entry.created)}</div>;
     case 'type':
@@ -216,6 +241,7 @@ interface FileRowProps {
   colWidths: string;
   columns: ColumnDef[];
   gitStatus?: string;
+  folderSize?: number;
   onClick: (e: React.MouseEvent) => void;
   onDoubleClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
@@ -234,7 +260,7 @@ const gitStatusLetters: Record<string, string> = {
   modified: 'M', added: 'A', deleted: 'D', renamed: 'R', untracked: '?', conflict: '!', typechange: 'T',
 };
 
-function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWidths, columns, gitStatus: gs, onClick, onDoubleClick, onContextMenu, onRenameDone, onHover, onHoverEnd, onPeekToggle, onPointerDragStart, onMiddleClick }: FileRowProps & { onMiddleClick?: (entry: FileEntry) => void }) {
+function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWidths, columns, gitStatus: gs, folderSize, onClick, onDoubleClick, onContextMenu, onRenameDone, onHover, onHoverEnd, onPeekToggle, onPointerDragStart, onMiddleClick }: FileRowProps & { onMiddleClick?: (entry: FileEntry) => void }) {
   return (
     <div
       className={selected ? 'file-row-selected' : undefined}
@@ -294,7 +320,7 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
         )}
       </div>
       {columns.filter(c => c.id !== 'name').map(c => (
-        <CellValue key={c.id} col={c.id} entry={entry} gitStatus={gs} />
+        <CellValue key={c.id} col={c.id} entry={entry} gitStatus={gs} folderSize={entry.is_dir ? folderSize : undefined} />
       ))}
     </div>
   );
@@ -676,6 +702,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const [peekChildren, setPeekChildren] = useState<Record<string, FileEntry[]>>({});
   // dropHighlight removed -- pointer-event drag system handles visuals globally
   const [filterText, setFilterText] = useState('');
+  const [folderSizes, setFolderSizes] = useState<Record<string, number>>({});
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
   const tooltipTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const lastClickedIndex = useRef<number>(-1);
@@ -813,6 +840,23 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       navigate(currentPath);
     }
   }, []);
+
+  // Calculate folder sizes in background
+  useEffect(() => {
+    if (currentPath === 'this-pc' || currentPath === 'recycle-bin') return;
+    const folders = entries.filter((e) => e.is_dir).map((e) => e.path);
+    if (folders.length === 0) return;
+    setFolderSizes({}); // Clear on directory change
+    import('../../api/filesystem').then(({ batchFolderSizes }) => {
+      batchFolderSizes(folders).then((results: [string, number][]) => {
+        const map: Record<string, number> = {};
+        for (const [path, size] of results) {
+          map[path] = size;
+        }
+        setFolderSizes(map);
+      }).catch(() => {});
+    });
+  }, [currentPath, entries.length]);
 
   // Update tab title
   useEffect(() => {
@@ -1454,6 +1498,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
                     colWidths={colWidths}
                     columns={activeColumns}
                     gitStatus={gitStatusMap.get(item.entry.name)}
+                    folderSize={item.entry.is_dir ? folderSizes[item.entry.path] : undefined}
                     onClick={(e) => handleRowClick(item.entry, item.sortedIndex ?? i, e)}
                     onDoubleClick={() => handleDoubleClick(item.entry)}
                     onContextMenu={(e) => { e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, entry: item.entry }); }}
@@ -1543,6 +1588,57 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
               });
             }
           }}
+        />
+      )}
+
+      {/* Miller Columns */}
+      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'columns' && (
+        <MillerColumns
+          initialPath={currentPath}
+          onNavigate={navigate}
+          onOpenFile={handleDoubleClick}
+          onContextMenu={(e, entry) => { setCtxMenu({ x: e.clientX, y: e.clientY, entry }); }}
+        />
+      )}
+
+      {/* Gallery View */}
+      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'gallery' && (
+        <GalleryView
+          entries={sortedEntries}
+          selectedPaths={selectedPaths}
+          onRowClick={handleRowClick}
+          onDoubleClick={handleDoubleClick}
+          onContextMenu={(e, entry) => { setCtxMenu({ x: e.clientX, y: e.clientY, entry }); }}
+        />
+      )}
+
+      {/* Tiles View */}
+      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'tiles' && (
+        <TilesView
+          entries={sortedEntries}
+          selectedPaths={selectedPaths}
+          onRowClick={handleRowClick}
+          onDoubleClick={handleDoubleClick}
+          onContextMenu={(e, entry) => { setCtxMenu({ x: e.clientX, y: e.clientY, entry }); }}
+        />
+      )}
+
+      {/* Flat View */}
+      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'flat' && (
+        <FlatView
+          rootPath={currentPath}
+          onDoubleClick={handleDoubleClick}
+          onContextMenu={(e, entry) => { setCtxMenu({ x: e.clientX, y: e.clientY, entry }); }}
+        />
+      )}
+
+      {/* Treemap View */}
+      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'treemap' && (
+        <TreemapView
+          rootPath={currentPath}
+          onNavigate={navigate}
+          onOpenFile={handleDoubleClick}
+          onContextMenu={(e, entry) => { setCtxMenu({ x: e.clientX, y: e.clientY, entry }); }}
         />
       )}
 

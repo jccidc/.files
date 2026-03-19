@@ -96,6 +96,7 @@ pub fn run() {
             filesystem::read_file_bytes,
             filesystem::create_folder,
             filesystem::create_file,
+            filesystem::batch_folder_sizes,
             terminal::spawn_pty,
             terminal::write_pty,
             terminal::resize_pty,

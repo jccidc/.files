@@ -218,6 +218,47 @@ pub fn create_file(parent: String, name: String) -> Result<String, String> {
     Ok(target.to_string_lossy().to_string())
 }
 
+/// Calculate sizes for multiple folders in batch.
+/// Returns a map of path -> total size in bytes.
+/// Skips folders that take too long (>2s per folder) or are inaccessible.
+#[tauri::command]
+pub async fn batch_folder_sizes(paths: Vec<String>) -> Result<Vec<(String, u64)>, String> {
+    let mut results = Vec::new();
+
+    for path in &paths {
+        let dir_path = std::path::Path::new(path);
+        if !dir_path.is_dir() {
+            results.push((path.clone(), 0));
+            continue;
+        }
+
+        let mut total_size: u64 = 0;
+        let mut count: u64 = 0;
+        let start = std::time::Instant::now();
+
+        for entry in WalkDir::new(path).min_depth(1).into_iter().filter_map(|e| e.ok()) {
+            // Timeout: skip if taking too long (2 seconds per folder)
+            if start.elapsed().as_secs() > 2 {
+                break;
+            }
+            count += 1;
+            // Safety cap: don't walk more than 50K entries per folder
+            if count > 50_000 {
+                break;
+            }
+            if let Ok(meta) = entry.metadata() {
+                if !meta.is_dir() {
+                    total_size += meta.len();
+                }
+            }
+        }
+
+        results.push((path.clone(), total_size));
+    }
+
+    Ok(results)
+}
+
 /// Returns the real paths for Desktop, Documents, Downloads --
 /// accounting for OneDrive folder backup redirects.
 #[tauri::command]

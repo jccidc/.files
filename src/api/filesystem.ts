@@ -36,3 +36,7 @@ export async function createFolder(parent: string, name: string): Promise<string
 export async function createFile(parent: string, name: string): Promise<string> {
   return invoke('create_file', { parent, name });
 }
+
+export async function batchFolderSizes(paths: string[]): Promise<[string, number][]> {
+  return invoke('batch_folder_sizes', { paths });
+}

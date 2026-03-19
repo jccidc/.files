@@ -4,7 +4,7 @@ import { readDir } from '../api/filesystem';
 import { copyFiles, moveFiles } from '../api/shell';
 import { useSettingsStore } from './settings';
 
-export type ViewMode = 'list' | 'grid';
+export type ViewMode = 'list' | 'grid' | 'columns' | 'gallery' | 'tiles' | 'flat' | 'treemap';
 
 export interface TabExplorerState {
   currentPath: string;
