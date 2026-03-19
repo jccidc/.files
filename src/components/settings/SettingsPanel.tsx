@@ -1279,8 +1279,8 @@ export function SettingsPanel({ open, onClose }: Props) {
                 { id: 'system', label: 'CPU / RAM / Battery' },
                 { id: 'disk', label: 'Disk Space' },
               ].map((w) => {
-                const tbWidgets: string[] = (settings as any).titlebar_widgets || ['clock', 'weather'];
-                const ftWidgets: string[] = (settings as any).footer_widgets || [];
+                const tbWidgets: string[] = (settings as any).titlebar_widgets || ['verse', 'clock', 'weather'];
+                const ftWidgets: string[] = (settings as any).footer_widgets || ['spotify', 'system', 'disk'];
                 const location = tbWidgets.includes(w.id) ? 'titlebar' : ftWidgets.includes(w.id) ? 'footer' : 'off';
                 return (
                   <div key={w.id} style={rowStyle}>

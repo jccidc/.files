@@ -192,6 +192,38 @@ pub async fn get_weather(zip: String, unit: String) -> Result<(String, String, S
     }
 }
 
+/// Send a media key (prev, play, next)
+#[tauri::command]
+pub fn send_media_key(key: String) -> Result<(), String> {
+    // Virtual key codes: 0xB1=prev, 0xB3=play/pause, 0xB0=next
+    let vk = match key.as_str() {
+        "prev" => "0xB1",
+        "play" => "0xB3",
+        "next" => "0xB0",
+        _ => return Err(format!("Unknown media key: {}", key)),
+    };
+    let script = format!(
+        r#"
+        Add-Type -TypeDefinition '
+        using System;
+        using System.Runtime.InteropServices;
+        public class MediaKey {{
+            [DllImport("user32.dll")] public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+            public static void Press(byte vk) {{ keybd_event(vk, 0, 0, UIntPtr.Zero); keybd_event(vk, 0, 2, UIntPtr.Zero); }}
+        }}
+        '
+        [MediaKey]::Press({})
+        "#,
+        vk
+    );
+    std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Toggle fullscreen
 #[tauri::command]
 pub fn toggle_fullscreen(window: tauri::WebviewWindow) -> Result<(), String> {

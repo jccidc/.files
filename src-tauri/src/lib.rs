@@ -165,6 +165,7 @@ pub fn run() {
             extras::permanent_delete,
             extras::search_file_contents,
             extras::get_weather,
+            extras::send_media_key,
             extras::toggle_fullscreen,
             extras::get_spotify_status,
             extras::get_system_stats,

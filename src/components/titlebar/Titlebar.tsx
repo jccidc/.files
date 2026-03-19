@@ -163,27 +163,74 @@ function SpotifyWidget() {
     return () => clearInterval(interval);
   }, []);
 
+  const sendKey = async (key: string) => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('send_media_key', { key });
+    } catch {}
+  };
+
   if (!track) return (
     <div style={{ fontSize: 10, color: 'var(--t3)', padding: '0 8px', flexShrink: 0 }}>
-      <span style={{ opacity: 0.5 }}>Spotify not playing</span>
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="var(--t3)" stroke="none" style={{ opacity: 0.4, marginRight: 4 }}>
+        <circle cx="8" cy="8" r="7" />
+      </svg>
+      <span style={{ opacity: 0.5 }}>Spotify idle</span>
     </div>
   );
 
+  const display = `${track.title}  --  ${track.artist}`;
+
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 6,
-      fontSize: 11, color: 'var(--t2)', padding: '0 8px',
-      flexShrink: 0, maxWidth: 200, overflow: 'hidden',
+      display: 'flex', alignItems: 'center', gap: 4,
+      fontSize: 11, color: 'var(--t2)', padding: '0 6px',
+      flexShrink: 0, minWidth: 180, maxWidth: 350,
+      overflow: 'hidden',
     }}>
+      {/* Spotify icon */}
       <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--green)" stroke="none" style={{ flexShrink: 0 }}>
         <circle cx="8" cy="8" r="7" />
         <path d="M5 6.5c2.5-0.8 5 0 5 0" stroke="var(--deep)" strokeWidth="1.2" fill="none" />
         <path d="M5 8.5c2-0.6 4 0 4 0" stroke="var(--deep)" strokeWidth="1.2" fill="none" />
         <path d="M5.5 10.5c1.5-0.4 3 0 3 0" stroke="var(--deep)" strokeWidth="1.2" fill="none" />
       </svg>
-      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        <span style={{ fontWeight: 500 }}>{track.title}</span>
-        <span style={{ color: 'var(--t3)', marginLeft: 4 }}>{track.artist}</span>
+
+      {/* Playback controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+        <button onClick={() => sendKey('prev')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--t2)', padding: 2, display: 'flex' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--t1)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--t2)'; }}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><rect x="0" y="1" width="2" height="8" /><polygon points="9,1 3,5 9,9" /></svg>
+        </button>
+        <button onClick={() => sendKey('play')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--t2)', padding: 2, display: 'flex' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--t1)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--t2)'; }}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><rect x="1" y="1" width="3" height="8" /><rect x="6" y="1" width="3" height="8" /></svg>
+        </button>
+        <button onClick={() => sendKey('next')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--t2)', padding: 2, display: 'flex' }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--t1)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--t2)'; }}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><polygon points="1,1 7,5 1,9" /><rect x="8" y="1" width="2" height="8" /></svg>
+        </button>
+      </div>
+
+      {/* Scrolling track info — always scrolls within fixed width */}
+      <div style={{
+        width: 160, overflow: 'hidden', position: 'relative', flexShrink: 0,
+        maskImage: 'linear-gradient(to right, transparent 0px, black 8px, black calc(100% - 8px), transparent)',
+        WebkitMaskImage: 'linear-gradient(to right, transparent 0px, black 8px, black calc(100% - 8px), transparent)',
+      }}>
+        <div style={{
+          whiteSpace: 'nowrap',
+          animation: 'marquee-scroll 15s linear infinite',
+          paddingLeft: '100%',
+          fontSize: 11,
+        }}>
+          <span style={{ fontWeight: 500 }}>{track.title}</span>
+          <span style={{ color: 'var(--t3)', margin: '0 6px' }}>--</span>
+          <span style={{ color: 'var(--t3)' }}>{track.artist}</span>
+        </div>
       </div>
     </div>
   );
@@ -291,7 +338,8 @@ function DiskSpaceWidget() {
 
 // ---- Widget Registry ----
 
-const WIDGET_REGISTRY: Record<string, { component: React.FC; label: string; flex?: boolean; icon: string }> = {
+const WIDGET_REGISTRY: Record<string, { component: React.FC; label: string; flex?: boolean; icon: string; fixed?: boolean }> = {
+  verse: { component: VerseMarquee, label: 'Bible Verse', icon: 'book', flex: true, fixed: true },
   clock: { component: FlipClock, label: 'Flip Clock', icon: 'clock' },
   weather: { component: WeatherWidget, label: 'Weather', icon: 'cloud' },
   spotify: { component: SpotifyWidget, label: 'Spotify', icon: 'music' },
@@ -299,14 +347,15 @@ const WIDGET_REGISTRY: Record<string, { component: React.FC; label: string; flex
   disk: { component: DiskSpaceWidget, label: 'Disk Space', icon: 'disk' },
 };
 
-const DEFAULT_WIDGETS = ['clock', 'weather'];
+const DEFAULT_TITLEBAR_WIDGETS = ['verse', 'clock', 'weather'];
+const DEFAULT_FOOTER_WIDGETS = ['spotify', 'system', 'disk'];
 
 function WidgetSeparator() {
   return <div style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 4px', flexShrink: 0 }} />;
 }
 
 function TitlebarWidgets() {
-  const [widgetOrder, setWidgetOrder] = useState<string[]>(DEFAULT_WIDGETS);
+  const [widgetOrder, setWidgetOrder] = useState<string[]>(DEFAULT_TITLEBAR_WIDGETS);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const widgetRefs = useRef<Record<number, HTMLDivElement | null>>({});
@@ -314,17 +363,19 @@ function TitlebarWidgets() {
   useEffect(() => {
     import('../../stores/settings').then(({ useSettingsStore }) => {
       const saved = (useSettingsStore.getState().settings as any).titlebar_widgets;
-      if (saved && Array.isArray(saved) && saved.length > 0) setWidgetOrder(saved);
+      if (saved && Array.isArray(saved)) setWidgetOrder(saved);
       useSettingsStore.subscribe((s) => {
         const w = (s.settings as any).titlebar_widgets;
-        if (w && Array.isArray(w) && w.length > 0) setWidgetOrder(w);
+        if (w && Array.isArray(w)) setWidgetOrder(w);
       });
     });
   }, []);
 
   const saveOrder = (order: string[]) => {
+    // Ensure verse is always in the order
+    const safe = order.includes('verse') ? order : ['verse', ...order];
     import('../../stores/settings').then(({ useSettingsStore }) => {
-      useSettingsStore.getState().update({ titlebar_widgets: order } as any);
+      useSettingsStore.getState().update({ titlebar_widgets: safe } as any);
     });
   };
 
@@ -379,15 +430,17 @@ function TitlebarWidgets() {
     document.addEventListener('pointerup', onUp);
   };
 
+  // Ensure verse is always present in titlebar
+  const ensuredOrder = widgetOrder.includes('verse') ? widgetOrder : ['verse', ...widgetOrder];
+
   return (
     <div
-      data-tauri-drag-region
       style={{
         flex: 1, display: 'flex', alignItems: 'center',
         height: '100%', overflow: 'hidden', gap: 0,
       }}
     >
-      {widgetOrder.map((id, idx) => {
+      {ensuredOrder.map((id, idx) => {
         const widget = WIDGET_REGISTRY[id];
         if (!widget) return null;
         const Comp = widget.component;
@@ -406,25 +459,27 @@ function TitlebarWidgets() {
               minWidth: 0,
             }}
           >
-            {/* Drag handle — tiny grip dots */}
-            <div
-              onPointerDown={(e) => handlePointerDown(idx, e)}
-              style={{
-                cursor: 'grab', display: 'flex', alignItems: 'center',
-                padding: '0 3px', flexShrink: 0, touchAction: 'none',
-                opacity: 0,
-                transition: 'opacity 0.15s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.5'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; }}
-            >
-              <svg width="4" height="12" viewBox="0 0 4 12" fill="var(--t3)" stroke="none">
-                <circle cx="1" cy="2" r="0.8" /><circle cx="3" cy="2" r="0.8" />
-                <circle cx="1" cy="5" r="0.8" /><circle cx="3" cy="5" r="0.8" />
-                <circle cx="1" cy="8" r="0.8" /><circle cx="3" cy="8" r="0.8" />
-                <circle cx="1" cy="11" r="0.8" /><circle cx="3" cy="11" r="0.8" />
-              </svg>
-            </div>
+            {/* Drag handle — hidden for fixed widgets like verse */}
+            {!widget.fixed && (
+              <div
+                onPointerDown={(e) => handlePointerDown(idx, e)}
+                style={{
+                  cursor: 'grab', display: 'flex', alignItems: 'center',
+                  padding: '0 4px', flexShrink: 0, touchAction: 'none',
+                  opacity: 0.25,
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.25'; }}
+                title="Drag to reorder"
+              >
+                <svg width="4" height="10" viewBox="0 0 4 10" fill="var(--t3)" stroke="none">
+                  <circle cx="1" cy="1.5" r="0.8" /><circle cx="3" cy="1.5" r="0.8" />
+                  <circle cx="1" cy="4.5" r="0.8" /><circle cx="3" cy="4.5" r="0.8" />
+                  <circle cx="1" cy="7.5" r="0.8" /><circle cx="3" cy="7.5" r="0.8" />
+                </svg>
+              </div>
+            )}
             <Comp />
             {idx < widgetOrder.length - 1 && <WidgetSeparator />}
           </div>
@@ -650,10 +705,7 @@ export function Titlebar({ onOpenSettings }: Props) {
         <div style={{ width: 1, height: 16, background: 'var(--border)', flexShrink: 0 }} />
       </div>
 
-      {/* Bible verse — fixed, non-removable */}
-      <VerseMarquee />
-
-      {/* Configurable widget area */}
+      {/* Configurable widget area — verse is embedded as a fixed widget, others draggable around it */}
       <TitlebarWidgets />
 
       {/* Right: action buttons + window controls */}
@@ -721,7 +773,7 @@ export function Titlebar({ onOpenSettings }: Props) {
 // ---- Footer Bar (hosts widgets user places at bottom) ----
 
 export function FooterWidgets() {
-  const [widgetOrder, setWidgetOrder] = useState<string[]>([]);
+  const [widgetOrder, setWidgetOrder] = useState<string[]>(DEFAULT_FOOTER_WIDGETS);
 
   useEffect(() => {
     import('../../stores/settings').then(({ useSettingsStore }) => {
