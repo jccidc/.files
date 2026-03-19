@@ -199,3 +199,71 @@ pub fn toggle_fullscreen(window: tauri::WebviewWindow) -> Result<(), String> {
     window.set_fullscreen(!is_fullscreen).map_err(|e| e.to_string())?;
     Ok(())
 }
+
+/// Get currently playing Spotify track by reading the Spotify window title.
+/// Returns (artist, track, is_playing). No API key needed.
+#[tauri::command]
+pub fn get_spotify_status() -> Result<(String, String, bool), String> {
+    let script = r#"
+    $spotify = Get-Process -Name Spotify -ErrorAction SilentlyContinue |
+        Where-Object { $_.MainWindowTitle -ne '' -and $_.MainWindowTitle -ne 'Spotify' -and $_.MainWindowTitle -ne 'Spotify Free' -and $_.MainWindowTitle -ne 'Spotify Premium' } |
+        Select-Object -First 1
+    if ($spotify -and $spotify.MainWindowTitle -match ' - ') {
+        Write-Output $spotify.MainWindowTitle
+    } else {
+        Write-Output ''
+    }
+    "#;
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let title = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if title.is_empty() {
+        return Ok((String::new(), String::new(), false));
+    }
+
+    // Spotify window title format: "Artist - Track"
+    let parts: Vec<&str> = title.splitn(2, " - ").collect();
+    if parts.len() >= 2 {
+        Ok((parts[0].trim().to_string(), parts[1].trim().to_string(), true))
+    } else {
+        Ok((title, String::new(), true))
+    }
+}
+
+/// Get system resource usage (CPU %, RAM used/total, battery %)
+#[tauri::command]
+pub async fn get_system_stats() -> Result<(f32, u64, u64, Option<u32>), String> {
+    // CPU, RAM used, RAM total, Battery %
+    let script = r#"
+    $cpu = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
+    $os = Get-CimInstance Win32_OperatingSystem
+    $ramUsed = $os.TotalVisibleMemorySize - $os.FreePhysicalMemory
+    $ramTotal = $os.TotalVisibleMemorySize
+    $battery = $null
+    $bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue
+    if ($bat) { $battery = $bat.EstimatedChargeRemaining }
+    Write-Output "$cpu|$ramUsed|$ramTotal|$battery"
+    "#;
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let parts: Vec<&str> = stdout.split('|').collect();
+    if parts.len() < 4 {
+        return Err("Failed to parse system stats".into());
+    }
+
+    let cpu: f32 = parts[0].parse().unwrap_or(0.0);
+    let ram_used: u64 = parts[1].parse().unwrap_or(0) * 1024; // KB to bytes
+    let ram_total: u64 = parts[2].parse().unwrap_or(0) * 1024;
+    let battery: Option<u32> = parts[3].parse().ok();
+
+    Ok((cpu, ram_used, ram_total, battery))
+}

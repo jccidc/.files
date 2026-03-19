@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import './theme/tokens.css';
-import { Titlebar } from './components/titlebar/Titlebar';
+import { Titlebar, FooterWidgets } from './components/titlebar/Titlebar';
 import { Sidebar } from './components/sidebar/Sidebar';
 import { StatusBar } from './components/common/StatusBar';
 import { FuzzySearch } from './components/common/FuzzySearch';
@@ -256,6 +256,7 @@ function App() {
           {previewPanelVisible && <PreviewPanel />}
         </div>
         <StatusBar />
+        <FooterWidgets />
       </div>
       <FuzzySearch open={searchOpen} onClose={() => setSearchOpen(false)} />
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />

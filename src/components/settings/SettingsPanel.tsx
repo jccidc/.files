@@ -1270,7 +1270,40 @@ export function SettingsPanel({ open, onClose }: Props) {
                   <div style={toggleDot(isDefaultHandler)} />
                 </button>
               </div>
-              {sectionTitle('Titlebar')}
+              {sectionTitle('Widgets')}
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>Place widgets in the titlebar or footer. Bible verse is always in the titlebar.</div>
+              {[
+                { id: 'clock', label: 'Flip Clock' },
+                { id: 'weather', label: 'Weather' },
+                { id: 'spotify', label: 'Spotify Now Playing' },
+                { id: 'system', label: 'CPU / RAM / Battery' },
+                { id: 'disk', label: 'Disk Space' },
+              ].map((w) => {
+                const tbWidgets: string[] = (settings as any).titlebar_widgets || ['clock', 'weather'];
+                const ftWidgets: string[] = (settings as any).footer_widgets || [];
+                const location = tbWidgets.includes(w.id) ? 'titlebar' : ftWidgets.includes(w.id) ? 'footer' : 'off';
+                return (
+                  <div key={w.id} style={rowStyle}>
+                    <span style={{ fontSize: 12, color: 'var(--t1)' }}>{w.label}</span>
+                    <select
+                      value={location}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        let tb = tbWidgets.filter((id: string) => id !== w.id);
+                        let ft = ftWidgets.filter((id: string) => id !== w.id);
+                        if (val === 'titlebar') tb.push(w.id);
+                        if (val === 'footer') ft.push(w.id);
+                        update({ titlebar_widgets: tb, footer_widgets: ft } as any);
+                      }}
+                      style={{ ...selectStyle, width: 100 }}
+                    >
+                      <option value="off">Off</option>
+                      <option value="titlebar">Titlebar</option>
+                      <option value="footer">Footer</option>
+                    </select>
+                  </div>
+                );
+              })}
 
               <div style={rowStyle}>
                 <span style={{ fontSize: 12, color: 'var(--t1)' }}>Clock Format</span>

@@ -31,3 +31,11 @@ export async function searchFileContents(
 export async function toggleFullscreen(): Promise<void> {
   return invoke('toggle_fullscreen');
 }
+
+export async function getSpotifyStatus(): Promise<[string, string, boolean]> {
+  return invoke('get_spotify_status');
+}
+
+export async function getSystemStats(): Promise<[number, number, number, number | null]> {
+  return invoke('get_system_stats');
+}

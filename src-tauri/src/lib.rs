@@ -166,6 +166,8 @@ pub fn run() {
             extras::search_file_contents,
             extras::get_weather,
             extras::toggle_fullscreen,
+            extras::get_spotify_status,
+            extras::get_system_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -4,24 +4,47 @@ import { useLayoutStore } from '../../stores/layout';
 
 function WeatherWidget() {
   const [weather, setWeather] = useState<{ temp: string; condition: string; icon: string } | null>(null);
+  const [noZip, setNoZip] = useState(false);
 
   useEffect(() => {
     const fetchWeather = async () => {
       try {
         const { useSettingsStore } = await import('../../stores/settings');
         const s = useSettingsStore.getState().settings as any;
-        const zip = s.weather_zip;
-        if (!zip) return;
+        const zip = s.weather_zip || '';
         const unit = s.weather_unit || 'f';
         const { invoke } = await import('@tauri-apps/api/core');
+        // If no zip, use empty string — wttr.in auto-detects by IP
         const [temp, condition, icon] = await invoke<[string, string, string]>('get_weather', { zip, unit });
-        setWeather({ temp, condition, icon });
-      } catch {}
+        if (temp) {
+          setWeather({ temp, condition, icon });
+          setNoZip(false);
+        }
+      } catch {
+        setNoZip(true);
+      }
     };
     fetchWeather();
     const interval = setInterval(fetchWeather, 30 * 60 * 1000);
-    return () => clearInterval(interval);
+    // Also re-fetch when settings change (user enters zip)
+    let unsub: (() => void) | undefined;
+    import('../../stores/settings').then(({ useSettingsStore }) => {
+      unsub = useSettingsStore.subscribe((s) => {
+        if ((s.settings as any).weather_zip || (s.settings as any).weather_unit) {
+          fetchWeather();
+        }
+      });
+    });
+    return () => { clearInterval(interval); unsub?.(); };
   }, []);
+
+  if (!weather && !noZip) {
+    return (
+      <div style={{ fontSize: 10, color: 'var(--t3)', padding: '0 8px', flexShrink: 0 }}>
+        Loading...
+      </div>
+    );
+  }
 
   if (!weather) return null;
 
@@ -112,6 +135,301 @@ function FlipDigit({ value, prev }: { value: string; prev: string }) {
           <span style={{ transform: 'translateY(-25%)' }}>{value}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---- Widget System ----
+
+// ---- New Widgets ----
+
+function SpotifyWidget() {
+  const [track, setTrack] = useState<{ artist: string; title: string; playing: boolean } | null>(null);
+
+  useEffect(() => {
+    const fetchSpotify = async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const [artist, title, playing] = await invoke<[string, string, boolean]>('get_spotify_status');
+        if (playing && artist) {
+          setTrack({ artist, title, playing });
+        } else {
+          setTrack(null);
+        }
+      } catch { setTrack(null); }
+    };
+    fetchSpotify();
+    const interval = setInterval(fetchSpotify, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!track) return (
+    <div style={{ fontSize: 10, color: 'var(--t3)', padding: '0 8px', flexShrink: 0 }}>
+      <span style={{ opacity: 0.5 }}>Spotify not playing</span>
+    </div>
+  );
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 6,
+      fontSize: 11, color: 'var(--t2)', padding: '0 8px',
+      flexShrink: 0, maxWidth: 200, overflow: 'hidden',
+    }}>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--green)" stroke="none" style={{ flexShrink: 0 }}>
+        <circle cx="8" cy="8" r="7" />
+        <path d="M5 6.5c2.5-0.8 5 0 5 0" stroke="var(--deep)" strokeWidth="1.2" fill="none" />
+        <path d="M5 8.5c2-0.6 4 0 4 0" stroke="var(--deep)" strokeWidth="1.2" fill="none" />
+        <path d="M5.5 10.5c1.5-0.4 3 0 3 0" stroke="var(--deep)" strokeWidth="1.2" fill="none" />
+      </svg>
+      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ fontWeight: 500 }}>{track.title}</span>
+        <span style={{ color: 'var(--t3)', marginLeft: 4 }}>{track.artist}</span>
+      </div>
+    </div>
+  );
+}
+
+function SystemStatsWidget() {
+  const [stats, setStats] = useState<{ cpu: number; ramUsed: number; ramTotal: number; battery: number | null } | null>(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const [cpu, ramUsed, ramTotal, battery] = await invoke<[number, number, number, number | null]>('get_system_stats');
+        setStats({ cpu, ramUsed, ramTotal, battery });
+      } catch {}
+    };
+    fetchStats();
+    const interval = setInterval(fetchStats, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!stats) return null;
+
+  const ramPct = stats.ramTotal > 0 ? Math.round((stats.ramUsed / stats.ramTotal) * 100) : 0;
+  const ramGB = (stats.ramUsed / (1024 * 1024 * 1024)).toFixed(1);
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      fontSize: 10, color: 'var(--t2)', padding: '0 8px',
+      flexShrink: 0,
+    }}>
+      {/* CPU */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="var(--cyan)" strokeWidth="1.2">
+          <rect x="2" y="2" width="8" height="8" rx="1" />
+          <line x1="0" y1="5" x2="2" y2="5" /><line x1="0" y1="7" x2="2" y2="7" />
+          <line x1="10" y1="5" x2="12" y2="5" /><line x1="10" y1="7" x2="12" y2="7" />
+          <line x1="5" y1="0" x2="5" y2="2" /><line x1="7" y1="0" x2="7" y2="2" />
+        </svg>
+        <span style={{ fontWeight: 500, color: stats.cpu > 80 ? 'var(--red)' : 'var(--t2)' }}>{Math.round(stats.cpu)}%</span>
+      </div>
+      {/* RAM */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="var(--purple, #a78bfa)" strokeWidth="1.2">
+          <rect x="1" y="3" width="10" height="6" rx="1" />
+          <rect x="3" y="1" width="2" height="2" rx="0.5" /><rect x="7" y="1" width="2" height="2" rx="0.5" />
+        </svg>
+        <span>{ramGB}GB</span>
+        <span style={{ color: 'var(--t3)' }}>{ramPct}%</span>
+      </div>
+      {/* Battery */}
+      {stats.battery !== null && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <svg width="12" height="10" viewBox="0 0 14 10" fill="none" stroke={stats.battery < 20 ? 'var(--red)' : 'var(--green)'} strokeWidth="1.2">
+            <rect x="1" y="1" width="10" height="8" rx="1" />
+            <rect x="11" y="3" width="2" height="4" rx="0.5" />
+            <rect x="2" y="2" width={Math.max(1, stats.battery / 100 * 8)} height="6" rx="0.5" fill={stats.battery < 20 ? 'var(--red)' : 'var(--green)'} stroke="none" />
+          </svg>
+          <span>{stats.battery}%</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiskSpaceWidget() {
+  const [disks, setDisks] = useState<{ letter: string; pct: number }[]>([]);
+
+  useEffect(() => {
+    import('../../api/filesystem').then(({ getDrives }) => {
+      getDrives().then((drives: any[]) => {
+        setDisks(drives.filter((d) => d.total_bytes > 0).map((d) => ({
+          letter: d.letter.replace('\\', ''),
+          pct: Math.round(((d.total_bytes - d.free_bytes) / d.total_bytes) * 100),
+        })));
+      }).catch(() => {});
+    });
+  }, []);
+
+  if (disks.length === 0) return null;
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 6,
+      fontSize: 10, color: 'var(--t2)', padding: '0 8px',
+      flexShrink: 0,
+    }}>
+      {disks.map((d) => (
+        <div key={d.letter} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <span style={{ fontWeight: 500 }}>{d.letter}</span>
+          <div style={{ width: 24, height: 4, background: 'var(--deep)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{
+              height: '100%', borderRadius: 2,
+              width: `${d.pct}%`,
+              background: d.pct > 90 ? 'var(--red)' : 'var(--accent)',
+            }} />
+          </div>
+          <span style={{ color: 'var(--t3)' }}>{d.pct}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---- Widget Registry ----
+
+const WIDGET_REGISTRY: Record<string, { component: React.FC; label: string; flex?: boolean; icon: string }> = {
+  clock: { component: FlipClock, label: 'Flip Clock', icon: 'clock' },
+  weather: { component: WeatherWidget, label: 'Weather', icon: 'cloud' },
+  spotify: { component: SpotifyWidget, label: 'Spotify', icon: 'music' },
+  system: { component: SystemStatsWidget, label: 'System Stats', icon: 'cpu' },
+  disk: { component: DiskSpaceWidget, label: 'Disk Space', icon: 'disk' },
+};
+
+const DEFAULT_WIDGETS = ['clock', 'weather'];
+
+function WidgetSeparator() {
+  return <div style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 4px', flexShrink: 0 }} />;
+}
+
+function TitlebarWidgets() {
+  const [widgetOrder, setWidgetOrder] = useState<string[]>(DEFAULT_WIDGETS);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const widgetRefs = useRef<Record<number, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    import('../../stores/settings').then(({ useSettingsStore }) => {
+      const saved = (useSettingsStore.getState().settings as any).titlebar_widgets;
+      if (saved && Array.isArray(saved) && saved.length > 0) setWidgetOrder(saved);
+      useSettingsStore.subscribe((s) => {
+        const w = (s.settings as any).titlebar_widgets;
+        if (w && Array.isArray(w) && w.length > 0) setWidgetOrder(w);
+      });
+    });
+  }, []);
+
+  const saveOrder = (order: string[]) => {
+    import('../../stores/settings').then(({ useSettingsStore }) => {
+      useSettingsStore.getState().update({ titlebar_widgets: order } as any);
+    });
+  };
+
+  const handlePointerDown = (idx: number, e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDragIdx(idx);
+
+    const onMove = (ev: PointerEvent) => {
+      let overIdx: number | null = null;
+      for (let i = 0; i < widgetOrder.length; i++) {
+        const el = widgetRefs.current[i];
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (ev.clientX >= rect.left && ev.clientX < rect.right) {
+          overIdx = i;
+          break;
+        }
+      }
+      setDragOverIdx(overIdx !== idx ? overIdx : null);
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+
+      let targetIdx: number | null = null;
+      for (let i = 0; i < widgetOrder.length; i++) {
+        const el = widgetRefs.current[i];
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        if (ev.clientX >= rect.left && ev.clientX < rect.right) {
+          targetIdx = i;
+          break;
+        }
+      }
+
+      if (targetIdx !== null && targetIdx !== idx) {
+        const order = [...widgetOrder];
+        const [moved] = order.splice(idx, 1);
+        order.splice(targetIdx, 0, moved);
+        setWidgetOrder(order);
+        saveOrder(order);
+      }
+
+      setDragIdx(null);
+      setDragOverIdx(null);
+    };
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  };
+
+  return (
+    <div
+      data-tauri-drag-region
+      style={{
+        flex: 1, display: 'flex', alignItems: 'center',
+        height: '100%', overflow: 'hidden', gap: 0,
+      }}
+    >
+      {widgetOrder.map((id, idx) => {
+        const widget = WIDGET_REGISTRY[id];
+        if (!widget) return null;
+        const Comp = widget.component;
+        const isDragging = dragIdx === idx;
+        const isDragOver = dragOverIdx === idx;
+        return (
+          <div
+            key={id}
+            ref={(el) => { widgetRefs.current[idx] = el; }}
+            style={{
+              display: 'flex', alignItems: 'center',
+              flex: widget.flex ? 1 : undefined,
+              opacity: isDragging ? 0.4 : 1,
+              borderLeft: isDragOver ? '2px solid var(--accent)' : '2px solid transparent',
+              height: '100%',
+              minWidth: 0,
+            }}
+          >
+            {/* Drag handle — tiny grip dots */}
+            <div
+              onPointerDown={(e) => handlePointerDown(idx, e)}
+              style={{
+                cursor: 'grab', display: 'flex', alignItems: 'center',
+                padding: '0 3px', flexShrink: 0, touchAction: 'none',
+                opacity: 0,
+                transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.5'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; }}
+            >
+              <svg width="4" height="12" viewBox="0 0 4 12" fill="var(--t3)" stroke="none">
+                <circle cx="1" cy="2" r="0.8" /><circle cx="3" cy="2" r="0.8" />
+                <circle cx="1" cy="5" r="0.8" /><circle cx="3" cy="5" r="0.8" />
+                <circle cx="1" cy="8" r="0.8" /><circle cx="3" cy="8" r="0.8" />
+                <circle cx="1" cy="11" r="0.8" /><circle cx="3" cy="11" r="0.8" />
+              </svg>
+            </div>
+            <Comp />
+            {idx < widgetOrder.length - 1 && <WidgetSeparator />}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -321,7 +639,7 @@ export function Titlebar({ onOpenSettings }: Props) {
         WebkitUserSelect: 'none',
       }}
     >
-      {/* Left: app title */}
+      {/* Left: app title + divider */}
       <div
         data-tauri-drag-region
         style={{ display: 'flex', alignItems: 'center', paddingLeft: 12, gap: 8, flexShrink: 0 }}
@@ -329,13 +647,14 @@ export function Titlebar({ onOpenSettings }: Props) {
         <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--t1)', letterSpacing: '-0.02em' }}>
           .files
         </span>
+        <div style={{ width: 1, height: 16, background: 'var(--border)', flexShrink: 0 }} />
       </div>
 
-      {/* Center: daily verse marquee */}
+      {/* Bible verse — fixed, non-removable */}
       <VerseMarquee />
 
-      {/* Right: flip clock */}
-      <FlipClock />
+      {/* Configurable widget area */}
+      <TitlebarWidgets />
 
       {/* Right: action buttons + window controls */}
       <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -348,7 +667,6 @@ export function Titlebar({ onOpenSettings }: Props) {
         >
           <IconSidebar />
         </button>
-        <WeatherWidget />
         <button
           style={btnBase}
           onClick={onOpenSettings}
@@ -396,6 +714,52 @@ export function Titlebar({ onOpenSettings }: Props) {
           <IconClose />
         </button>
       </div>
+    </div>
+  );
+}
+
+// ---- Footer Bar (hosts widgets user places at bottom) ----
+
+export function FooterWidgets() {
+  const [widgetOrder, setWidgetOrder] = useState<string[]>([]);
+
+  useEffect(() => {
+    import('../../stores/settings').then(({ useSettingsStore }) => {
+      const saved = (useSettingsStore.getState().settings as any).footer_widgets;
+      if (saved && Array.isArray(saved)) setWidgetOrder(saved);
+      useSettingsStore.subscribe((s) => {
+        const w = (s.settings as any).footer_widgets;
+        if (w && Array.isArray(w)) setWidgetOrder(w);
+      });
+    });
+  }, []);
+
+  if (widgetOrder.length === 0) return null;
+
+  return (
+    <div style={{
+      height: 28, minHeight: 28,
+      background: 'var(--deepest)',
+      borderTop: '1px solid var(--border)',
+      display: 'flex',
+      alignItems: 'center',
+      padding: '0 12px',
+      gap: 0,
+      overflow: 'hidden',
+    }}>
+      {widgetOrder.map((id, idx) => {
+        const widget = WIDGET_REGISTRY[id];
+        if (!widget) return null;
+        const Comp = widget.component;
+        return (
+          <div key={id} style={{ display: 'flex', alignItems: 'center', flex: widget.flex ? 1 : undefined, minWidth: 0 }}>
+            <Comp />
+            {idx < widgetOrder.length - 1 && (
+              <div style={{ width: 1, height: 14, background: 'var(--border)', margin: '0 4px', flexShrink: 0 }} />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
