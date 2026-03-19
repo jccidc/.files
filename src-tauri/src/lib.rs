@@ -164,6 +164,7 @@ pub fn run() {
             extras::create_symlink,
             extras::permanent_delete,
             extras::search_file_contents,
+            extras::get_weather,
             extras::toggle_fullscreen,
         ])
         .run(tauri::generate_context!())

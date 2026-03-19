@@ -170,6 +170,28 @@ pub async fn search_file_contents(
     Ok(results)
 }
 
+/// Fetch current weather for a zip code via wttr.in (no API key needed)
+/// unit: "f" for Fahrenheit, "c" for Celsius
+#[tauri::command]
+pub async fn get_weather(zip: String, unit: String) -> Result<(String, String, String), String> {
+    let unit_flag = if unit == "c" { "&m" } else { "&u" };
+    let url = format!("https://wttr.in/{}?format=%t|%C|%c{}", zip, unit_flag);
+    let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+    let body = resp.text().await.map_err(|e| e.to_string())?;
+    let parts: Vec<&str> = body.trim().split('|').collect();
+    if parts.len() >= 3 {
+        Ok((
+            parts[0].trim().to_string(),
+            parts[1].trim().to_string(),
+            parts[2].trim().to_string(),
+        ))
+    } else if parts.len() >= 2 {
+        Ok((parts[0].trim().to_string(), parts[1].trim().to_string(), String::new()))
+    } else {
+        Ok((body.trim().to_string(), String::new(), String::new()))
+    }
+}
+
 /// Toggle fullscreen
 #[tauri::command]
 pub fn toggle_fullscreen(window: tauri::WebviewWindow) -> Result<(), String> {

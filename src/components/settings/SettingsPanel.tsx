@@ -156,13 +156,15 @@ export function SettingsPanel({ open, onClose }: Props) {
   const canCreate = customThemes.length < MAX_CUSTOM_THEMES;
 
   const startNewTheme = () => {
-    const baseT = THEMES[baseThemeId] || THEMES['dotfiles-dark'];
+    // Use the currently active theme as the starting point (not baseThemeId)
+    const currentThemeId = settings.theme;
+    const activeT = THEMES[currentThemeId] || customThemes.find(t => t.id === currentThemeId) || THEMES['dotfiles-dark'];
     const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     setSmartColors({
-      base: baseT.base, surface: baseT.surface, t1: baseT.t1,
-      accent: baseT.accent, border: baseT.border, warm: baseT.warm,
+      base: activeT.base, surface: activeT.surface, t1: activeT.t1,
+      accent: activeT.accent, border: activeT.border, warm: activeT.warm,
     });
-    setEditingTheme({ ...baseT, id, name: 'My Theme' });
+    setEditingTheme({ ...activeT, id, name: `${activeT.name} Copy` });
     setEditMode('smart');
   };
 
@@ -1268,6 +1270,43 @@ export function SettingsPanel({ open, onClose }: Props) {
                   <div style={toggleDot(isDefaultHandler)} />
                 </button>
               </div>
+              {sectionTitle('Titlebar')}
+
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>Clock Format</span>
+                <select value={(settings as any).clock_format || '12h'} onChange={(e) => update({ clock_format: e.target.value } as any)} style={{ ...selectStyle, width: 80 }}>
+                  <option value="12h">12-hour</option>
+                  <option value="24h">24-hour</option>
+                </select>
+              </div>
+
+              {sectionTitle('Weather')}
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>Show live weather in the titlebar</div>
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>ZIP Code</span>
+                <input
+                  type="text"
+                  placeholder="e.g. 46321"
+                  value={(settings as any).weather_zip || ''}
+                  onChange={(e) => update({ weather_zip: e.target.value } as any)}
+                  style={{
+                    width: 80, padding: '4px 8px', fontSize: 12,
+                    background: 'var(--deep)', border: '1px solid var(--border)',
+                    borderRadius: 4, color: 'var(--t1)', fontFamily: 'inherit',
+                    outline: 'none',
+                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+                />
+              </div>
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>Temperature Unit</span>
+                <select value={(settings as any).weather_unit || 'f'} onChange={(e) => update({ weather_unit: e.target.value } as any)} style={{ ...selectStyle, width: 100 }}>
+                  <option value="f">Fahrenheit</option>
+                  <option value="c">Celsius</option>
+                </select>
+              </div>
+
               {sectionTitle('Sidebar Folders')}
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>Choose which folders appear in the sidebar</div>
               {['Desktop', 'Documents', 'Downloads', 'Pictures', 'Music', 'Videos', 'Recycle Bin'].map((folder) => {
