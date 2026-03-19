@@ -108,6 +108,7 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
     items.push({ label: '', action: () => {}, separator: true });
 
     // Path / Explorer / Pin
+    items.push({ label: 'Copy Name', action: () => { navigator.clipboard.writeText(entry.name); onClose(); } });
     items.push({ label: 'Copy Path', shortcut: 'Ctrl+Shift+C', action: () => { onCopyPath(entry.path); onClose(); } });
     items.push({ label: 'Show in Explorer', action: () => {
       import('../../api/shell').then(({ openInExplorer }) => openInExplorer(entry.path));

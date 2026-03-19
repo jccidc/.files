@@ -646,7 +646,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const viewMode = tabState?.viewMode ?? 'list';
 
   // Per-tab actions (bound to tabId)
-  const navigate = useCallback((path: string) => store.getState().navigate(tabId, path), [tabId]);
+  const navigate = useCallback((path: string) => { setFilterText(''); store.getState().navigate(tabId, path); }, [tabId]);
   const refresh = useCallback(() => store.getState().refresh(tabId), [tabId]);
   const setSelected = useCallback((paths: Set<string>) => store.getState().setSelected(tabId, paths), [tabId]);
   const toggleSelected = useCallback((path: string) => store.getState().toggleSelected(tabId, path), [tabId]);
@@ -732,7 +732,16 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
 
   const sortedEntriesRaw = sortEntries(entries, sortField, sortAsc);
   const sortedEntries = filterText
-    ? sortedEntriesRaw.filter((e) => e.name.toLowerCase().includes(filterText.toLowerCase()))
+    ? sortedEntriesRaw.filter((e) => {
+        const name = e.name.toLowerCase();
+        const filter = filterText.toLowerCase().trim();
+        // Support wildcards: *.mp4, Ca*, *.txt, photo*
+        if (filter.includes('*')) {
+          const regex = new RegExp('^' + filter.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$', 'i');
+          return regex.test(e.name);
+        }
+        return name.includes(filter);
+      })
     : sortedEntriesRaw;
 
   // Group-by logic
@@ -1021,37 +1030,44 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     return () => window.removeEventListener('keydown', handler, true);
   }, [selectedPaths, tabId]);
 
-  // Type-ahead: start typing to jump to matching file
+  // Instant filter: start typing to filter files, Escape to clear
   useEffect(() => {
-    let typeBuffer = '';
-    let typeTimer: ReturnType<typeof setTimeout>;
+    let clearTimer: ReturnType<typeof setTimeout>;
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (e.ctrlKey || e.altKey || e.metaKey) return;
-      if (e.key.length !== 1) return; // Only printable characters
 
-      clearTimeout(typeTimer);
-      typeBuffer += e.key.toLowerCase();
-      typeTimer = setTimeout(() => { typeBuffer = ''; }, 800);
-
-      const match = sortedEntries.find((entry) =>
-        entry.name.toLowerCase().startsWith(typeBuffer)
-      );
-      if (match) {
-        clearSelection();
-        toggleSelected(match.path);
-        // Scroll into view
-        const el = document.querySelector(`[data-filepath="${CSS.escape(match.path)}"]`);
-        if (el) el.scrollIntoView({ block: 'nearest' });
+      // Escape clears filter
+      if (e.key === 'Escape' && filterText) {
+        e.preventDefault();
+        setFilterText('');
+        return;
       }
+
+      // Backspace removes last char from filter
+      if (e.key === 'Backspace' && filterText) {
+        e.preventDefault();
+        setFilterText(filterText.slice(0, -1));
+        return;
+      }
+
+      if (e.key.length !== 1) return; // Only printable characters
+      e.preventDefault();
+
+      const newFilter = filterText + e.key;
+      setFilterText(newFilter);
+
+      // Auto-clear after 3 seconds of no typing
+      clearTimeout(clearTimer);
+      clearTimer = setTimeout(() => setFilterText(''), 5000);
     };
     window.addEventListener('keydown', handler);
     return () => {
       window.removeEventListener('keydown', handler);
-      clearTimeout(typeTimer);
+      clearTimeout(clearTimer);
     };
-  }, [sortedEntries, clearSelection, toggleSelected]);
+  }, [filterText, sortedEntries, clearSelection, toggleSelected]);
 
   // Click handler with shift-range and ctrl-toggle
   const handleRowClick = useCallback(
@@ -1378,6 +1394,23 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       {/* This PC special view */}
       {currentPath === 'this-pc' && (
         <ThisPcView onNavigate={(path) => navigate(path)} />
+      )}
+
+      {/* Instant filter bar */}
+      {filterText && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '4px 12px', background: 'var(--deep)',
+          borderBottom: '1px solid var(--border)', fontSize: 12,
+        }}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--accent)" strokeWidth="1.5">
+            <circle cx="5" cy="5" r="4" /><line x1="8" y1="8" x2="11" y2="11" />
+          </svg>
+          <span style={{ color: 'var(--t3)' }}>Filter:</span>
+          <span style={{ color: 'var(--accent)', fontFamily: "'JetBrains Mono', monospace", fontWeight: 500 }}>{filterText}</span>
+          <span style={{ color: 'var(--t3)', fontSize: 10 }}>({sortedEntries.length} match{sortedEntries.length !== 1 ? 'es' : ''})</span>
+          <span style={{ color: 'var(--t3)', fontSize: 10, marginLeft: 'auto' }}>Esc to clear</span>
+        </div>
       )}
 
       {/* File list */}

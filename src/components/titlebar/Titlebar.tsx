@@ -179,7 +179,6 @@ function SpotifyWidget() {
     </div>
   );
 
-  const display = `${track.title}  --  ${track.artist}`;
 
   return (
     <div style={{
