@@ -1,6 +1,6 @@
 [package]
 name = "dotfiles"
-version = "0.1.0"
+version = "0.4.0"
 description = ".files — Windows file explorer replacement"
 authors = ["Jimmy CrakCrn"]
 edition = "2021"
