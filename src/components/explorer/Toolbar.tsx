@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { invoke } from '@tauri-apps/api/core';
 import { useExplorerStore } from '../../stores/explorer';
 import { usePreviewStore } from '../../stores/preview';
-import { TAG_TYPES, type TagId } from '../../types';
+import { TAG_TYPES, type TagId, type DirListing } from '../../types';
 
 export type GroupBy = 'none' | 'type' | 'date' | 'size' | 'letter';
 export type TagFilter = 'all' | 'any-tagged' | 'untagged' | TagId;
@@ -259,6 +261,66 @@ const GROUP_OPTIONS: { key: GroupBy; label: string }[] = [
   { key: 'letter', label: 'First Letter' },
 ];
 
+// -- Breadcrumb Dropdown --
+
+function BreadcrumbDropdown({ x, y, items, currentFolder, onSelect, onClose }: {
+  x: number;
+  y: number;
+  items: { name: string; path: string }[];
+  currentFolder: string;
+  onSelect: (path: string) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [highlightIdx, setHighlightIdx] = useState(-1);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    requestAnimationFrame(() => document.addEventListener('mousedown', handler));
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightIdx(i => Math.min(i + 1, items.length - 1)); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setHighlightIdx(i => Math.max(i - 1, 0)); }
+      if (e.key === 'Enter' && highlightIdx >= 0) { onSelect(items[highlightIdx].path); }
+      if (e.key === 'Escape') { onClose(); }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [highlightIdx, items, onSelect, onClose]);
+
+  return (
+    <div ref={ref} style={{
+      position: 'fixed', left: x, top: y, zIndex: 9999,
+      background: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: 6, padding: '4px 0', minWidth: 160, maxHeight: 300,
+      overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+    }}>
+      {items.map((item, i) => (
+        <div key={item.path}
+          onMouseEnter={() => setHighlightIdx(i)}
+          onClick={() => onSelect(item.path)}
+          style={{
+            padding: '6px 12px', cursor: 'pointer', fontSize: 12,
+            background: highlightIdx === i ? 'var(--hover)' : 'transparent',
+            color: item.name === currentFolder ? 'var(--accent)' : 'var(--t1)',
+            fontWeight: item.name === currentFolder ? 600 : 400,
+          }}
+        >
+          {item.name}
+        </div>
+      ))}
+      {items.length === 0 && (
+        <div style={{ padding: '6px 12px', fontSize: 12, color: 'var(--t3)' }}>No subfolders</div>
+      )}
+    </div>
+  );
+}
+
 // -- Component --
 
 export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort, filterText, onFilterChange, groupBy, onGroupByChange, onSearch, tagFilter, onTagFilterChange }: ToolbarProps) {
@@ -289,6 +351,12 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
   const [pathEditing, setPathEditing] = useState(false);
   const [pathValue, setPathValue] = useState(currentPath);
   const [pathCtxMenu, setPathCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [breadcrumbDropdown, setBreadcrumbDropdown] = useState<{
+    idx: number;
+    x: number;
+    y: number;
+    items: { name: string; path: string }[];
+  } | null>(null);
   const sortRef = useRef<HTMLDivElement>(null);
   const groupRef = useRef<HTMLDivElement>(null);
   const tagFilterRef = useRef<HTMLDivElement>(null);
@@ -829,7 +897,7 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
               const partial = segments.slice(0, i + 1).join('\\');
               const fullPath = i === 0 ? partial + '\\' : partial;
               return (
-                <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
                   {i > 0 && <IconChevron />}
                   <span
                     onClick={(e) => { e.stopPropagation(); navigate(fullPath); }}
@@ -838,6 +906,32 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
                     onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--t2)'; }}
                   >
                     {seg}
+                  </span>
+                  <span
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (breadcrumbDropdown?.idx === i) { setBreadcrumbDropdown(null); return; }
+                      try {
+                        const listing = await invoke<DirListing>('read_dir', { path: fullPath, showHidden: false });
+                        const dirs = listing.entries
+                          .filter(entry => entry.is_dir)
+                          .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+                          .map(entry => ({ name: entry.name, path: entry.path }));
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setBreadcrumbDropdown({ idx: i, x: rect.left, y: rect.bottom + 2, items: dirs });
+                      } catch { /* ignore read errors */ }
+                    }}
+                    style={{
+                      cursor: 'pointer', padding: '2px 2px', borderRadius: 3, display: 'inline-flex',
+                      alignItems: 'center', color: breadcrumbDropdown?.idx === i ? 'var(--accent)' : 'var(--t3)',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--t1)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = breadcrumbDropdown?.idx === i ? 'var(--accent)' : 'var(--t3)'; }}
+                    title="Show sibling folders"
+                  >
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" stroke="none">
+                      <polygon points="1,2 7,2 4,6" />
+                    </svg>
                   </span>
                 </span>
               );
@@ -856,6 +950,21 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
           <IconSearch />
         </button>
       </div>
+
+      {breadcrumbDropdown && createPortal(
+        <BreadcrumbDropdown
+          x={breadcrumbDropdown.x}
+          y={breadcrumbDropdown.y}
+          items={breadcrumbDropdown.items}
+          currentFolder={segments[breadcrumbDropdown.idx + 1] ?? ''}
+          onSelect={(folderPath) => {
+            navigate(folderPath);
+            setBreadcrumbDropdown(null);
+          }}
+          onClose={() => setBreadcrumbDropdown(null)}
+        />,
+        document.body
+      )}
     </div>
   );
 }
