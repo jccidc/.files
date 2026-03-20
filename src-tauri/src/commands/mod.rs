@@ -1,3 +1,4 @@
+pub mod archive;
 pub mod clipboard;
 pub mod context_ops;
 pub mod cloud;

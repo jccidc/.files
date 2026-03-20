@@ -2,7 +2,7 @@ mod commands;
 mod models;
 mod utils;
 
-use commands::{clipboard, cloud, context_ops, extras, file_ops, filesystem, fonts, git, properties, registry, search, settings, shell, terminal, watcher};
+use commands::{archive, clipboard, cloud, context_ops, extras, file_ops, filesystem, fonts, git, properties, registry, search, settings, shell, terminal, watcher};
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
@@ -170,6 +170,9 @@ pub fn run() {
             extras::toggle_fullscreen,
             extras::get_spotify_status,
             extras::get_system_stats,
+            archive::extract_archive,
+            archive::compress_archive,
+            archive::list_archive,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

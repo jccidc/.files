@@ -41,6 +41,10 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-feature
 base64 = "0.22"
 winreg = "0.55"
 zip = { version = "8.3", default-features = false, features = ["deflate"] }
+sevenz-rust = "0.6"
+tar = "0.4"
+flate2 = "1"
+bzip2 = "0.5"
 
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "5.4"
