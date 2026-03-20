@@ -1415,6 +1415,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
             key={col.id}
             style={colHeaderStyle(col.sortField)}
             onClick={() => col.sortField && handleSort(col.sortField)}
+            {...((col.id === 'modified' || col.id === 'accessed') ? { title: 'Today = green | This week = cyan | This month = normal | 3 months = dim | Older = faded' } : {})}
           >
             {col.label} {col.sortField && sortField === col.sortField && (sortAsc ? <IconSortAsc /> : <IconSortDesc />)}
             {idx < activeColumns.length - 1 && (
