@@ -108,6 +108,21 @@ pub struct AppSettings {
     pub custom_themes: Vec<serde_json::Value>,
     #[serde(default)]
     pub custom_fonts: Vec<serde_json::Value>,
+    // Widgets
+    #[serde(default = "default_titlebar_widgets")]
+    pub titlebar_widgets: Vec<String>,
+    #[serde(default = "default_footer_widgets")]
+    pub footer_widgets: Vec<String>,
+    #[serde(default = "default_widget_alignment")]
+    pub widget_alignment: String,
+    #[serde(default = "default_clock_format")]
+    pub clock_format: String,
+    #[serde(default)]
+    pub weather_zip: String,
+    #[serde(default = "default_weather_unit")]
+    pub weather_unit: String,
+    #[serde(default)]
+    pub hidden_sidebar_folders: Vec<String>,
 }
 
 fn default_theme() -> String { "dotfiles-dark".to_string() }
@@ -135,6 +150,11 @@ fn default_icon_theme() -> String { "minimal".to_string() }
 fn default_accent_secondary() -> String { "#A78BFA".to_string() }
 fn default_bg_pattern() -> String { "none".to_string() }
 fn default_bg_opacity() -> f32 { 0.05 }
+fn default_titlebar_widgets() -> Vec<String> { vec!["verse".into(), "clock".into(), "weather".into()] }
+fn default_footer_widgets() -> Vec<String> { vec!["spotify".into(), "system".into(), "disk".into()] }
+fn default_widget_alignment() -> String { "left".to_string() }
+fn default_clock_format() -> String { "12h".to_string() }
+fn default_weather_unit() -> String { "f".to_string() }
 
 impl Default for AppSettings {
     fn default() -> Self {
@@ -187,6 +207,13 @@ impl Default for AppSettings {
             cloud_sources: Vec::new(),
             custom_themes: Vec::new(),
             custom_fonts: Vec::new(),
+            titlebar_widgets: default_titlebar_widgets(),
+            footer_widgets: default_footer_widgets(),
+            widget_alignment: default_widget_alignment(),
+            clock_format: default_clock_format(),
+            weather_zip: String::new(),
+            weather_unit: default_weather_unit(),
+            hidden_sidebar_folders: Vec::new(),
         }
     }
 }

@@ -10,7 +10,7 @@ function WeatherWidget() {
     const fetchWeather = async () => {
       try {
         const { useSettingsStore } = await import('../../stores/settings');
-        const s = useSettingsStore.getState().settings as any;
+        const s = useSettingsStore.getState().settings;
         const zip = s.weather_zip || '';
         const unit = s.weather_unit || 'f';
         const { invoke } = await import('@tauri-apps/api/core');
@@ -30,7 +30,7 @@ function WeatherWidget() {
     let unsub: (() => void) | undefined;
     import('../../stores/settings').then(({ useSettingsStore }) => {
       unsub = useSettingsStore.subscribe((s) => {
-        if ((s.settings as any).weather_zip || (s.settings as any).weather_unit) {
+        if (s.settings.weather_zip || s.settings.weather_unit) {
           fetchWeather();
         }
       });
@@ -362,11 +362,11 @@ export function TitlebarWidgets() {
 
   useEffect(() => {
     import('../../stores/settings').then(({ useSettingsStore }) => {
-      const s = useSettingsStore.getState().settings as any;
+      const s = useSettingsStore.getState().settings;
       if (s.titlebar_widgets && Array.isArray(s.titlebar_widgets)) setWidgetOrder(s.titlebar_widgets);
       if (s.widget_alignment) setAlignment(s.widget_alignment);
       useSettingsStore.subscribe((state) => {
-        const ss = state.settings as any;
+        const ss = state.settings;
         if (ss.titlebar_widgets && Array.isArray(ss.titlebar_widgets)) setWidgetOrder(ss.titlebar_widgets);
         if (ss.widget_alignment) setAlignment(ss.widget_alignment);
       });
@@ -375,7 +375,7 @@ export function TitlebarWidgets() {
 
   const saveOrder = (order: string[]) => {
     import('../../stores/settings').then(({ useSettingsStore }) => {
-      useSettingsStore.getState().update({ titlebar_widgets: order } as any);
+      useSettingsStore.getState().update({ titlebar_widgets: order });
     });
   };
 
@@ -506,10 +506,10 @@ function FlipClock() {
 
   useEffect(() => {
     import('../../stores/settings').then(({ useSettingsStore }) => {
-      const fmt = (useSettingsStore.getState().settings as any).clock_format;
+      const fmt = useSettingsStore.getState().settings.clock_format;
       if (fmt === '24h') setIs24h(true);
       useSettingsStore.subscribe((s) => {
-        setIs24h((s.settings as any).clock_format === '24h');
+        setIs24h(s.settings.clock_format === '24h');
       });
     });
   }, []);
@@ -692,10 +692,10 @@ export function Titlebar({ onOpenSettings }: Props) {
 
   useEffect(() => {
     import('../../stores/settings').then(({ useSettingsStore }) => {
-      const s = useSettingsStore.getState().settings as any;
+      const s = useSettingsStore.getState().settings;
       if (s.titlebar_widgets && Array.isArray(s.titlebar_widgets)) setEnabledWidgets(s.titlebar_widgets);
       useSettingsStore.subscribe((state) => {
-        const ss = state.settings as any;
+        const ss = state.settings;
         if (ss.titlebar_widgets && Array.isArray(ss.titlebar_widgets)) setEnabledWidgets(ss.titlebar_widgets);
       });
     });
@@ -817,10 +817,10 @@ export function FooterWidgets() {
 
   useEffect(() => {
     import('../../stores/settings').then(({ useSettingsStore }) => {
-      const saved = (useSettingsStore.getState().settings as any).footer_widgets;
+      const saved = useSettingsStore.getState().settings.footer_widgets;
       if (saved && Array.isArray(saved)) setWidgetOrder(saved);
       useSettingsStore.subscribe((s) => {
-        const w = (s.settings as any).footer_widgets;
+        const w = s.settings.footer_widgets;
         if (w && Array.isArray(w)) setWidgetOrder(w);
       });
     });

@@ -55,6 +55,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   cloud_sources: [],
   custom_themes: [],
   custom_fonts: [],
+  titlebar_widgets: ['verse', 'clock', 'weather'],
+  footer_widgets: ['spotify', 'system', 'disk'],
+  widget_alignment: 'left',
+  clock_format: '12h',
+  weather_zip: '',
+  weather_unit: 'f',
+  hidden_sidebar_folders: [],
 };
 
 interface SettingsState {

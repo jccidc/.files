@@ -129,6 +129,14 @@ export interface AppSettings {
   cloud_sources: CloudSource[];
   custom_themes: ThemeTokens[];
   custom_fonts: CustomFont[];
+  // Widgets
+  titlebar_widgets: string[];
+  footer_widgets: string[];
+  widget_alignment: string;
+  clock_format: string;
+  weather_zip: string;
+  weather_unit: string;
+  hidden_sidebar_folders: string[];
 }
 
 export type TabType = 'explorer' | 'terminal' | 'preview';

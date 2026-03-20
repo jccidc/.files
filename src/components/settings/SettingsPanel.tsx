@@ -1280,8 +1280,8 @@ export function SettingsPanel({ open, onClose }: Props) {
                 { id: 'system', label: 'CPU / RAM / Battery' },
                 { id: 'disk', label: 'Disk Space' },
               ].map((w) => {
-                const tbWidgets: string[] = (settings as any).titlebar_widgets || ['verse', 'clock', 'weather'];
-                const ftWidgets: string[] = (settings as any).footer_widgets || ['spotify', 'system', 'disk'];
+                const tbWidgets: string[] = settings.titlebar_widgets || ['verse', 'clock', 'weather'];
+                const ftWidgets: string[] = settings.footer_widgets || ['spotify', 'system', 'disk'];
                 const location = tbWidgets.includes(w.id) ? 'titlebar' : ftWidgets.includes(w.id) ? 'footer' : 'off';
                 return (
                   <div key={w.id} style={rowStyle}>
@@ -1294,7 +1294,7 @@ export function SettingsPanel({ open, onClose }: Props) {
                         let ft = ftWidgets.filter((id: string) => id !== w.id);
                         if (val === 'titlebar') tb.push(w.id);
                         if (val === 'footer') ft.push(w.id);
-                        update({ titlebar_widgets: tb, footer_widgets: ft } as any);
+                        update({ titlebar_widgets: tb, footer_widgets: ft });
                       }}
                       style={{ ...selectStyle, width: 100 }}
                     >
@@ -1308,7 +1308,7 @@ export function SettingsPanel({ open, onClose }: Props) {
 
               <div style={rowStyle}>
                 <span style={{ fontSize: 12, color: 'var(--t1)' }}>Widget Alignment</span>
-                <select value={(settings as any).widget_alignment || 'left'} onChange={(e) => update({ widget_alignment: e.target.value } as any)} style={{ ...selectStyle, width: 100 }}>
+                <select value={settings.widget_alignment || 'left'} onChange={(e) => update({ widget_alignment: e.target.value })} style={{ ...selectStyle, width: 100 }}>
                   <option value="left">Left</option>
                   <option value="center">Center</option>
                   <option value="right">Right</option>
@@ -1317,7 +1317,7 @@ export function SettingsPanel({ open, onClose }: Props) {
 
               <div style={rowStyle}>
                 <span style={{ fontSize: 12, color: 'var(--t1)' }}>Clock Format</span>
-                <select value={(settings as any).clock_format || '12h'} onChange={(e) => update({ clock_format: e.target.value } as any)} style={{ ...selectStyle, width: 80 }}>
+                <select value={settings.clock_format || '12h'} onChange={(e) => update({ clock_format: e.target.value })} style={{ ...selectStyle, width: 80 }}>
                   <option value="12h">12-hour</option>
                   <option value="24h">24-hour</option>
                 </select>
@@ -1330,8 +1330,8 @@ export function SettingsPanel({ open, onClose }: Props) {
                 <input
                   type="text"
                   placeholder="e.g. 46321"
-                  value={(settings as any).weather_zip || ''}
-                  onChange={(e) => update({ weather_zip: e.target.value } as any)}
+                  value={settings.weather_zip || ''}
+                  onChange={(e) => update({ weather_zip: e.target.value })}
                   style={{
                     width: 80, padding: '4px 8px', fontSize: 12,
                     background: 'var(--deep)', border: '1px solid var(--border)',
@@ -1344,7 +1344,7 @@ export function SettingsPanel({ open, onClose }: Props) {
               </div>
               <div style={rowStyle}>
                 <span style={{ fontSize: 12, color: 'var(--t1)' }}>Temperature Unit</span>
-                <select value={(settings as any).weather_unit || 'f'} onChange={(e) => update({ weather_unit: e.target.value } as any)} style={{ ...selectStyle, width: 100 }}>
+                <select value={settings.weather_unit || 'f'} onChange={(e) => update({ weather_unit: e.target.value })} style={{ ...selectStyle, width: 100 }}>
                   <option value="f">Fahrenheit</option>
                   <option value="c">Celsius</option>
                 </select>
@@ -1353,17 +1353,17 @@ export function SettingsPanel({ open, onClose }: Props) {
               {sectionTitle('Sidebar Folders')}
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>Choose which folders appear in the sidebar</div>
               {['Desktop', 'Documents', 'Downloads', 'Pictures', 'Music', 'Videos', 'Recycle Bin'].map((folder) => {
-                const hidden: string[] = (settings as any).hidden_sidebar_folders || [];
+                const hidden: string[] = settings.hidden_sidebar_folders || [];
                 const isVisible = !hidden.includes(folder);
                 return (
                   <div key={folder} style={rowStyle}>
                     <span style={{ fontSize: 12, color: 'var(--t1)' }}>{folder}</span>
                     <button style={toggleStyle(isVisible)} onClick={() => {
-                      const current: string[] = (settings as any).hidden_sidebar_folders || [];
+                      const current: string[] = settings.hidden_sidebar_folders || [];
                       if (isVisible) {
-                        update({ hidden_sidebar_folders: [...current, folder] } as any);
+                        update({ hidden_sidebar_folders: [...current, folder] });
                       } else {
-                        update({ hidden_sidebar_folders: current.filter((f: string) => f !== folder) } as any);
+                        update({ hidden_sidebar_folders: current.filter((f: string) => f !== folder) });
                       }
                     }}>
                       <div style={toggleDot(isVisible)} />
