@@ -316,7 +316,7 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
       }}
     >
       {/* Render cells in column order: pre-name columns, then name, then post-name columns */}
-      {columns.filter(c => c.id !== 'name').map((c, i) => {
+      {columns.filter(c => c.id !== 'name').map((c) => {
         const nameIdx = columns.findIndex(cc => cc.id === 'name');
         const origIdx = columns.findIndex(cc => cc.id === c.id);
         if (origIdx < nameIdx) {
@@ -758,7 +758,13 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   // Column system
   const [visibleCols, setVisibleCols] = useState<ColumnId[]>(() => {
     const saved = useSettingsStore.getState().settings.column_order;
-    return saved?.length ? saved as ColumnId[] : DEFAULT_VISIBLE;
+    if (!saved?.length) return DEFAULT_VISIBLE;
+    const cols = saved as ColumnId[];
+    // Ensure new default columns are present in saved order (migration)
+    for (const defCol of DEFAULT_VISIBLE) {
+      if (!cols.includes(defCol)) cols.unshift(defCol);
+    }
+    return cols;
   });
   const [colWidthOverrides, setColWidthOverrides] = useState<Record<string, number>>({});
   const [headerCtxMenu, setHeaderCtxMenu] = useState<{ x: number; y: number } | null>(null);
