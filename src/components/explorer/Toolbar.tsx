@@ -908,29 +908,33 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
                     {seg}
                   </span>
                   <span
+                    onMouseDown={(e) => { e.stopPropagation(); }}
                     onClick={async (e) => {
                       e.stopPropagation();
+                      e.preventDefault();
+                      console.log('[breadcrumb] chevron clicked, segment:', i, 'path:', fullPath);
                       if (breadcrumbDropdown?.idx === i) { setBreadcrumbDropdown(null); return; }
+                      const rect = e.currentTarget.getBoundingClientRect();
                       try {
                         const listing = await invoke<DirListing>('read_dir', { path: fullPath, showHidden: false });
                         const dirs = listing.entries
                           .filter(entry => entry.is_dir)
                           .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
                           .map(entry => ({ name: entry.name, path: entry.path }));
-                        const rect = e.currentTarget.getBoundingClientRect();
+                        console.log('[breadcrumb] got', dirs.length, 'dirs');
                         setBreadcrumbDropdown({ idx: i, x: rect.left, y: rect.bottom + 2, items: dirs });
-                      } catch { /* ignore read errors */ }
+                      } catch (err) { console.error('[breadcrumb] error:', err); }
                     }}
                     style={{
-                      cursor: 'pointer', padding: '2px 2px', borderRadius: 3, display: 'inline-flex',
+                      cursor: 'pointer', padding: '2px 4px', borderRadius: 3, display: 'inline-flex',
                       alignItems: 'center', color: breadcrumbDropdown?.idx === i ? 'var(--accent)' : 'var(--t3)',
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--t1)'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = breadcrumbDropdown?.idx === i ? 'var(--accent)' : 'var(--t3)'; }}
                     title="Show sibling folders"
                   >
-                    <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" stroke="none">
-                      <polygon points="1,2 7,2 4,6" />
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" stroke="none">
+                      <polygon points="2,3 8,3 5,7" />
                     </svg>
                   </span>
                 </span>

@@ -611,6 +611,7 @@ function VerseMarquee() {
           fontStyle: 'italic',
           animation: 'marquee-scroll 45s linear infinite',
           paddingLeft: '100%',
+          pointerEvents: 'none',
         }}
       >
         {display}

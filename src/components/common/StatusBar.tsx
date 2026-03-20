@@ -71,8 +71,17 @@ export function StatusBar() {
         </span>
       </div>
 
-      {/* Right: counts + view toggle */}
+      {/* Right: age legend + counts + view toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+        {/* Age color legend */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 4 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', display: 'inline-block', flexShrink: 0 }} />Today</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--cyan)', display: 'inline-block', flexShrink: 0 }} />Week</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--t2)', display: 'inline-block', flexShrink: 0 }} />Month</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--t3)', display: 'inline-block', flexShrink: 0 }} />3mo</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--t3)', opacity: 0.5, display: 'inline-block', flexShrink: 0 }} />Old</span>
+        </div>
+        <span style={{ color: 'var(--border)' }}>|</span>
         {selected > 0 && <span style={{ color: 'var(--accent)' }}>{selected} selected</span>}
         <span>
           {dirCount > 0 && `${dirCount} folder${dirCount !== 1 ? 's' : ''}`}

@@ -228,6 +228,12 @@ function PeekRow({ entry, selected, colWidths, columns, onClick, onDoubleClick }
       onMouseEnter={(e) => { if (!selected) e.currentTarget.style.background = 'var(--hover)'; }}
       onMouseLeave={(e) => { if (!selected) e.currentTarget.style.background = selected ? 'var(--active)' : 'transparent'; }}
     >
+      {columns.filter(c => c.id !== 'name').map((c) => {
+        const nameIdx = columns.findIndex(cc => cc.id === 'name');
+        const origIdx = columns.findIndex(cc => cc.id === c.id);
+        if (origIdx < nameIdx) return <CellValue key={c.id} col={c.id} entry={entry} />;
+        return null;
+      })}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--density-gap)', padding: '0 var(--density-pad-x)', paddingLeft: 28, overflow: 'hidden' }}>
         <FileIcon entry={entry} />
         <span style={{
@@ -237,9 +243,12 @@ function PeekRow({ entry, selected, colWidths, columns, onClick, onDoubleClick }
           {displayName(entry)}
         </span>
       </div>
-      {columns.filter(c => c.id !== 'name').map(c => (
-        <CellValue key={c.id} col={c.id} entry={entry} />
-      ))}
+      {columns.filter(c => c.id !== 'name').map((c) => {
+        const nameIdx = columns.findIndex(cc => cc.id === 'name');
+        const origIdx = columns.findIndex(cc => cc.id === c.id);
+        if (origIdx > nameIdx) return <CellValue key={c.id} col={c.id} entry={entry} />;
+        return null;
+      })}
     </div>
   );
 }
@@ -306,6 +315,15 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
         cursor: 'pointer', borderRadius: 2, userSelect: 'none',
       }}
     >
+      {/* Render cells in column order: pre-name columns, then name, then post-name columns */}
+      {columns.filter(c => c.id !== 'name').map((c, i) => {
+        const nameIdx = columns.findIndex(cc => cc.id === 'name');
+        const origIdx = columns.findIndex(cc => cc.id === c.id);
+        if (origIdx < nameIdx) {
+          return <CellValue key={c.id} col={c.id} entry={entry} gitStatus={gs} folderSize={entry.is_dir ? folderSize : undefined} />;
+        }
+        return null;
+      })}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--density-gap)', padding: '0 var(--density-pad-x)', overflow: 'hidden' }}>
         {entry.is_dir && peekEnabled && (
           <span
@@ -334,9 +352,14 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
           </span>
         )}
       </div>
-      {columns.filter(c => c.id !== 'name').map(c => (
-        <CellValue key={c.id} col={c.id} entry={entry} gitStatus={gs} folderSize={entry.is_dir ? folderSize : undefined} />
-      ))}
+      {columns.filter(c => c.id !== 'name').map((c) => {
+        const nameIdx = columns.findIndex(cc => cc.id === 'name');
+        const origIdx = columns.findIndex(cc => cc.id === c.id);
+        if (origIdx > nameIdx) {
+          return <CellValue key={c.id} col={c.id} entry={entry} gitStatus={gs} folderSize={entry.is_dir ? folderSize : undefined} />;
+        }
+        return null;
+      })}
     </div>
   );
 }
@@ -1827,7 +1850,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
             const { compressArchive } = await import('../../api/archive');
             const firstName = paths[0].replace(/.*[\\/]/, '').replace(/\.[^.]+$/, '');
             const baseName = paths.length > 1 ? 'Archive' : firstName;
-            const ext = format === '7z' ? '.7z' : '.zip';
+            const ext = format === '7z' ? '.7z' : format === 'tar.gz' ? '.tar.gz' : '.zip';
             const destPath = currentPath.replace(/[\\/]?$/, '\\') + baseName + ext;
             await compressArchive(paths, destPath, format);
             refresh();

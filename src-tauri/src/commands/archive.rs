@@ -138,6 +138,7 @@ pub fn compress_archive(paths: Vec<String>, dest: String, format: String) -> Res
     match format.to_lowercase().as_str() {
         "zip" => compress_zip(&paths, &dest)?,
         "7z" => compress_7z(&paths, &dest)?,
+        "tar.gz" | "tgz" => compress_tar_gz(&paths, &dest)?,
         _ => return Err(format!("Unsupported compression format: {}", format)),
     }
     Ok(dest)
@@ -257,6 +258,28 @@ fn add_dir_to_7z(
             .push_archive_entry(entry, Some(std::io::Cursor::new(data)))
             .map_err(|e| format!("7z add file failed: {}", e))?;
     }
+    Ok(())
+}
+
+fn compress_tar_gz(paths: &[String], dest: &str) -> Result<(), String> {
+    let file = fs::File::create(dest).map_err(|e| e.to_string())?;
+    let gz = flate2::write::GzEncoder::new(file, flate2::Compression::default());
+    let mut tar_builder = tar::Builder::new(gz);
+
+    for source in paths {
+        let src_path = Path::new(source);
+        if src_path.is_dir() {
+            let dir_name = src_path.file_name().unwrap_or_default().to_string_lossy().to_string();
+            tar_builder.append_dir_all(&dir_name, src_path).map_err(|e| format!("tar.gz add dir failed: {}", e))?;
+        } else {
+            let name = src_path.file_name().unwrap_or_default().to_string_lossy().to_string();
+            let mut f = fs::File::open(src_path).map_err(|e| e.to_string())?;
+            tar_builder.append_file(&name, &mut f).map_err(|e| format!("tar.gz add file failed: {}", e))?;
+        }
+    }
+
+    let gz = tar_builder.into_inner().map_err(|e| format!("tar finalize failed: {}", e))?;
+    gz.finish().map_err(|e| format!("gz finalize failed: {}", e))?;
     Ok(())
 }
 

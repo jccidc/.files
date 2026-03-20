@@ -135,6 +135,7 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
         submenu: [
           { label: 'ZIP archive', action: () => { onCompress(paths, 'zip'); onClose(); } },
           { label: '7z archive', action: () => { onCompress(paths, '7z'); onClose(); } },
+          { label: 'tar.gz archive', action: () => { onCompress(paths, 'tar.gz'); onClose(); } },
         ],
       });
     }
