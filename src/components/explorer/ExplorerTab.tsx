@@ -17,12 +17,13 @@ import { TreemapView } from './TreemapView';
 import { PropertiesPanel } from './PropertiesPanel';
 import { FileGrid } from './FileGrid';
 import { BatchRename } from './BatchRename';
-import { Toolbar, type GroupBy } from './Toolbar';
+import { Toolbar, type GroupBy, type TagFilter } from './Toolbar';
 import { QuickPreview } from '../preview/QuickPreview';
 import { usePreviewStore } from '../../stores/preview';
 import { FileIcon } from '../common/FileIcon';
 import { useGitStore } from '../../stores/git';
-import type { Tab, FileEntry } from '../../types';
+import type { Tab, FileEntry, TagId } from '../../types';
+import { TAG_TYPES } from '../../types';
 
 
 /** Strip .lnk extension for cleaner display */
@@ -170,6 +171,16 @@ function getAgeColor(iso: string): string {
 
 function CellValue({ col, entry, gitStatus, folderSize }: { col: ColumnId; entry: FileEntry; gitStatus?: string; folderSize?: number }) {
   switch (col) {
+    case 'tag': {
+      const fileTags = useSettingsStore.getState().settings.file_tags || {};
+      const norm = entry.path.replace(/\\/g, '/');
+      const tagId = fileTags[norm] as TagId | undefined;
+      if (tagId && TAG_TYPES[tagId]) {
+        const tag = TAG_TYPES[tagId];
+        return <div style={{ width: 28, textAlign: 'center', fontSize: 14, lineHeight: '28px', cursor: 'default' }} title={tag.label}>{tag.icon}</div>;
+      }
+      return <div style={{ width: 28 }} />;
+    }
     case 'size':
       if (entry.is_dir) {
         if (folderSize !== undefined && folderSize > 0) {
@@ -366,7 +377,7 @@ function sortEntries(entries: FileEntry[], field: SortField, asc: boolean): File
 
 // ---- Column definitions ----
 
-type ColumnId = 'name' | 'size' | 'modified' | 'created' | 'accessed' | 'type' | 'status';
+type ColumnId = 'tag' | 'name' | 'size' | 'modified' | 'created' | 'accessed' | 'type' | 'status';
 
 interface ColumnDef {
   id: ColumnId;
@@ -378,6 +389,7 @@ interface ColumnDef {
 }
 
 const ALL_COLUMNS: ColumnDef[] = [
+  { id: 'tag',      label: 'Tag',      sortField: undefined,  defaultWidth: 28, minWidth: 28, removable: true },
   { id: 'name',     label: 'Name',     sortField: 'name',     defaultWidth: 0, minWidth: 120, removable: false },
   { id: 'size',     label: 'Size',     sortField: 'size',     defaultWidth: 100, minWidth: 60, removable: true },
   { id: 'modified', label: 'Modified', sortField: 'modified', defaultWidth: 140, minWidth: 80, removable: true },
@@ -387,7 +399,7 @@ const ALL_COLUMNS: ColumnDef[] = [
   { id: 'status',   label: 'Status',   sortField: undefined,  defaultWidth: 70,  minWidth: 50, removable: true },
 ];
 
-const DEFAULT_VISIBLE: ColumnId[] = ['name', 'size', 'modified'];
+const DEFAULT_VISIBLE: ColumnId[] = ['tag', 'name', 'size', 'modified'];
 
 // ---- Column Chooser Menu (right-click on header) ----
 
@@ -695,6 +707,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const { updateTab: panelUpdateTab, addTab: panelAddTab } = usePanelsStore();
   const followSelection = usePreviewStore((s) => s.followSelection);
   const pinnedPaths = useSettingsStore((s) => s.settings.pinned_paths);
+  const fileTags = useSettingsStore((s) => s.settings.file_tags);
   const updateSettings = useSettingsStore((s) => s.update);
   const gitFiles = useGitStore((s) => s.files);
   const gitRepoInfo = useGitStore((s) => s.repoInfo);
@@ -712,6 +725,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const [filterText, setFilterText] = useState('');
   const [folderSizes, setFolderSizes] = useState<Record<string, number>>({});
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
+  const [tagFilter, setTagFilter] = useState<TagFilter>('all');
   const tooltipTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const lastClickedIndex = useRef<number>(-1);
   const slowClickTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -819,18 +833,29 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   }
 
   const sortedEntriesRaw = sortEntries(entries, sortField, sortAsc);
-  const sortedEntries = filterText
-    ? sortedEntriesRaw.filter((e) => {
-        const name = e.name.toLowerCase();
-        const filter = filterText.toLowerCase().trim();
-        // Support wildcards: *.mp4, Ca*, *.txt, photo*
-        if (filter.includes('*')) {
-          const regex = new RegExp('^' + filter.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$', 'i');
-          return regex.test(e.name);
-        }
-        return name.includes(filter);
-      })
-    : sortedEntriesRaw;
+  const tagsMap = fileTags || {};
+  const sortedEntries = sortedEntriesRaw.filter((e) => {
+    // Tag filter
+    if (tagFilter !== 'all') {
+      const norm = e.path.replace(/\\/g, '/');
+      const entryTag = tagsMap[norm];
+      if (tagFilter === 'any-tagged' && !entryTag) return false;
+      if (tagFilter === 'untagged' && entryTag) return false;
+      if (tagFilter !== 'any-tagged' && tagFilter !== 'untagged' && entryTag !== tagFilter) return false;
+    }
+    // Text filter
+    if (filterText) {
+      const name = e.name.toLowerCase();
+      const filter = filterText.toLowerCase().trim();
+      // Support wildcards: *.mp4, Ca*, *.txt, photo*
+      if (filter.includes('*')) {
+        const regex = new RegExp('^' + filter.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$', 'i');
+        return regex.test(e.name);
+      }
+      return name.includes(filter);
+    }
+    return true;
+  });
 
   // Group-by logic
   function getGroupKey(entry: FileEntry): string {
@@ -1294,6 +1319,19 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     setPeekPaths(next);
   };
 
+  const handleTag = (paths: string[], tagId: string | null) => {
+    const tags = { ...(useSettingsStore.getState().settings.file_tags || {}) };
+    for (const p of paths) {
+      const norm = p.replace(/\\/g, '/');
+      if (tagId === null || tags[norm] === tagId) {
+        delete tags[norm];
+      } else {
+        tags[norm] = tagId;
+      }
+    }
+    updateSettings({ file_tags: tags });
+  };
+
   const handleCopyPath = (path: string) => navigator.clipboard.writeText(path).catch(() => {});
   const handlePinToggle = (path: string) => {
     const current = pinnedPaths || [];
@@ -1449,6 +1487,8 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         onFilterChange={setFilterText}
         groupBy={groupBy}
         onGroupByChange={setGroupBy}
+        tagFilter={tagFilter}
+        onTagFilterChange={setTagFilter}
         onSearch={() => window.dispatchEvent(new CustomEvent('open-fuzzy-search'))}
       />
 
@@ -1807,6 +1847,8 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
             refresh();
           }}
           selectedPaths={[...selectedPaths]}
+          onTag={handleTag}
+          currentTags={useSettingsStore.getState().settings.file_tags || {}}
           onGitDiscard={gitRepoInfo?.is_repo && gitRepoInfo.root ? (filePath: string) => {
             const getGitRelPath = (p: string, root: string) => {
               const norm = (s: string) => s.replace(/\\/g, '/').replace(/\/$/, '');

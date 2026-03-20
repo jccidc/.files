@@ -125,6 +125,8 @@ pub struct AppSettings {
     pub hidden_sidebar_folders: Vec<String>,
     #[serde(default)]
     pub column_order: Vec<String>,
+    #[serde(default = "default_file_tags")]
+    pub file_tags: serde_json::Value,
 }
 
 fn default_theme() -> String { "dotfiles-dark".to_string() }
@@ -157,6 +159,7 @@ fn default_footer_widgets() -> Vec<String> { vec!["spotify".into(), "system".int
 fn default_widget_alignment() -> String { "left".to_string() }
 fn default_clock_format() -> String { "12h".to_string() }
 fn default_weather_unit() -> String { "f".to_string() }
+fn default_file_tags() -> serde_json::Value { serde_json::Value::Object(serde_json::Map::new()) }
 
 impl Default for AppSettings {
     fn default() -> Self {
@@ -217,6 +220,7 @@ impl Default for AppSettings {
             weather_unit: default_weather_unit(),
             hidden_sidebar_folders: Vec::new(),
             column_order: Vec::new(),
+            file_tags: default_file_tags(),
         }
     }
 }

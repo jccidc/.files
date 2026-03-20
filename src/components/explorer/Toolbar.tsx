@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { useExplorerStore } from '../../stores/explorer';
 import { usePreviewStore } from '../../stores/preview';
+import { TAG_TYPES, type TagId } from '../../types';
 
 export type GroupBy = 'none' | 'type' | 'date' | 'size' | 'letter';
+export type TagFilter = 'all' | 'any-tagged' | 'untagged' | TagId;
 
 interface ToolbarProps {
   tabId: string;
@@ -16,6 +18,8 @@ interface ToolbarProps {
   groupBy: GroupBy;
   onGroupByChange: (g: GroupBy) => void;
   onSearch: () => void;
+  tagFilter: TagFilter;
+  onTagFilterChange: (f: TagFilter) => void;
 }
 
 // -- Icon components (14x14, strokeWidth 1.5) --
@@ -257,7 +261,7 @@ const GROUP_OPTIONS: { key: GroupBy; label: string }[] = [
 
 // -- Component --
 
-export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort, filterText, onFilterChange, groupBy, onGroupByChange, onSearch }: ToolbarProps) {
+export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort, filterText, onFilterChange, groupBy, onGroupByChange, onSearch, tagFilter, onTagFilterChange }: ToolbarProps) {
   const tabState = useExplorerStore((s) => s.tabStates[tabId]);
   const currentPath = tabState?.currentPath ?? 'C:\\';
   const canGoBack = tabState?.canGoBack ?? false;
@@ -280,12 +284,14 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
 
   const [sortOpen, setSortOpen] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
+  const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [pathEditing, setPathEditing] = useState(false);
   const [pathValue, setPathValue] = useState(currentPath);
   const [pathCtxMenu, setPathCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const sortRef = useRef<HTMLDivElement>(null);
   const groupRef = useRef<HTMLDivElement>(null);
+  const tagFilterRef = useRef<HTMLDivElement>(null);
   const filterInputRef = useRef<HTMLInputElement>(null);
   const pathInputRef = useRef<HTMLInputElement>(null);
   const pathSubmittedRef = useRef(false);
@@ -316,14 +322,15 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
 
   // Close dropdowns on outside click
   useEffect(() => {
-    if (!sortOpen && !groupOpen) return;
+    if (!sortOpen && !groupOpen && !tagFilterOpen) return;
     const handler = (e: MouseEvent) => {
       if (sortOpen && sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false);
       if (groupOpen && groupRef.current && !groupRef.current.contains(e.target as Node)) setGroupOpen(false);
+      if (tagFilterOpen && tagFilterRef.current && !tagFilterRef.current.contains(e.target as Node)) setTagFilterOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [sortOpen, groupOpen]);
+  }, [sortOpen, groupOpen, tagFilterOpen]);
 
   // Close path context menu on outside click
   useEffect(() => {
@@ -630,6 +637,67 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
                   onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
                   {g.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Tag filter dropdown */}
+        <div ref={tagFilterRef} style={{ position: 'relative' }}>
+          <button
+            style={tagFilter !== 'all' ? { ...btnBase, color: 'var(--accent)' } : btnBase}
+            onClick={() => setTagFilterOpen(!tagFilterOpen)}
+            onMouseEnter={handleBtnHover}
+            onMouseLeave={(e) => handleBtnLeave(e, tagFilter !== 'all')}
+            title="Filter by tag"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 2h5l5 5-4 4-5-5V2z" />
+              <circle cx="4" cy="5" r="1" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
+          {tagFilterOpen && (
+            <div style={{
+              position: 'absolute', top: 30, left: 0,
+              background: 'var(--raised)', border: '1px solid var(--border)',
+              borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+              zIndex: 100, minWidth: 160, padding: '4px 0',
+            }}>
+              {[
+                { key: 'all' as TagFilter, label: 'All Files', icon: '' },
+                { key: 'any-tagged' as TagFilter, label: 'Any Tagged', icon: '' },
+                { key: 'untagged' as TagFilter, label: 'Untagged', icon: '' },
+              ].map(({ key, label }) => (
+                <div
+                  key={key}
+                  onClick={() => { onTagFilterChange(key); setTagFilterOpen(false); }}
+                  style={{
+                    padding: '6px 12px', fontSize: 12,
+                    color: tagFilter === key ? 'var(--accent)' : 'var(--t2)',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {label}
+                </div>
+              ))}
+              <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
+              {(Object.entries(TAG_TYPES) as [TagId, typeof TAG_TYPES[TagId]][]).map(([id, tag]) => (
+                <div
+                  key={id}
+                  onClick={() => { onTagFilterChange(id); setTagFilterOpen(false); }}
+                  style={{
+                    padding: '6px 12px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 8,
+                    color: tagFilter === id ? 'var(--accent)' : 'var(--t2)',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span style={{ fontSize: 14 }}>{tag.icon}</span>
+                  <span>{tag.label}</span>
                 </div>
               ))}
             </div>

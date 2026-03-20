@@ -72,6 +72,18 @@ export interface CustomFont {
   file: string;  // filename in app fonts dir
 }
 
+export const TAG_TYPES = {
+  important: { icon: '\u2757', label: 'Important', color: '#F87171' },
+  archive:   { icon: '\uD83D\uDCE6', label: 'Archive', color: '#FBBF24' },
+  favorite:  { icon: '\u2B50', label: 'Favorite', color: '#FBBF24' },
+  private:   { icon: '\uD83D\uDD12', label: 'Private', color: '#8891A0' },
+  done:      { icon: '\u2705', label: 'Done', color: '#4ADE80' },
+  progress:  { icon: '\uD83D\uDD04', label: 'In Progress', color: '#22D3EE' },
+  pinned:    { icon: '\uD83D\uDCCC', label: 'Pinned', color: '#C084FC' },
+} as const;
+
+export type TagId = keyof typeof TAG_TYPES;
+
 export interface AppSettings {
   // Appearance
   theme: string;
@@ -139,6 +151,7 @@ export interface AppSettings {
   weather_unit: string;
   hidden_sidebar_folders: string[];
   column_order: string[];
+  file_tags: Record<string, string>;  // normalized path -> TagId
 }
 
 export type TabType = 'explorer' | 'terminal' | 'preview';

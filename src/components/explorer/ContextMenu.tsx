@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { FileEntry } from '../../types';
+import type { FileEntry, TagId } from '../../types';
+import { TAG_TYPES } from '../../types';
 
 interface ContextMenuProps {
   x: number;
@@ -31,6 +32,8 @@ interface ContextMenuProps {
   onCreateShortcut?: (path: string) => void;
   onOpenTerminalHere?: (path: string) => void;
   selectedPaths?: string[];
+  onTag?: (paths: string[], tagId: string | null) => void;
+  currentTags?: Record<string, string>;
 }
 
 interface MenuItem {
@@ -40,9 +43,10 @@ interface MenuItem {
   shortcut?: string;
   danger?: boolean;
   disabled?: boolean;
+  submenu?: { label: string; icon?: string; action: () => void; active?: boolean }[];
 }
 
-export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefresh, onNewTerminal, onPreviewInTab, onPinToQuickAccess, isPinned, onGitStage, onGitDiscard, gitFileStatus, onCut, onCopy, onPaste, canPaste, onProperties, onNewFolder, onNewFile, onOpenWith, onCompressZip, onExtractZip, onCreateShortcut, onOpenTerminalHere: _onOpenTerminalHere, selectedPaths }: ContextMenuProps) {
+export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefresh, onNewTerminal, onPreviewInTab, onPinToQuickAccess, isPinned, onGitStage, onGitDiscard, gitFileStatus, onCut, onCopy, onPaste, canPaste, onProperties, onNewFolder, onNewFile, onOpenWith, onCompressZip, onExtractZip, onCreateShortcut, onOpenTerminalHere: _onOpenTerminalHere, selectedPaths, onTag, currentTags }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -134,6 +138,27 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
       items.push({ label: 'Create Shortcut', action: () => { onCreateShortcut(entry.path); onClose(); } });
     }
 
+    // Tag as...
+    if (onTag) {
+      const paths = selectedPaths && selectedPaths.length > 1 ? selectedPaths : [entry.path];
+      const norm = entry.path.replace(/\\/g, '/');
+      const currentTag = currentTags?.[norm] as TagId | undefined;
+      const tagSubmenu: { label: string; icon: string; action: () => void; active: boolean }[] =
+        (Object.entries(TAG_TYPES) as [TagId, typeof TAG_TYPES[TagId]][]).map(([id, tag]) => ({
+          label: tag.label,
+          icon: tag.icon,
+          active: currentTag === id,
+          action: () => { onTag(paths, id); onClose(); },
+        }));
+      tagSubmenu.push({
+        label: 'Remove Tag',
+        icon: '\u2716',
+        active: false,
+        action: () => { onTag(paths, null); onClose(); },
+      });
+      items.push({ label: 'Tag as...', action: () => {}, submenu: tagSubmenu });
+    }
+
     // Git actions
     if (gitFileStatus && (onGitStage || onGitDiscard)) {
       items.push({ label: 'Git', action: () => {}, separator: true });
@@ -166,6 +191,8 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
 
   items.push({ label: 'Refresh', shortcut: 'F5', action: () => { onRefresh(); onClose(); } });
 
+  const [hoveredSubmenu, setHoveredSubmenu] = useState<number | null>(null);
+
   const menuWidth = 220;
   const menuHeight = items.reduce((h, item) => h + (item.separator ? 9 + (item.label ? 18 : 0) : 32), 8);
   const adjustedX = x + menuWidth > window.innerWidth ? x - menuWidth : x;
@@ -190,6 +217,53 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
               </div>
             )}
           </div>
+        ) : item.submenu ? (
+          <div
+            key={i}
+            style={{ position: 'relative' }}
+            onMouseEnter={() => setHoveredSubmenu(i)}
+            onMouseLeave={() => setHoveredSubmenu(null)}
+          >
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '6px 12px', cursor: 'pointer', fontSize: 12, color: 'var(--t1)',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
+              onMouseLeave={(e) => { if (hoveredSubmenu !== i) e.currentTarget.style.background = 'transparent'; }}
+            >
+              <span>{item.label}</span>
+              <span style={{ fontSize: 10, color: 'var(--t3)' }}>{'\u25B6'}</span>
+            </div>
+            {hoveredSubmenu === i && (
+              <div style={{
+                position: 'absolute',
+                left: adjustedX + menuWidth > window.innerWidth - 180 ? -178 : menuWidth - 2,
+                top: -4,
+                minWidth: 176, background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 6, padding: '4px 0', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                zIndex: 1001,
+              }}>
+                {item.submenu.map((sub, si) => (
+                  <div
+                    key={si}
+                    onClick={sub.action}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '6px 12px', cursor: 'pointer', fontSize: 12,
+                      color: sub.active ? 'var(--accent)' : sub.label === 'Remove Tag' ? 'var(--red)' : 'var(--t1)',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                  >
+                    {sub.icon && <span style={{ fontSize: 14, width: 18, textAlign: 'center' }}>{sub.icon}</span>}
+                    <span>{sub.label}</span>
+                    {sub.active && <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--accent)' }}>{'\u2713'}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
           <div
             key={i}
@@ -200,7 +274,7 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
               color: item.disabled ? 'var(--t3)' : item.danger ? 'var(--red)' : 'var(--t1)',
               opacity: item.disabled ? 0.5 : 1,
             }}
-            onMouseEnter={(e) => { if (!item.disabled) e.currentTarget.style.background = 'var(--hover)'; }}
+            onMouseEnter={(e) => { if (!item.disabled) e.currentTarget.style.background = 'var(--hover)'; setHoveredSubmenu(null); }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
             <span>{item.label}</span>
