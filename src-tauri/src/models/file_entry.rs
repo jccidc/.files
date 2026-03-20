@@ -10,6 +10,7 @@ pub struct FileEntry {
     pub size: u64,
     pub modified: String,
     pub created: String,
+    pub accessed: String,
     pub extension: Option<String>,
     pub readonly: bool,
     pub children_count: Option<u32>,

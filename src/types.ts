@@ -7,6 +7,7 @@ export interface FileEntry {
   size: number;
   modified: string;
   created: string;
+  accessed: string;
   extension: string | null;
   readonly: boolean;
   children_count: number | null;

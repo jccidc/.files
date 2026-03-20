@@ -42,6 +42,15 @@ fn build_file_entry(path: &Path) -> Result<FileEntry, String> {
         })
         .unwrap_or_default();
 
+    let accessed = metadata
+        .accessed()
+        .ok()
+        .map(|t| {
+            let dt: DateTime<Local> = t.into();
+            dt.to_rfc3339()
+        })
+        .unwrap_or_default();
+
     let is_dir = metadata.is_dir();
     let children_count = if is_dir {
         std::fs::read_dir(path).ok().map(|rd| rd.count() as u32)
@@ -58,6 +67,7 @@ fn build_file_entry(path: &Path) -> Result<FileEntry, String> {
         size: metadata.len(),
         modified,
         created,
+        accessed,
         extension,
         readonly: metadata.permissions().readonly(),
         children_count,

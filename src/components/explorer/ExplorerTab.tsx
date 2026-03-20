@@ -106,6 +106,8 @@ function HoverTooltip({ entry, x, y }: { entry: FileEntry; x: number; y: number 
         Modified: {formatDateFull(entry.modified)}
         <br />
         Created: {formatDateFull(entry.created)}
+        <br />
+        Accessed: {formatDateFull(entry.accessed)}
         {entry.readonly && <><br /><span style={{ color: 'var(--yellow)' }}>Read-only</span></>}
         {entry.is_symlink && <><br /><span style={{ color: 'var(--cyan)' }}>Symlink</span></>}
       </div>
@@ -180,6 +182,8 @@ function CellValue({ col, entry, gitStatus, folderSize }: { col: ColumnId; entry
       return <div style={{ ...cellStyle, color: getAgeColor(entry.modified) }}>{formatDate(entry.modified)}</div>;
     case 'created':
       return <div style={cellStyle}>{formatDate(entry.created)}</div>;
+    case 'accessed':
+      return <div style={{ ...cellStyle, color: getAgeColor(entry.accessed) }}>{formatDate(entry.accessed)}</div>;
     case 'type':
       return <div style={cellStyle}>{entry.is_dir ? 'Folder' : (entry.extension ? `.${entry.extension}` : '--')}</div>;
     case 'status': {
@@ -328,7 +332,7 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
 
 // ---- Sort types ----
 
-type SortField = 'name' | 'size' | 'modified' | 'created' | 'type';
+type SortField = 'name' | 'size' | 'modified' | 'created' | 'accessed' | 'type';
 
 function sortEntries(entries: FileEntry[], field: SortField, asc: boolean): FileEntry[] {
   const sorted = [...entries];
@@ -348,6 +352,9 @@ function sortEntries(entries: FileEntry[], field: SortField, asc: boolean): File
       case 'created':
         cmp = (a.created || '').localeCompare(b.created || '');
         break;
+      case 'accessed':
+        cmp = (a.accessed || '').localeCompare(b.accessed || '');
+        break;
       case 'type':
         cmp = (a.extension || '').localeCompare(b.extension || '');
         break;
@@ -359,7 +366,7 @@ function sortEntries(entries: FileEntry[], field: SortField, asc: boolean): File
 
 // ---- Column definitions ----
 
-type ColumnId = 'name' | 'size' | 'modified' | 'created' | 'type' | 'status';
+type ColumnId = 'name' | 'size' | 'modified' | 'created' | 'accessed' | 'type' | 'status';
 
 interface ColumnDef {
   id: ColumnId;
@@ -375,6 +382,7 @@ const ALL_COLUMNS: ColumnDef[] = [
   { id: 'size',     label: 'Size',     sortField: 'size',     defaultWidth: 100, minWidth: 60, removable: true },
   { id: 'modified', label: 'Modified', sortField: 'modified', defaultWidth: 140, minWidth: 80, removable: true },
   { id: 'created',  label: 'Created',  sortField: 'created',  defaultWidth: 140, minWidth: 80, removable: true },
+  { id: 'accessed', label: 'Accessed', sortField: 'accessed', defaultWidth: 140, minWidth: 80, removable: true },
   { id: 'type',     label: 'Type',     sortField: 'type',     defaultWidth: 80,  minWidth: 50, removable: true },
   { id: 'status',   label: 'Status',   sortField: undefined,  defaultWidth: 70,  minWidth: 50, removable: true },
 ];
