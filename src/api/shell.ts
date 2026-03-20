@@ -27,3 +27,7 @@ export async function renameFile(path: string, newName: string): Promise<string>
 export async function resolveShortcut(path: string): Promise<string | null> {
   return invoke('resolve_shortcut', { path });
 }
+
+export async function showProperties(path: string): Promise<void> {
+  return invoke('show_properties', { path });
+}

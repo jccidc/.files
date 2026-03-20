@@ -30,6 +30,8 @@ export interface DriveInfo {
   drive_type: 'fixed' | 'removable' | 'network' | 'cdrom' | 'ramdisk' | 'unknown';
   label: string;
   is_cloud: boolean;
+  total_bytes: number;
+  free_bytes: number;
 }
 
 export interface CloudSource {
@@ -90,6 +92,14 @@ export interface AppSettings {
   border_radius: number;       // 0-12
   density: string;             // 'compact' | 'comfortable' | 'spacious'
   icon_theme: string;          // 'minimal' | 'colorful' | 'monochrome'
+  // Radical theming
+  accent_secondary: string;    // second accent color for gradient mode
+  gradient_accent: boolean;    // blend accent -> accent_secondary across UI
+  selection_glow: boolean;     // pulsing glow ring on selected files
+  neon_mode: boolean;          // high-contrast glowing borders + text shadows
+  accent_tinted_text: boolean; // file names subtly tinted toward accent
+  rainbow_folders: boolean;    // each folder gets a unique palette color
+  adaptive_accent: boolean;    // file name color shifts by extension/type
   bg_pattern: string;          // 'none' | 'dots' | 'grid' | 'noise' | 'gradient' | 'custom'
   bg_custom_url: string;
   bg_opacity: number;          // 0.02-0.2

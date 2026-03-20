@@ -4,7 +4,7 @@ import { readDir } from '../api/filesystem';
 import { copyFiles, moveFiles } from '../api/shell';
 import { useSettingsStore } from './settings';
 
-export type ViewMode = 'list' | 'grid';
+export type ViewMode = 'list' | 'grid' | 'columns' | 'gallery' | 'tiles' | 'flat' | 'treemap';
 
 export interface TabExplorerState {
   currentPath: string;
@@ -83,7 +83,14 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => {
     }));
   };
 
+  const SPECIAL_PATHS = ['this-pc', 'recycle-bin'];
+
   const loadPath = async (tabId: string, path: string) => {
+    // Special virtual paths don't load a directory
+    if (SPECIAL_PATHS.includes(path)) {
+      updateTab(tabId, { currentPath: path, entries: [], selectedPaths: new Set(), loading: false, error: null });
+      return;
+    }
     const showHidden = useSettingsStore.getState().settings.show_hidden;
     updateTab(tabId, { loading: true, error: null });
     try {

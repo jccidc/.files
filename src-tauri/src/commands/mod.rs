@@ -1,7 +1,12 @@
+pub mod clipboard;
+pub mod context_ops;
 pub mod cloud;
+pub mod extras;
+pub mod file_ops;
 pub mod filesystem;
 pub mod fonts;
 pub mod git;
+pub mod properties;
 pub mod search;
 pub mod settings;
 pub mod shell;

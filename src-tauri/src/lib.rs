@@ -2,7 +2,7 @@ mod commands;
 mod models;
 mod utils;
 
-use commands::{cloud, filesystem, fonts, git, registry, search, settings, shell, terminal, watcher};
+use commands::{clipboard, cloud, context_ops, extras, file_ops, filesystem, fonts, git, properties, registry, search, settings, shell, terminal, watcher};
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder},
     tray::TrayIconBuilder,
@@ -33,6 +33,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_drag::init())
         .setup(|app| {
             // Build tray menu
             let show = MenuItemBuilder::with_id("show", "Show .files").build(app)?;
@@ -93,6 +94,9 @@ pub fn run() {
             filesystem::dir_stats,
             filesystem::get_known_folder_paths,
             filesystem::read_file_bytes,
+            filesystem::create_folder,
+            filesystem::create_file,
+            filesystem::batch_folder_sizes,
             terminal::spawn_pty,
             terminal::write_pty,
             terminal::resize_pty,
@@ -104,12 +108,22 @@ pub fn run() {
             search::fuzzy_find,
             shell::delete_to_trash,
             shell::open_in_explorer,
+            shell::open_shell_folder,
             shell::open_file,
             shell::copy_files,
             shell::move_files,
             shell::rename_file,
             shell::resolve_shortcut,
             shell::eject_drive,
+            shell::show_properties,
+            clipboard::clipboard_copy_files,
+            clipboard::clipboard_cut_files,
+            clipboard::clipboard_read_files,
+            clipboard::clipboard_has_files,
+            file_ops::copy_files_with_progress,
+            file_ops::move_files_with_progress,
+            file_ops::cancel_file_op,
+            file_ops::check_conflicts,
             git::git_repo_info,
             git::git_status,
             git::git_stage,
@@ -131,6 +145,31 @@ pub fn run() {
             fonts::list_system_fonts,
             fonts::install_custom_font,
             fonts::remove_custom_font,
+            context_ops::get_open_with_apps,
+            context_ops::open_with,
+            context_ops::open_with_dialog,
+            context_ops::get_send_to_items,
+            context_ops::send_to,
+            context_ops::compress_to_zip,
+            context_ops::extract_zip,
+            context_ops::create_shortcut,
+            context_ops::list_subdirs,
+            properties::get_drive_properties,
+            properties::get_all_drive_properties,
+            properties::get_file_properties,
+            properties::set_file_attribute,
+            properties::search_with_filters,
+            extras::list_recycle_bin,
+            extras::empty_recycle_bin,
+            extras::restore_from_bin,
+            extras::create_symlink,
+            extras::permanent_delete,
+            extras::search_file_contents,
+            extras::get_weather,
+            extras::send_media_key,
+            extras::toggle_fullscreen,
+            extras::get_spotify_status,
+            extras::get_system_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

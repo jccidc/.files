@@ -28,3 +28,15 @@ export async function getKnownFolderPaths(): Promise<[string, string][]> {
 export async function readFileBytes(path: string): Promise<string> {
   return invoke('read_file_bytes', { path });
 }
+
+export async function createFolder(parent: string, name: string): Promise<string> {
+  return invoke('create_folder', { parent, name });
+}
+
+export async function createFile(parent: string, name: string): Promise<string> {
+  return invoke('create_file', { parent, name });
+}
+
+export async function batchFolderSizes(paths: string[]): Promise<[string, number][]> {
+  return invoke('batch_folder_sizes', { paths });
+}

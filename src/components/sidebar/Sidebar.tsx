@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useLayoutStore } from '../../stores/layout';
 import { useExplorerStore, useActiveExplorerState } from '../../stores/explorer';
+import { usePanelsStore } from '../../stores/panels';
 import { getDrives, getKnownFolderPaths, readDir } from '../../api/filesystem';
 import { useSettingsStore } from '../../stores/settings';
 import { useGitStore } from '../../stores/git';
@@ -206,14 +207,22 @@ function SectionLabel({ text, collapsed, onToggle, onPointerDown, dragOver, drag
 
 export function Sidebar() {
   const { sidebarWidth, setSidebarWidth } = useLayoutStore();
-  const { currentPath, tabId: activeTabId } = useActiveExplorerState();
+  const { currentPath } = useActiveExplorerState();
   const navigate = (path: string) => {
-    const tid = activeTabId || useExplorerStore.getState().activeTabId;
+    // Use the focused panel's active tab, not explorer store's activeTabId
+    const focusedTab = usePanelsStore.getState().getFocusedActiveTab();
+    const tid = focusedTab?.id || useExplorerStore.getState().activeTabId;
     if (tid) useExplorerStore.getState().navigate(tid, path);
   };
   const pinnedPaths = useSettingsStore((s) => s.settings.pinned_paths) || [];
   const updateSettings = useSettingsStore((s) => s.update);
-  const sectionOrder = useSettingsStore((s) => s.settings.sidebar_section_order) || ['sources', 'cloud', 'quick-access', 'git'];
+  const ALL_SECTIONS = ['home', 'folders', 'this-pc', 'recents', 'quick-access', 'sources', 'cloud', 'git'];
+  const savedOrder = useSettingsStore((s) => s.settings.sidebar_section_order) || [];
+  // Merge: keep saved order, prepend any new sections that aren't in the saved list
+  const sectionOrder = [
+    ...ALL_SECTIONS.filter((s) => !savedOrder.includes(s)),
+    ...savedOrder,
+  ];
   const isGitRepo = useGitStore((s) => s.repoInfo?.is_repo ?? false);
   const checkRepo = useGitStore((s) => s.checkRepo);
 
@@ -231,10 +240,18 @@ export function Sidebar() {
   const startW = useRef(0);
   const dragStartY = useRef(0);
 
+  const lastDriveJson = useRef('');
   const refreshDrives = useCallback(() => {
     getDrives()
-      .then(setDrives)
-      .catch(() => setDrives([{ letter: 'C:\\', drive_type: 'fixed', label: 'Local Disk (C:)', is_cloud: false }]));
+      .then((newDrives) => {
+        // Only update state if drives actually changed (prevents sidebar re-render blink)
+        const json = JSON.stringify(newDrives.map((d) => d.letter + d.label));
+        if (json !== lastDriveJson.current) {
+          lastDriveJson.current = json;
+          setDrives(newDrives);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -242,7 +259,18 @@ export function Sidebar() {
 
     getKnownFolderPaths()
       .then((folders) => {
-        setQuickAccessDefaults(folders.map(([label, path]) => ({ label, path })));
+        const defaults = folders.map(([label, path]) => ({ label, path }));
+        // Add Pictures, Music, Videos if they exist
+        const home = folders.find(([l]) => l === 'Desktop')?.[1]?.replace(/\\Desktop$/, '') || '';
+        if (home) {
+          for (const extra of ['Pictures', 'Music', 'Videos']) {
+            const extraPath = home + '\\' + extra;
+            if (!defaults.find((d) => d.label === extra)) {
+              defaults.push({ label: extra, path: extraPath });
+            }
+          }
+        }
+        setQuickAccessDefaults(defaults);
       })
       .catch(() => {
         const home = 'C:\\Users\\Public';
@@ -250,11 +278,14 @@ export function Sidebar() {
           { label: 'Desktop', path: home + '\\Desktop' },
           { label: 'Documents', path: home + '\\Documents' },
           { label: 'Downloads', path: home + '\\Downloads' },
+          { label: 'Pictures', path: home + '\\Pictures' },
+          { label: 'Music', path: home + '\\Music' },
+          { label: 'Videos', path: home + '\\Videos' },
         ]);
       });
 
     // Poll for drive changes every 5 seconds (hot-plug detection)
-    const interval = setInterval(refreshDrives, 5000);
+    const interval = setInterval(refreshDrives, 15000);
     return () => clearInterval(interval);
   }, [refreshDrives]);
 
@@ -445,6 +476,155 @@ export function Sidebar() {
   });
 
   const sections: Record<string, () => React.ReactNode> = {
+    home: () => (
+      <div key="home" ref={(el) => { sectionRefs.current['home'] = el; }}>
+        <div
+          onClick={() => {
+            const home = quickAccessDefaults.find((q) => q.label === 'Desktop')?.path?.replace(/\\Desktop$/, '') || 'C:\\Users\\Public';
+            navigate(home);
+          }}
+          style={{
+            ...itemStyle,
+            fontWeight: 500,
+            gap: 8,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--t1)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--t2)'; }}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--accent)" strokeWidth="1.3">
+            <path d="M2 8l6-5.5L14 8" /><path d="M3.5 8.5V13.5a1 1 0 001 1h2.5v-3.5h2v3.5h2.5a1 1 0 001-1V8.5" />
+          </svg>
+          <span>Home</span>
+        </div>
+      </div>
+    ),
+    folders: () => {
+      const hiddenFolders: string[] = (useSettingsStore.getState().settings as any).hidden_sidebar_folders || [];
+      const FolderIcon = ({ label }: { label: string }) => {
+        const s = { width: 14, height: 14, flexShrink: 0 as const };
+        switch (label) {
+          case 'Desktop': return <svg {...s} viewBox="0 0 16 16" fill="none" stroke="var(--cyan)" strokeWidth="1.3"><rect x="1" y="2" width="14" height="9" rx="1.5" /><line x1="5" y1="14" x2="11" y2="14" /><line x1="8" y1="11" x2="8" y2="14" /></svg>;
+          case 'Documents': return <svg {...s} viewBox="0 0 16 16" fill="none" stroke="var(--blue, #60a5fa)" strokeWidth="1.3"><path d="M4 1.5h5l4 4V14.5H4V1.5z" /><polyline points="9,1.5 9,5.5 13,5.5" /><line x1="6" y1="8" x2="11" y2="8" /><line x1="6" y1="10.5" x2="11" y2="10.5" /></svg>;
+          case 'Downloads': return <svg {...s} viewBox="0 0 16 16" fill="none" stroke="var(--green)" strokeWidth="1.3"><path d="M8 1v8" /><polyline points="5,6 8,9 11,6" /><path d="M2 11v3h12v-3" /></svg>;
+          case 'Pictures': return <svg {...s} viewBox="0 0 16 16" fill="none" stroke="var(--purple, #a78bfa)" strokeWidth="1.3"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" /><circle cx="5" cy="6" r="1.5" /><polyline points="1.5,11 5,8 8,11 11,7 14.5,11" /></svg>;
+          case 'Music': return <svg {...s} viewBox="0 0 16 16" fill="none" stroke="var(--pink, #f472b6)" strokeWidth="1.3"><path d="M6 12V4l8-2v8" /><circle cx="4" cy="12" r="2" /><circle cx="12" cy="10" r="2" /></svg>;
+          case 'Videos': return <svg {...s} viewBox="0 0 16 16" fill="none" stroke="var(--red, #f87171)" strokeWidth="1.3"><rect x="1.5" y="3" width="10" height="10" rx="1.5" /><polygon points="14.5,5 14.5,11 11.5,9 11.5,7" fill="var(--red, #f87171)" /></svg>;
+          case 'Recycle Bin': return <svg {...s} viewBox="0 0 16 16" fill="none" stroke="var(--t3)" strokeWidth="1.3"><path d="M3 4h10l-1 10H4L3 4z" /><line x1="1" y1="4" x2="15" y2="4" /><path d="M6 4V2h4v2" /><line x1="6.5" y1="6.5" x2="6.5" y2="12" /><line x1="9.5" y1="6.5" x2="9.5" y2="12" /></svg>;
+          default: return <FileIcon entry={{ name: label, path: '', is_dir: true, is_hidden: false, is_symlink: false, size: 0, modified: '', created: '', extension: null, readonly: false, children_count: null }} size={14} />;
+        }
+      };
+
+      const allFolders = [
+        ...quickAccessDefaults,
+        { label: 'Recycle Bin', path: 'recycle-bin' },
+      ].filter((f) => !hiddenFolders.includes(f.label));
+
+      return (
+        <div key="folders" ref={(el) => { sectionRefs.current['folders'] = el; }}>
+          {allFolders.map((qa) => (
+            <div
+              key={qa.path}
+              onClick={() => navigate(qa.path)}
+              style={{ ...itemStyle, gap: 8 }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--t1)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--t2)'; }}
+              onContextMenu={(e) => e.preventDefault()}
+              onMouseDown={(e) => { if (e.button === 2) { e.preventDefault(); e.stopPropagation(); handleSidebarContextMenu(e, qa.path); } }}
+            >
+              <FolderIcon label={qa.label} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{qa.label}</span>
+            </div>
+          ))}
+        </div>
+      );
+    },
+    'this-pc': () => (
+      <div key="this-pc" ref={(el) => { sectionRefs.current['this-pc'] = el; }}>
+        <div
+          onClick={() => navigate('this-pc')}
+          style={{ ...itemStyle, fontWeight: 500, gap: 8 }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--t1)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--t2)'; }}
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--cyan)" strokeWidth="1.3">
+            <rect x="2" y="2" width="12" height="9" rx="1.5" /><line x1="5" y1="14" x2="11" y2="14" /><line x1="8" y1="11" x2="8" y2="14" />
+          </svg>
+          <span>This PC</span>
+        </div>
+      </div>
+    ),
+    recents: () => {
+      const RecentsSection = () => {
+        const [recentFiles, setRecentFiles] = useState<string[]>([]);
+        const [recentFolders, setRecentFolders] = useState<string[]>([]);
+        useEffect(() => {
+          import('../../stores/recents').then(({ useRecentsStore }) => {
+            const state = useRecentsStore.getState();
+            setRecentFiles(state.recentFiles.slice(0, 5));
+            setRecentFolders(state.recentFolders.slice(0, 5));
+            const unsub = useRecentsStore.subscribe((s) => {
+              setRecentFiles(s.recentFiles.slice(0, 5));
+              setRecentFolders(s.recentFolders.slice(0, 5));
+            });
+            return () => unsub();
+          });
+        }, []);
+
+        if (recentFiles.length === 0 && recentFolders.length === 0) return null;
+
+        const getLabel = (p: string) => {
+          const segs = p.replace(/\\/g, '/').split('/').filter(Boolean);
+          return segs[segs.length - 1] || p;
+        };
+
+        return (
+          <>
+            {recentFolders.map((p) => (
+              <div
+                key={p}
+                onClick={() => navigate(p)}
+                style={{ ...itemStyle, gap: 8, paddingLeft: 16 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--t1)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--t2)'; }}
+                title={p}
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--t3)" stroke="none" style={{ flexShrink: 0, opacity: 0.6 }}>
+                  <path d="M1.5 3a1 1 0 011-1H6l1.5 1.5H13.5a1 1 0 011 1V13a1 1 0 01-1 1h-12a1 1 0 01-1-1V3z" />
+                </svg>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getLabel(p)}</span>
+              </div>
+            ))}
+            {recentFiles.map((p) => (
+              <div
+                key={p}
+                onClick={async () => {
+                  try {
+                    const { openFile } = await import('../../api/shell');
+                    await openFile(p);
+                  } catch {}
+                }}
+                style={{ ...itemStyle, gap: 8, paddingLeft: 16 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--t1)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--t2)'; }}
+                title={p}
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--t3)" strokeWidth="1.3" style={{ flexShrink: 0, opacity: 0.6 }}>
+                  <rect x="3" y="1.5" width="10" height="13" rx="1.5" /><line x1="5.5" y1="5" x2="10.5" y2="5" /><line x1="5.5" y1="7.5" x2="10.5" y2="7.5" /><line x1="5.5" y1="10" x2="8.5" y2="10" />
+                </svg>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getLabel(p)}</span>
+              </div>
+            ))}
+          </>
+        );
+      };
+
+      return (
+        <div key="recents" ref={(el) => { sectionRefs.current['recents'] = el; }}>
+          <SectionLabel text="Recent" collapsed={collapsed.recents} onToggle={() => toggleCollapsed('recents')} {...makeDragProps('recents')} />
+          {!collapsed.recents && <RecentsSection />}
+        </div>
+      );
+    },
     sources: () => (
       <div key="sources" ref={(el) => { sectionRefs.current['sources'] = el; }}>
         <SectionLabel text="Sources" collapsed={collapsed.sources} onToggle={() => toggleCollapsed('sources')} {...makeDragProps('sources')} />
@@ -493,17 +673,11 @@ export function Sidebar() {
         <SectionLabel text="Quick Access" collapsed={collapsed['quick-access']} onToggle={() => toggleCollapsed('quick-access')} {...makeDragProps('quick-access')} />
         {!collapsed['quick-access'] && (
           <>
-            {quickAccessDefaults.map((qa) => (
-              <FolderTreeItem
-                key={qa.path}
-                path={qa.path}
-                label={qa.label}
-                icon={<FileIcon entry={{ name: qa.label, path: qa.path, is_dir: true, is_hidden: false, is_symlink: false, size: 0, modified: '', created: '', extension: null, readonly: false, children_count: null }} size={14} />}
-                depth={0}
-                onNavigate={navigate}
-                onContextMenu={handleSidebarContextMenu}
-              />
-            ))}
+            {pinnedPaths.length === 0 && (
+              <div style={{ padding: '4px 12px', fontSize: 11, color: 'var(--t3)', fontStyle: 'italic' }}>
+                Right-click folders to pin here
+              </div>
+            )}
             {pinnedPaths.map((p, idx) => (
               <div
                 key={p}
@@ -575,6 +749,7 @@ export function Sidebar() {
 
   return (
     <div
+      data-sidebar
       style={{
         width: sidebarWidth,
         minWidth: sidebarWidth,
@@ -625,6 +800,36 @@ export function Sidebar() {
             }
           }}
           isPinned={(pinnedPaths || []).includes(sidebarCtx.path)}
+          onNewTerminal={(cwd) => {
+            const state = usePanelsStore.getState();
+            const focusedPanelId = state.focusedPanelId || Object.keys(state.panels)[0];
+            if (focusedPanelId) {
+              state.addTab(focusedPanelId, {
+                id: crypto.randomUUID(), type: 'terminal', title: 'Terminal', path: cwd, pinned: false,
+              });
+            }
+          }}
+          onProperties={async (p) => {
+            try {
+              const { showProperties } = await import('../../api/shell');
+              showProperties(p);
+            } catch {}
+          }}
+          onNewFolder={async (parentPath) => {
+            try {
+              const { createFolder } = await import('../../api/filesystem');
+              await createFolder(parentPath, 'New folder');
+            } catch {}
+          }}
+          onCompressZip={async (p) => {
+            try {
+              const { compressToZip } = await import('../../api/contextOps');
+              const name = p.replace(/.*[\\/]/, '');
+              const parent = p.replace(/[\\/][^\\/]+$/, '');
+              const zipPath = parent + '\\' + name + '.zip';
+              await compressToZip([p], zipPath);
+            } catch {}
+          }}
         />
       )}
     </div>

@@ -271,7 +271,7 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
   const goForward = () => useExplorerStore.getState().goForward(tabId);
   const goUp = () => useExplorerStore.getState().goUp(tabId);
   const goHome = () => useExplorerStore.getState().goHome(tabId);
-  const setViewMode = (mode: 'list' | 'grid') => useExplorerStore.getState().setViewMode(tabId, mode);
+  const setViewMode = (mode: string) => useExplorerStore.getState().setViewMode(tabId, mode as any);
   const copyPaths = (paths: string[]) => useExplorerStore.getState().copyPaths(paths);
   const cutPaths = (paths: string[]) => useExplorerStore.getState().cutPaths(paths);
   const paste = () => useExplorerStore.getState().paste(tabId);
@@ -363,7 +363,7 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
   const segments = currentPath.replace(/\\/g, '/').split('/').filter(Boolean);
 
   return (
-    <div style={{
+    <div data-toolbar style={{
       background: 'var(--toolbar-bg, var(--base))',
       borderBottom: '1px solid var(--border)',
       display: 'flex',
@@ -495,6 +495,54 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
           <IconGrid />
         </button>
         <button
+          style={viewMode === 'columns' ? btnActive : btnBase}
+          onClick={() => setViewMode('columns')}
+          onMouseEnter={handleBtnHover}
+          onMouseLeave={(e) => handleBtnLeave(e, viewMode === 'columns')}
+          title="Columns view"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1" y="1" width="3" height="12" rx="0.5" /><rect x="5.5" y="1" width="3" height="12" rx="0.5" /><rect x="10" y="1" width="3" height="12" rx="0.5" /></svg>
+        </button>
+        <button
+          style={viewMode === 'gallery' ? btnActive : btnBase}
+          onClick={() => setViewMode('gallery')}
+          onMouseEnter={handleBtnHover}
+          onMouseLeave={(e) => handleBtnLeave(e, viewMode === 'gallery')}
+          title="Gallery view"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1" y="1" width="12" height="8" rx="1" /><rect x="2" y="11" width="2" height="2" rx="0.5" /><rect x="5" y="11" width="2" height="2" rx="0.5" /><rect x="8" y="11" width="2" height="2" rx="0.5" /><rect x="11" y="11" width="2" height="2" rx="0.5" /></svg>
+        </button>
+        <button
+          style={viewMode === 'tiles' ? btnActive : btnBase}
+          onClick={() => setViewMode('tiles')}
+          onMouseEnter={handleBtnHover}
+          onMouseLeave={(e) => handleBtnLeave(e, viewMode === 'tiles')}
+          title="Tiles view"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1" y="1" width="5" height="5" rx="0.5" /><rect x="8" y="1" width="5" height="5" rx="0.5" /><rect x="1" y="8" width="5" height="5" rx="0.5" /><rect x="8" y="8" width="5" height="5" rx="0.5" /></svg>
+        </button>
+        <button
+          style={viewMode === 'flat' ? btnActive : btnBase}
+          onClick={() => setViewMode('flat')}
+          onMouseEnter={handleBtnHover}
+          onMouseLeave={(e) => handleBtnLeave(e, viewMode === 'flat')}
+          title="Flat view (all files recursive)"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2"><line x1="1" y1="3" x2="13" y2="3" /><line x1="1" y1="6" x2="13" y2="6" /><line x1="1" y1="9" x2="13" y2="9" /><line x1="1" y1="12" x2="13" y2="12" /></svg>
+        </button>
+        <button
+          style={viewMode === 'treemap' ? btnActive : btnBase}
+          onClick={() => setViewMode('treemap')}
+          onMouseEnter={handleBtnHover}
+          onMouseLeave={(e) => handleBtnLeave(e, viewMode === 'treemap')}
+          title="Treemap view (disk space visualization)"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2"><rect x="1" y="1" width="7" height="8" rx="0.5" /><rect x="9" y="1" width="4" height="4" rx="0.5" /><rect x="9" y="6" width="4" height="3" rx="0.5" /><rect x="1" y="10" width="4" height="3" rx="0.5" /><rect x="6" y="10" width="3" height="3" rx="0.5" /><rect x="10" y="10" width="3" height="3" rx="0.5" /></svg>
+        </button>
+
+        <div style={dividerStyle} />
+
+        <button
           style={previewVisible ? btnActive : btnBase}
           onClick={togglePreview}
           onMouseEnter={handleBtnHover}
@@ -623,7 +671,7 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
       </div>
 
       {/* Bottom row: breadcrumb / editable path bar */}
-      <div style={{
+      <div data-breadcrumb style={{
         display: 'flex', alignItems: 'center', gap: 2, padding: '4px 8px',
         borderTop: '1px solid var(--border)', fontSize: 12, overflow: 'hidden',
         minHeight: 30,

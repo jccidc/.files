@@ -22,6 +22,15 @@ interface ContextMenuProps {
   onPaste?: () => void;
   canPaste?: boolean;
   selectedCount?: number;
+  onProperties?: (path: string) => void;
+  onNewFolder?: () => void;
+  onNewFile?: () => void;
+  onOpenWith?: (path: string) => void;
+  onCompressZip?: (paths: string[]) => void;
+  onExtractZip?: (path: string) => void;
+  onCreateShortcut?: (path: string) => void;
+  onOpenTerminalHere?: (path: string) => void;
+  selectedPaths?: string[];
 }
 
 interface MenuItem {
@@ -33,7 +42,7 @@ interface MenuItem {
   disabled?: boolean;
 }
 
-export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefresh, onNewTerminal, onPreviewInTab, onPinToQuickAccess, isPinned, onGitStage, onGitDiscard, gitFileStatus, onCut, onCopy, onPaste, canPaste }: ContextMenuProps) {
+export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefresh, onNewTerminal, onPreviewInTab, onPinToQuickAccess, isPinned, onGitStage, onGitDiscard, gitFileStatus, onCut, onCopy, onPaste, canPaste, onProperties, onNewFolder, onNewFile, onOpenWith, onCompressZip, onExtractZip, onCreateShortcut, onOpenTerminalHere: _onOpenTerminalHere, selectedPaths }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,6 +78,10 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
     if (!entry.is_dir && onPreviewInTab) {
       items.push({ label: 'Preview in Tab', action: () => { onPreviewInTab(entry); onClose(); } });
     }
+    // Open With (for files only)
+    if (!entry.is_dir && onOpenWith) {
+      items.push({ label: 'Open With...', action: () => { onOpenWith(entry.path); onClose(); } });
+    }
     items.push({ label: '', action: () => {}, separator: true });
 
     // Cut / Copy / Paste
@@ -95,6 +108,7 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
     items.push({ label: '', action: () => {}, separator: true });
 
     // Path / Explorer / Pin
+    items.push({ label: 'Copy Name', action: () => { navigator.clipboard.writeText(entry.name); onClose(); } });
     items.push({ label: 'Copy Path', shortcut: 'Ctrl+Shift+C', action: () => { onCopyPath(entry.path); onClose(); } });
     items.push({ label: 'Show in Explorer', action: () => {
       import('../../api/shell').then(({ openInExplorer }) => openInExplorer(entry.path));
@@ -108,6 +122,18 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
       });
     }
 
+    // Compress / Extract / Create Shortcut
+    if (onCompressZip) {
+      const paths = selectedPaths && selectedPaths.length > 1 ? selectedPaths : [entry.path];
+      items.push({ label: 'Compress to ZIP', action: () => { onCompressZip(paths); onClose(); } });
+    }
+    if (onExtractZip && !entry.is_dir && (entry.extension || '').toLowerCase() === 'zip') {
+      items.push({ label: 'Extract All...', action: () => { onExtractZip(entry.path); onClose(); } });
+    }
+    if (onCreateShortcut) {
+      items.push({ label: 'Create Shortcut', action: () => { onCreateShortcut(entry.path); onClose(); } });
+    }
+
     // Git actions
     if (gitFileStatus && (onGitStage || onGitDiscard)) {
       items.push({ label: 'Git', action: () => {}, separator: true });
@@ -118,15 +144,32 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
         items.push({ label: 'Discard Changes', danger: true, action: () => { onGitDiscard(entry.path); onClose(); } });
       }
     }
+    // Properties
+    if (onProperties) {
+      items.push({ label: '', action: () => {}, separator: true });
+      items.push({ label: 'Properties', shortcut: 'Alt+Enter', action: () => { onProperties(entry.path); onClose(); } });
+    }
+
     items.push({ label: '', action: () => {}, separator: true });
+  }
+
+  // New items (always available - background or on folder)
+  if (onNewFolder || onNewFile) {
+    items.push({ label: '', action: () => {}, separator: true });
+    if (onNewFolder) {
+      items.push({ label: 'New Folder', shortcut: 'Ctrl+Shift+N', action: () => { onNewFolder(); onClose(); } });
+    }
+    if (onNewFile) {
+      items.push({ label: 'New Text File', action: () => { onNewFile(); onClose(); } });
+    }
   }
 
   items.push({ label: 'Refresh', shortcut: 'F5', action: () => { onRefresh(); onClose(); } });
 
   const menuWidth = 220;
-  const menuHeight = items.length * 32;
+  const menuHeight = items.reduce((h, item) => h + (item.separator ? 9 + (item.label ? 18 : 0) : 32), 8);
   const adjustedX = x + menuWidth > window.innerWidth ? x - menuWidth : x;
-  const adjustedY = y + menuHeight > window.innerHeight ? y - menuHeight : y;
+  const adjustedY = y + menuHeight > window.innerHeight ? Math.max(0, y - menuHeight) : y;
 
   return createPortal(
     <div

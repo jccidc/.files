@@ -156,13 +156,15 @@ export function SettingsPanel({ open, onClose }: Props) {
   const canCreate = customThemes.length < MAX_CUSTOM_THEMES;
 
   const startNewTheme = () => {
-    const baseT = THEMES[baseThemeId] || THEMES['dotfiles-dark'];
+    // Use the currently active theme as the starting point (not baseThemeId)
+    const currentThemeId = settings.theme;
+    const activeT = THEMES[currentThemeId] || customThemes.find(t => t.id === currentThemeId) || THEMES['dotfiles-dark'];
     const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     setSmartColors({
-      base: baseT.base, surface: baseT.surface, t1: baseT.t1,
-      accent: baseT.accent, border: baseT.border, warm: baseT.warm,
+      base: activeT.base, surface: activeT.surface, t1: activeT.t1,
+      accent: activeT.accent, border: activeT.border, warm: activeT.warm,
     });
-    setEditingTheme({ ...baseT, id, name: 'My Theme' });
+    setEditingTheme({ ...activeT, id, name: `${activeT.name} Copy` });
     setEditMode('smart');
   };
 
@@ -744,13 +746,24 @@ export function SettingsPanel({ open, onClose }: Props) {
               </div>
 
               {sectionTitle('Window Effect')}
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 8 }}>
                 <label style={labelStyle}>Native window vibrancy (Windows 11)</label>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {(['none', 'mica', 'mica-alt', 'acrylic', 'tabbed'] as const).map((fx) => (
                     <button
                       key={fx}
-                      onClick={() => update({ window_effect: fx })}
+                      onClick={() => {
+                        const updates: Record<string, any> = { window_effect: fx };
+                        // Auto-lower opacity when enabling an effect for the first time
+                        if (fx !== 'none' && (settings.base_opacity ?? 1) > 0.85) {
+                          updates.base_opacity = fx === 'acrylic' ? 0.6 : 0.75;
+                        }
+                        // Restore opacity when switching back to none
+                        if (fx === 'none' && (settings.base_opacity ?? 1) < 0.9) {
+                          updates.base_opacity = 1.0;
+                        }
+                        update(updates);
+                      }}
                       style={{
                         padding: '6px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer',
                         border: settings.window_effect === fx ? '1px solid var(--accent)' : '1px solid var(--border)',
@@ -763,9 +776,19 @@ export function SettingsPanel({ open, onClose }: Props) {
                     </button>
                   ))}
                 </div>
+                {settings.window_effect && settings.window_effect !== 'none' && (settings.base_opacity ?? 1) > 0.85 && (
+                  <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 6 }}>
+                    Tip: Lower the Base Opacity below to see the {settings.window_effect} effect through the window.
+                  </div>
+                )}
+                <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 4 }}>
+                  {settings.window_effect === 'mica' ? 'Subtle tint sampled from your desktop wallpaper' :
+                   settings.window_effect === 'mica-alt' ? 'Stronger wallpaper tint with more contrast' :
+                   settings.window_effect === 'acrylic' ? 'Frosted glass blur effect — best with low opacity' :
+                   settings.window_effect === 'tabbed' ? 'System tabbed window style with subtle tinting' :
+                   'Solid background, no transparency'}
+                </div>
               </div>
-
-              {sectionTitle('Window Transparency')}
               <div style={{ marginBottom: 8 }}>
                 <label style={labelStyle}>Base Opacity: {Math.round((settings.base_opacity ?? 1) * 100)}%</label>
                 <input
@@ -773,7 +796,6 @@ export function SettingsPanel({ open, onClose }: Props) {
                   onChange={(e) => update({ base_opacity: Number(e.target.value) / 100 })}
                   style={{ width: '100%', accentColor: 'var(--accent)' }}
                 />
-                <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 2 }}>Controls how much desktop shows through. Works best with Acrylic effect.</div>
               </div>
 
               {sectionTitle('Panel Opacity')}
@@ -840,6 +862,73 @@ export function SettingsPanel({ open, onClose }: Props) {
                   />
                 </div>
               )}
+
+              {sectionTitle('Radical Theming')}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <label style={{ ...labelStyle, marginBottom: 0, flex: 1 }}>Secondary Accent</label>
+                  <input
+                    type="color"
+                    value={settings.accent_secondary || '#A78BFA'}
+                    onChange={(e) => update({ accent_secondary: e.target.value })}
+                    style={{ width: 28, height: 28, border: 'none', cursor: 'pointer', background: 'transparent', padding: 0 }}
+                  />
+                </div>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Gradient Accent</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>Blend primary to secondary accent across selections</div>
+                </div>
+                <button style={toggleStyle(!!settings.gradient_accent)} onClick={() => update({ gradient_accent: !settings.gradient_accent })}>
+                  <div style={toggleDot(!!settings.gradient_accent)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Selection Glow</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>Pulsing glow ring around selected files</div>
+                </div>
+                <button style={toggleStyle(!!settings.selection_glow)} onClick={() => update({ selection_glow: !settings.selection_glow })}>
+                  <div style={toggleDot(!!settings.selection_glow)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Neon Mode</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>Glowing borders and text shadows on active elements</div>
+                </div>
+                <button style={toggleStyle(!!settings.neon_mode)} onClick={() => update({ neon_mode: !settings.neon_mode })}>
+                  <div style={toggleDot(!!settings.neon_mode)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Accent-Tinted Text</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>File names subtly tinted toward accent color</div>
+                </div>
+                <button style={toggleStyle(!!settings.accent_tinted_text)} onClick={() => update({ accent_tinted_text: !settings.accent_tinted_text })}>
+                  <div style={toggleDot(!!settings.accent_tinted_text)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Rainbow Folders</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>Each folder gets a unique color from a palette</div>
+                </div>
+                <button style={toggleStyle(!!settings.rainbow_folders)} onClick={() => update({ rainbow_folders: !settings.rainbow_folders })}>
+                  <div style={toggleDot(!!settings.rainbow_folders)} />
+                </button>
+              </div>
+              <div style={rowStyle}>
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--t1)' }}>Adaptive Accent</span>
+                  <div style={{ fontSize: 10, color: 'var(--t3)' }}>File name color shifts by file extension/type</div>
+                </div>
+                <button style={toggleStyle(!!settings.adaptive_accent)} onClick={() => update({ adaptive_accent: !settings.adaptive_accent })}>
+                  <div style={toggleDot(!!settings.adaptive_accent)} />
+                </button>
+              </div>
 
               {sectionTitle('Layout & Shape')}
               <div style={{ marginBottom: 16 }}>
@@ -1181,6 +1270,107 @@ export function SettingsPanel({ open, onClose }: Props) {
                   <div style={toggleDot(isDefaultHandler)} />
                 </button>
               </div>
+              {sectionTitle('Widgets')}
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>Place widgets in the titlebar or footer. Bible verse is always in the titlebar.</div>
+              {[
+                { id: 'verse', label: 'Daily Bible Verse' },
+                { id: 'clock', label: 'Flip Clock' },
+                { id: 'weather', label: 'Weather' },
+                { id: 'spotify', label: 'Spotify Now Playing' },
+                { id: 'system', label: 'CPU / RAM / Battery' },
+                { id: 'disk', label: 'Disk Space' },
+              ].map((w) => {
+                const tbWidgets: string[] = (settings as any).titlebar_widgets || ['verse', 'clock', 'weather'];
+                const ftWidgets: string[] = (settings as any).footer_widgets || ['spotify', 'system', 'disk'];
+                const location = tbWidgets.includes(w.id) ? 'titlebar' : ftWidgets.includes(w.id) ? 'footer' : 'off';
+                return (
+                  <div key={w.id} style={rowStyle}>
+                    <span style={{ fontSize: 12, color: 'var(--t1)' }}>{w.label}</span>
+                    <select
+                      value={location}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        let tb = tbWidgets.filter((id: string) => id !== w.id);
+                        let ft = ftWidgets.filter((id: string) => id !== w.id);
+                        if (val === 'titlebar') tb.push(w.id);
+                        if (val === 'footer') ft.push(w.id);
+                        update({ titlebar_widgets: tb, footer_widgets: ft } as any);
+                      }}
+                      style={{ ...selectStyle, width: 100 }}
+                    >
+                      <option value="off">Off</option>
+                      <option value="titlebar">Titlebar</option>
+                      <option value="footer">Footer</option>
+                    </select>
+                  </div>
+                );
+              })}
+
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>Widget Alignment</span>
+                <select value={(settings as any).widget_alignment || 'left'} onChange={(e) => update({ widget_alignment: e.target.value } as any)} style={{ ...selectStyle, width: 100 }}>
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                  <option value="right">Right</option>
+                </select>
+              </div>
+
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>Clock Format</span>
+                <select value={(settings as any).clock_format || '12h'} onChange={(e) => update({ clock_format: e.target.value } as any)} style={{ ...selectStyle, width: 80 }}>
+                  <option value="12h">12-hour</option>
+                  <option value="24h">24-hour</option>
+                </select>
+              </div>
+
+              {sectionTitle('Weather')}
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>Show live weather in the titlebar</div>
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>ZIP Code</span>
+                <input
+                  type="text"
+                  placeholder="e.g. 46321"
+                  value={(settings as any).weather_zip || ''}
+                  onChange={(e) => update({ weather_zip: e.target.value } as any)}
+                  style={{
+                    width: 80, padding: '4px 8px', fontSize: 12,
+                    background: 'var(--deep)', border: '1px solid var(--border)',
+                    borderRadius: 4, color: 'var(--t1)', fontFamily: 'inherit',
+                    outline: 'none',
+                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+                />
+              </div>
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>Temperature Unit</span>
+                <select value={(settings as any).weather_unit || 'f'} onChange={(e) => update({ weather_unit: e.target.value } as any)} style={{ ...selectStyle, width: 100 }}>
+                  <option value="f">Fahrenheit</option>
+                  <option value="c">Celsius</option>
+                </select>
+              </div>
+
+              {sectionTitle('Sidebar Folders')}
+              <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>Choose which folders appear in the sidebar</div>
+              {['Desktop', 'Documents', 'Downloads', 'Pictures', 'Music', 'Videos', 'Recycle Bin'].map((folder) => {
+                const hidden: string[] = (settings as any).hidden_sidebar_folders || [];
+                const isVisible = !hidden.includes(folder);
+                return (
+                  <div key={folder} style={rowStyle}>
+                    <span style={{ fontSize: 12, color: 'var(--t1)' }}>{folder}</span>
+                    <button style={toggleStyle(isVisible)} onClick={() => {
+                      const current: string[] = (settings as any).hidden_sidebar_folders || [];
+                      if (isVisible) {
+                        update({ hidden_sidebar_folders: [...current, folder] } as any);
+                      } else {
+                        update({ hidden_sidebar_folders: current.filter((f: string) => f !== folder) } as any);
+                      }
+                    }}>
+                      <div style={toggleDot(isVisible)} />
+                    </button>
+                  </div>
+                );
+              })}
             </>
           )}
 
