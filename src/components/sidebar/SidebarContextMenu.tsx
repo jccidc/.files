@@ -17,7 +17,7 @@ interface SidebarContextMenuProps {
   onProperties?: (path: string) => void;
   onNewFolder?: (parentPath: string) => void;
   onNewTerminal?: (path: string) => void;
-  onCompressZip?: (path: string) => void;
+  onCompress?: (path: string, format: string) => void;
 }
 
 interface MenuItem {
@@ -28,7 +28,7 @@ interface MenuItem {
   disabled?: boolean;
 }
 
-export function SidebarContextMenu({ x, y, path, isDir, onClose, onOpen, onOpenInTerminal, onCopyPath, onRename, onDelete, onPinToggle, isPinned, onProperties, onNewFolder, onNewTerminal, onCompressZip }: SidebarContextMenuProps) {
+export function SidebarContextMenu({ x, y, path, isDir, onClose, onOpen, onOpenInTerminal, onCopyPath, onRename, onDelete, onPinToggle, isPinned, onProperties, onNewFolder, onNewTerminal, onCompress }: SidebarContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -72,8 +72,9 @@ export function SidebarContextMenu({ x, y, path, isDir, onClose, onOpen, onOpenI
   }
 
   // Compress
-  if (onCompressZip) {
-    items.push({ label: 'Compress to ZIP', action: () => { onCompressZip(path); onClose(); } });
+  if (onCompress) {
+    items.push({ label: 'Compress to ZIP', action: () => { onCompress(path, 'zip'); onClose(); } });
+    items.push({ label: 'Compress to 7z', action: () => { onCompress(path, '7z'); onClose(); } });
   }
 
   if (isDir && onPinToggle) {

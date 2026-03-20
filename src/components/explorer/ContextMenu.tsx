@@ -27,8 +27,8 @@ interface ContextMenuProps {
   onNewFolder?: () => void;
   onNewFile?: () => void;
   onOpenWith?: (path: string) => void;
-  onCompressZip?: (paths: string[]) => void;
-  onExtractZip?: (path: string) => void;
+  onCompress?: (paths: string[], format: string) => void;
+  onExtract?: (path: string, dest?: string) => void;
   onCreateShortcut?: (path: string) => void;
   onOpenTerminalHere?: (path: string) => void;
   selectedPaths?: string[];
@@ -46,7 +46,7 @@ interface MenuItem {
   submenu?: { label: string; icon?: string; action: () => void; active?: boolean }[];
 }
 
-export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefresh, onNewTerminal, onPreviewInTab, onPinToQuickAccess, isPinned, onGitStage, onGitDiscard, gitFileStatus, onCut, onCopy, onPaste, canPaste, onProperties, onNewFolder, onNewFile, onOpenWith, onCompressZip, onExtractZip, onCreateShortcut, onOpenTerminalHere: _onOpenTerminalHere, selectedPaths, onTag, currentTags }: ContextMenuProps) {
+export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefresh, onNewTerminal, onPreviewInTab, onPinToQuickAccess, isPinned, onGitStage, onGitDiscard, gitFileStatus, onCut, onCopy, onPaste, canPaste, onProperties, onNewFolder, onNewFile, onOpenWith, onCompress, onExtract, onCreateShortcut, onOpenTerminalHere: _onOpenTerminalHere, selectedPaths, onTag, currentTags }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -127,12 +127,24 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
     }
 
     // Compress / Extract / Create Shortcut
-    if (onCompressZip) {
+    if (onCompress) {
       const paths = selectedPaths && selectedPaths.length > 1 ? selectedPaths : [entry.path];
-      items.push({ label: 'Compress to ZIP', action: () => { onCompressZip(paths); onClose(); } });
+      items.push({
+        label: 'Compress to...',
+        action: () => {},
+        submenu: [
+          { label: 'ZIP archive', action: () => { onCompress(paths, 'zip'); onClose(); } },
+          { label: '7z archive', action: () => { onCompress(paths, '7z'); onClose(); } },
+        ],
+      });
     }
-    if (onExtractZip && !entry.is_dir && (entry.extension || '').toLowerCase() === 'zip') {
-      items.push({ label: 'Extract All...', action: () => { onExtractZip(entry.path); onClose(); } });
+    const archiveExts = ['zip', '7z', 'tar', 'gz', 'tgz', 'bz2', 'tbz2'];
+    const ext = (entry.extension || '').toLowerCase();
+    const isArchive = !entry.is_dir && archiveExts.includes(ext);
+    if (onExtract && isArchive) {
+      const stem = entry.name.replace(/\.(tar\.(gz|bz2|xz)|tgz|tbz2|zip|7z|gz|bz2)$/i, '');
+      items.push({ label: 'Extract Here', action: () => { onExtract(entry.path, '__current__'); onClose(); } });
+      items.push({ label: `Extract to ${stem}/`, action: () => { onExtract(entry.path); onClose(); } });
     }
     if (onCreateShortcut) {
       items.push({ label: 'Create Shortcut', action: () => { onCreateShortcut(entry.path); onClose(); } });

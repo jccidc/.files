@@ -295,6 +295,11 @@ pub async fn search_with_filters(
             dt.to_rfc3339()
         }).unwrap_or_default();
 
+        let accessed_str = meta.accessed().ok().map(|t| {
+            let dt: chrono::DateTime<chrono::Local> = t.into();
+            dt.to_rfc3339()
+        }).unwrap_or_default();
+
         results.push(crate::models::file_entry::FileEntry {
             name: name.to_string(),
             path: entry_path.to_string_lossy().to_string(),
@@ -304,6 +309,7 @@ pub async fn search_with_filters(
             size: meta.len(),
             modified: modified_str,
             created: created_str,
+            accessed: accessed_str,
             extension: entry_path.extension().map(|e| e.to_string_lossy().to_string()),
             readonly: meta.permissions().readonly(),
             children_count: None,

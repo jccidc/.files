@@ -510,7 +510,7 @@ export function Sidebar() {
           case 'Music': return <svg {...s} viewBox="0 0 16 16" fill="none" stroke="var(--pink, #f472b6)" strokeWidth="1.3"><path d="M6 12V4l8-2v8" /><circle cx="4" cy="12" r="2" /><circle cx="12" cy="10" r="2" /></svg>;
           case 'Videos': return <svg {...s} viewBox="0 0 16 16" fill="none" stroke="var(--red, #f87171)" strokeWidth="1.3"><rect x="1.5" y="3" width="10" height="10" rx="1.5" /><polygon points="14.5,5 14.5,11 11.5,9 11.5,7" fill="var(--red, #f87171)" /></svg>;
           case 'Recycle Bin': return <svg {...s} viewBox="0 0 16 16" fill="none" stroke="var(--t3)" strokeWidth="1.3"><path d="M3 4h10l-1 10H4L3 4z" /><line x1="1" y1="4" x2="15" y2="4" /><path d="M6 4V2h4v2" /><line x1="6.5" y1="6.5" x2="6.5" y2="12" /><line x1="9.5" y1="6.5" x2="9.5" y2="12" /></svg>;
-          default: return <FileIcon entry={{ name: label, path: '', is_dir: true, is_hidden: false, is_symlink: false, size: 0, modified: '', created: '', extension: null, readonly: false, children_count: null }} size={14} />;
+          default: return <FileIcon entry={{ name: label, path: '', is_dir: true, is_hidden: false, is_symlink: false, size: 0, modified: '', created: '', accessed: '', extension: null, readonly: false, children_count: null }} size={14} />;
         }
       };
 
@@ -821,13 +821,14 @@ export function Sidebar() {
               await createFolder(parentPath, 'New folder');
             } catch {}
           }}
-          onCompressZip={async (p) => {
+          onCompress={async (p, format) => {
             try {
-              const { compressToZip } = await import('../../api/contextOps');
+              const { compressArchive } = await import('../../api/archive');
               const name = p.replace(/.*[\\/]/, '');
               const parent = p.replace(/[\\/][^\\/]+$/, '');
-              const zipPath = parent + '\\' + name + '.zip';
-              await compressToZip([p], zipPath);
+              const ext = format === '7z' ? '.7z' : '.zip';
+              const destPath = parent + '\\' + name + ext;
+              await compressArchive([p], destPath, format);
             } catch {}
           }}
         />

@@ -1823,20 +1823,20 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
             const { openWithDialog } = await import('../../api/contextOps');
             openWithDialog(path);
           }}
-          onCompressZip={async (paths) => {
-            const { compressToZip } = await import('../../api/contextOps');
-            // Generate zip name from first item
+          onCompress={async (paths, format) => {
+            const { compressArchive } = await import('../../api/archive');
             const firstName = paths[0].replace(/.*[\\/]/, '').replace(/\.[^.]+$/, '');
-            const zipName = paths.length > 1 ? 'Archive.zip' : `${firstName}.zip`;
-            const zipPath = currentPath.replace(/\\?$/, '\\') + zipName;
-            await compressToZip(paths, zipPath);
+            const baseName = paths.length > 1 ? 'Archive' : firstName;
+            const ext = format === '7z' ? '.7z' : '.zip';
+            const destPath = currentPath.replace(/[\\/]?$/, '\\') + baseName + ext;
+            await compressArchive(paths, destPath, format);
             refresh();
           }}
-          onExtractZip={async (path) => {
-            const { extractZip } = await import('../../api/contextOps');
-            const folderName = path.replace(/.*[\\/]/, '').replace(/\.zip$/i, '');
-            const destDir = currentPath.replace(/\\?$/, '\\') + folderName;
-            await extractZip(path, destDir);
+          onExtract={async (path, dest) => {
+            const { extractArchive } = await import('../../api/archive');
+            // '__current__' means extract into the current directory
+            const extractDest = dest === '__current__' ? currentPath : undefined;
+            await extractArchive(path, extractDest);
             refresh();
           }}
           onCreateShortcut={async (path) => {

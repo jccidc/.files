@@ -53,6 +53,7 @@ export function PanelContent({ panelId }: Props) {
               size: 0,
               modified: '',
               created: '',
+              accessed: '',
               extension: activeTab.previewPath.split('.').pop() || null,
               readonly: false,
               children_count: null,
