@@ -719,15 +719,25 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const watcherIdRef = useRef(tab.id);
 
   // Column system
-  const [visibleCols, setVisibleCols] = useState<ColumnId[]>(DEFAULT_VISIBLE);
+  const [visibleCols, setVisibleCols] = useState<ColumnId[]>(() => {
+    const saved = useSettingsStore.getState().settings.column_order;
+    return saved?.length ? saved as ColumnId[] : DEFAULT_VISIBLE;
+  });
   const [colWidthOverrides, setColWidthOverrides] = useState<Record<string, number>>({});
   const [headerCtxMenu, setHeaderCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [dragColIdx, setDragColIdx] = useState<number | null>(null);
+  const [dragOverColIdx, setDragOverColIdx] = useState<number | null>(null);
 
   const activeColumns = visibleCols.map(id => ALL_COLUMNS.find(c => c.id === id)!);
 
   const getColWidth = (col: ColumnDef) => colWidthOverrides[col.id] ?? col.defaultWidth;
 
   const colWidths = activeColumns.map(c => c.defaultWidth === 0 ? '1fr' : `${getColWidth(c)}px`).join(' ');
+
+  const persistColumnOrder = useCallback((cols: ColumnId[]) => {
+    setVisibleCols(cols);
+    useSettingsStore.getState().update({ column_order: cols });
+  }, []);
 
   const resizeColumn = (colId: ColumnId, delta: number) => {
     const col = ALL_COLUMNS.find(c => c.id === colId)!;
@@ -738,13 +748,56 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   };
 
   const toggleColumn = (colId: ColumnId) => {
-    setVisibleCols(prev => {
-      if (prev.includes(colId)) return prev.filter(id => id !== colId);
-      // Insert after name, in definition order
-      const ordered = ALL_COLUMNS.map(c => c.id).filter(id => id === colId || prev.includes(id));
-      return ordered;
-    });
+    const next = visibleCols.includes(colId)
+      ? visibleCols.filter(id => id !== colId)
+      : ALL_COLUMNS.map(c => c.id).filter(id => id === colId || visibleCols.includes(id));
+    persistColumnOrder(next);
     setHeaderCtxMenu(null);
+  };
+
+  const handleColDragStart = (idx: number, e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    // Don't start drag from resize handle area (rightmost 5px)
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (e.clientX > rect.right - 8) return;
+    e.preventDefault();
+    setDragColIdx(idx);
+
+    const onMove = (ev: PointerEvent) => {
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      if (!el) { setDragOverColIdx(null); return; }
+      const header = (el as HTMLElement).closest('[data-col-idx]') as HTMLElement | null;
+      if (header) {
+        const overIdx = parseInt(header.dataset.colIdx!, 10);
+        setDragOverColIdx(overIdx !== idx ? overIdx : null);
+      } else {
+        setDragOverColIdx(null);
+      }
+    };
+
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+
+      setDragColIdx(current => {
+        setDragOverColIdx(overIdx => {
+          if (overIdx !== null && current !== null && overIdx !== current) {
+            setVisibleCols(prev => {
+              const order = [...prev];
+              const [moved] = order.splice(current, 1);
+              order.splice(overIdx, 0, moved);
+              useSettingsStore.getState().update({ column_order: order });
+              return order;
+            });
+          }
+          return null;
+        });
+        return null;
+      });
+    };
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   };
 
   // Build git status lookup: filename -> status
@@ -1413,8 +1466,15 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         {activeColumns.map((col, idx) => (
           <div
             key={col.id}
-            style={colHeaderStyle(col.sortField)}
+            data-col-idx={idx}
+            style={{
+              ...colHeaderStyle(col.sortField),
+              opacity: dragColIdx === idx ? 0.5 : 1,
+              borderLeft: dragOverColIdx === idx ? '2px solid var(--accent)' : '2px solid transparent',
+              transition: 'opacity 0.15s, border-left-color 0.15s',
+            }}
             onClick={() => col.sortField && handleSort(col.sortField)}
+            onPointerDown={(e) => handleColDragStart(idx, e)}
             {...((col.id === 'modified' || col.id === 'accessed') ? { title: 'Today = green | This week = cyan | This month = normal | 3 months = dim | Older = faded' } : {})}
           >
             {col.label} {col.sortField && sortField === col.sortField && (sortAsc ? <IconSortAsc /> : <IconSortDesc />)}

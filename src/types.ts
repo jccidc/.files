@@ -138,6 +138,7 @@ export interface AppSettings {
   weather_zip: string;
   weather_unit: string;
   hidden_sidebar_folders: string[];
+  column_order: string[];
 }
 
 export type TabType = 'explorer' | 'terminal' | 'preview';

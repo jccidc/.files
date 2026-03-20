@@ -62,6 +62,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   weather_zip: '',
   weather_unit: 'f',
   hidden_sidebar_folders: [],
+  column_order: [],
 };
 
 interface SettingsState {

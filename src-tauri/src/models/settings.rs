@@ -123,6 +123,8 @@ pub struct AppSettings {
     pub weather_unit: String,
     #[serde(default)]
     pub hidden_sidebar_folders: Vec<String>,
+    #[serde(default)]
+    pub column_order: Vec<String>,
 }
 
 fn default_theme() -> String { "dotfiles-dark".to_string() }
@@ -214,6 +216,7 @@ impl Default for AppSettings {
             weather_zip: String::new(),
             weather_unit: default_weather_unit(),
             hidden_sidebar_folders: Vec::new(),
+            column_order: Vec::new(),
         }
     }
 }
