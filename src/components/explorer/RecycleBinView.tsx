@@ -9,7 +9,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1073741824).toFixed(2)} GB`;
 }
 
-export function RecycleBinView({ onNavigate }: { onNavigate: (path: string) => void }) {
+export function RecycleBinView({ onNavigate: _onNavigate }: { onNavigate: (path: string) => void }) {
   const [items, setItems] = useState<{ name: string; path: string; size: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
