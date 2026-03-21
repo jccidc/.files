@@ -165,9 +165,7 @@ pub fn compress_to_zip(sources: Vec<String>, dest_zip: String) -> Result<String,
             let name = src_path.file_name().unwrap_or_default().to_string_lossy().to_string();
             zip_writer.start_file(&name, options).map_err(|e| e.to_string())?;
             let mut f = std::fs::File::open(src_path).map_err(|e| e.to_string())?;
-            let mut buf = Vec::new();
-            f.read_to_end(&mut buf).map_err(|e| e.to_string())?;
-            zip_writer.write_all(&buf).map_err(|e| e.to_string())?;
+            std::io::copy(&mut f, &mut zip_writer).map_err(|e| e.to_string())?;
         }
     }
 
@@ -193,9 +191,7 @@ fn add_dir_to_zip(
         } else {
             writer.start_file(&rel_str, *options).map_err(|e| e.to_string())?;
             let mut f = std::fs::File::open(&path).map_err(|e| e.to_string())?;
-            let mut buf = Vec::new();
-            f.read_to_end(&mut buf).map_err(|e| e.to_string())?;
-            writer.write_all(&buf).map_err(|e| e.to_string())?;
+            std::io::copy(&mut f, writer).map_err(|e| e.to_string())?;
         }
     }
     Ok(())
