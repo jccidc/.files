@@ -12,10 +12,10 @@ pub fn list_recycle_bin() -> Result<Vec<(String, String, String)>, String> {
     $shell = New-Object -ComObject Shell.Application
     $bin = $shell.Namespace(10)
     $bin.Items() | ForEach-Object {
-        $name = $_.Name
-        $path = $_.Path
-        $size = $_.ExtendedProperty('System.Size')
-        Write-Output "$name|$path|$size"
+        $n = $_.Name
+        $p = $_.Path
+        $s = $_.ExtendedProperty('System.Size')
+        Write-Output ($n + '|' + $p + '|' + $s)
     }
     "#;
     let output = std::process::Command::new("powershell")

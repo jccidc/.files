@@ -55,11 +55,8 @@ fn detect_format(path: &Path) -> Result<ArchiveFormat, String> {
         Ok(ArchiveFormat::Zip)
     } else if name.ends_with(".7z") {
         Ok(ArchiveFormat::SevenZ)
-    } else if name.ends_with(".gz") {
-        // Standalone .gz — treat as tar.gz (common convention)
-        Ok(ArchiveFormat::TarGz)
-    } else if name.ends_with(".bz2") {
-        Ok(ArchiveFormat::TarBz2)
+    } else if name.ends_with(".gz") || name.ends_with(".bz2") {
+        Err(format!("Standalone .gz/.bz2 not supported — only .tar.gz and .tar.bz2: {}", name))
     } else {
         Err(format!("Unsupported archive format: {}", name))
     }
@@ -95,6 +92,11 @@ fn extract_zip(path: &Path, dest: &Path) -> Result<(), String> {
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
         let outpath = dest.join(entry.mangled_name());
+
+        // Guard against path traversal (zip slip)
+        if !outpath.starts_with(dest) {
+            return Err(format!("Path traversal attempt blocked: {:?}", entry.mangled_name()));
+        }
 
         if entry.is_dir() {
             fs::create_dir_all(&outpath).map_err(|e| e.to_string())?;
@@ -162,8 +164,8 @@ fn compress_zip(paths: &[String], dest: &str) -> Result<(), String> {
                 .to_string_lossy()
                 .to_string();
             writer.start_file(&name, options).map_err(|e| e.to_string())?;
-            let data = fs::read(src_path).map_err(|e| e.to_string())?;
-            writer.write_all(&data).map_err(|e| e.to_string())?;
+            let mut f = fs::File::open(src_path).map_err(|e| e.to_string())?;
+            std::io::copy(&mut f, &mut writer).map_err(|e| e.to_string())?;
         }
     }
 
@@ -197,8 +199,8 @@ fn add_dir_to_zip(
                 .map_err(|e| e.to_string())?;
         } else {
             writer.start_file(&rel, *options).map_err(|e| e.to_string())?;
-            let data = fs::read(path).map_err(|e| e.to_string())?;
-            writer.write_all(&data).map_err(|e| e.to_string())?;
+            let mut f = fs::File::open(path).map_err(|e| e.to_string())?;
+            std::io::copy(&mut f, writer).map_err(|e| e.to_string())?;
         }
     }
     Ok(())
@@ -220,11 +222,11 @@ fn compress_7z(paths: &[String], dest: &str) -> Result<(), String> {
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_string();
-            let data = fs::read(src_path).map_err(|e| e.to_string())?;
+            let f = fs::File::open(src_path).map_err(|e| e.to_string())?;
             let mut entry = sevenz_rust::SevenZArchiveEntry::default();
             entry.name = name;
             writer
-                .push_archive_entry(entry, Some(std::io::Cursor::new(data)))
+                .push_archive_entry(entry, Some(f))
                 .map_err(|e| format!("7z add file failed: {}", e))?;
         }
     }
@@ -251,11 +253,11 @@ fn add_dir_to_7z(
             .map_err(|e| e.to_string())?
             .to_string_lossy()
             .replace('\\', "/");
-        let data = fs::read(path).map_err(|e| e.to_string())?;
+        let f = fs::File::open(path).map_err(|e| e.to_string())?;
         let mut entry = sevenz_rust::SevenZArchiveEntry::default();
         entry.name = rel;
         writer
-            .push_archive_entry(entry, Some(std::io::Cursor::new(data)))
+            .push_archive_entry(entry, Some(f))
             .map_err(|e| format!("7z add file failed: {}", e))?;
     }
     Ok(())

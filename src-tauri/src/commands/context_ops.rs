@@ -212,6 +212,11 @@ pub fn extract_zip(zip_path: String, dest_dir: String) -> Result<String, String>
         let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
         let outpath = dest.join(entry.mangled_name());
 
+        // Guard against path traversal (zip slip)
+        if !outpath.starts_with(dest) {
+            return Err(format!("Path traversal attempt blocked: {:?}", entry.mangled_name()));
+        }
+
         if entry.is_dir() {
             std::fs::create_dir_all(&outpath).map_err(|e| e.to_string())?;
         } else {

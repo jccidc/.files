@@ -37,11 +37,14 @@ export function RecycleBinView({ onNavigate: _onNavigate }: { onNavigate: (path:
   };
 
   const handleRestoreSelected = async () => {
-    for (const name of selected) {
-      await restoreFromBin(name);
+    try {
+      for (const name of selected) {
+        await restoreFromBin(name);
+      }
+    } finally {
+      setSelected(new Set());
+      refresh();
     }
-    setSelected(new Set());
-    refresh();
   };
 
   const handleRowClick = (name: string, e: React.MouseEvent) => {

@@ -760,7 +760,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const [visibleCols, setVisibleCols] = useState<ColumnId[]>(() => {
     const saved = useSettingsStore.getState().settings.column_order;
     if (!saved?.length) return DEFAULT_VISIBLE;
-    const cols = saved as ColumnId[];
+    const cols = [...saved] as ColumnId[];
     // Ensure new default columns are present in saved order (migration)
     for (const defCol of DEFAULT_VISIBLE) {
       if (!cols.includes(defCol)) cols.unshift(defCol);
@@ -1028,7 +1028,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
 
   useEffect(() => {
     // Don't watch special paths or drive roots (causes excessive events)
-    if (currentPath === 'this-pc' || currentPath.length <= 3) return;
+    if (currentPath === 'this-pc' || currentPath === 'recycle-bin' || currentPath.length <= 3) return;
     const id = watcherIdRef.current;
     let unlisten: (() => void) | undefined;
     watchDir(id, currentPath).catch(() => {});

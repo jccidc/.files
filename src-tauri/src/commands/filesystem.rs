@@ -301,8 +301,13 @@ pub fn get_known_folder_paths() -> Result<Vec<(String, String)>, String> {
         let path = shell_folders.as_ref()
             .and_then(|key| key.get_value::<String, _>(reg_key).ok())
             .map(|p| {
-                // Registry values may contain %USERPROFILE% — expand it
+                // Registry values may contain environment variables — expand them
                 p.replace("%USERPROFILE%", &user_profile)
+                 .replace("%APPDATA%", &std::env::var("APPDATA").unwrap_or_default())
+                 .replace("%LOCALAPPDATA%", &std::env::var("LOCALAPPDATA").unwrap_or_default())
+                 .replace("%PUBLIC%", &std::env::var("PUBLIC").unwrap_or_default())
+                 .replace("%HOMEDRIVE%", &std::env::var("HOMEDRIVE").unwrap_or_default())
+                 .replace("%HOMEPATH%", &std::env::var("HOMEPATH").unwrap_or_default())
             })
             .unwrap_or_else(|| format!("{}\\{}", &user_profile, display_name));
 
