@@ -269,8 +269,9 @@ pub async fn batch_folder_sizes(paths: Vec<String>) -> Result<Vec<(String, u64)>
     Ok(results)
 }
 
-/// Returns the real paths for Desktop, Documents, Downloads --
-/// accounting for OneDrive folder backup redirects.
+/// Returns the real paths for known user folders (Desktop, Documents, Downloads,
+/// Pictures, Music, Videos) by reading from the Windows registry.
+/// This correctly handles folders redirected to other drives (e.g. D:\Pictures).
 #[tauri::command]
 pub fn get_known_folder_paths() -> Result<Vec<(String, String)>, String> {
     let user_profile = std::env::var("USERPROFILE").unwrap_or_default();
@@ -278,26 +279,37 @@ pub fn get_known_folder_paths() -> Result<Vec<(String, String)>, String> {
         return Err("USERPROFILE not set".into());
     }
 
-    let onedrive = std::env::var("OneDrive")
-        .or_else(|_| std::env::var("OneDriveConsumer"))
-        .or_else(|_| std::env::var("OneDriveCommercial"))
+    // Registry key where Windows stores actual folder locations
+    // (including when user moves them to another drive)
+    let shell_folders = winreg::RegKey::predef(winreg::enums::HKEY_CURRENT_USER)
+        .open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders")
         .ok();
+
+    // Map of display name -> registry value name
+    let folders = [
+        ("Desktop",   "Desktop"),
+        ("Documents", "Personal"),    // registry uses "Personal" for Documents
+        ("Downloads", "{374DE290-123F-4565-9164-39C4925E467B}"), // Downloads GUID
+        ("Pictures",  "My Pictures"),
+        ("Music",     "My Music"),
+        ("Videos",    "My Video"),
+    ];
 
     let mut results = Vec::new();
 
-    for folder in &["Desktop", "Documents", "Downloads"] {
-        // Check OneDrive-backed path first
-        let path = if let Some(ref od) = onedrive {
-            let od_path = format!("{}\\{}", od.trim_end_matches('\\'), folder);
-            if Path::new(&od_path).is_dir() {
-                od_path
-            } else {
-                format!("{}\\{}", &user_profile, folder)
-            }
-        } else {
-            format!("{}\\{}", &user_profile, folder)
-        };
-        results.push((folder.to_string(), path));
+    for (display_name, reg_key) in &folders {
+        let path = shell_folders.as_ref()
+            .and_then(|key| key.get_value::<String, _>(reg_key).ok())
+            .map(|p| {
+                // Registry values may contain %USERPROFILE% — expand it
+                p.replace("%USERPROFILE%", &user_profile)
+            })
+            .unwrap_or_else(|| format!("{}\\{}", &user_profile, display_name));
+
+        // Only include if the path actually exists
+        if Path::new(&path).is_dir() {
+            results.push((display_name.to_string(), path));
+        }
     }
 
     Ok(results)

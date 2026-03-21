@@ -260,16 +260,6 @@ export function Sidebar() {
     getKnownFolderPaths()
       .then((folders) => {
         const defaults = folders.map(([label, path]) => ({ label, path }));
-        // Add Pictures, Music, Videos if they exist
-        const home = folders.find(([l]) => l === 'Desktop')?.[1]?.replace(/\\Desktop$/, '') || '';
-        if (home) {
-          for (const extra of ['Pictures', 'Music', 'Videos']) {
-            const extraPath = home + '\\' + extra;
-            if (!defaults.find((d) => d.label === extra)) {
-              defaults.push({ label: extra, path: extraPath });
-            }
-          }
-        }
         setQuickAccessDefaults(defaults);
       })
       .catch(() => {

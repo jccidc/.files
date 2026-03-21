@@ -62,15 +62,6 @@ export function ThisPcView({ onNavigate }: ThisPcViewProps) {
     import('../../api/filesystem').then(({ getKnownFolderPaths }) => {
       getKnownFolderPaths().then((pairs: [string, string][]) => {
         const known = pairs.map(([label, path]) => ({ label, path, icon: FOLDER_ICONS[label] || FOLDER_ICONS.Documents }));
-        // Add Pictures, Music, Videos
-        const home = pairs.find(([l]) => l === 'Desktop')?.[1]?.replace(/\\Desktop$/, '') || '';
-        if (home) {
-          for (const extra of ['Pictures', 'Music', 'Videos']) {
-            if (!known.find((k) => k.label === extra)) {
-              known.push({ label: extra, path: home + '\\' + extra, icon: FOLDER_ICONS[extra] || FOLDER_ICONS.Documents });
-            }
-          }
-        }
         setFolders(known);
       }).catch(() => {});
     });

@@ -9,6 +9,7 @@ import { readDir } from '../../api/filesystem';
 import { ContextMenu } from './ContextMenu';
 import { ConflictDialog } from './ConflictDialog';
 import { ThisPcView } from './ThisPcView';
+import { RecycleBinView } from './RecycleBinView';
 import { MillerColumns } from './MillerColumns';
 import { GalleryView } from './GalleryView';
 import { TilesView } from './TilesView';
@@ -1578,6 +1579,11 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         <ThisPcView onNavigate={(path) => navigate(path)} />
       )}
 
+      {/* Recycle Bin special view */}
+      {currentPath === 'recycle-bin' && (
+        <RecycleBinView onNavigate={(path) => navigate(path)} />
+      )}
+
       {/* Instant filter bar */}
       {filterText && (
         <div style={{
@@ -1596,9 +1602,9 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       )}
 
       {/* File list */}
-      {currentPath !== 'this-pc' && loading && <div style={{ padding: 24, color: 'var(--t3)', textAlign: 'center', flex: 1 }}>Loading...</div>}
-      {currentPath !== 'this-pc' && error && <div style={{ padding: 24, color: 'var(--red)', textAlign: 'center', flex: 1 }}>{error}</div>}
-      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'list' && (
+      {currentPath !== 'this-pc' && currentPath !== 'recycle-bin' && loading && <div style={{ padding: 24, color: 'var(--t3)', textAlign: 'center', flex: 1 }}>Loading...</div>}
+      {currentPath !== 'this-pc' && currentPath !== 'recycle-bin' && error && <div style={{ padding: 24, color: 'var(--red)', textAlign: 'center', flex: 1 }}>{error}</div>}
+      {currentPath !== 'this-pc' && currentPath !== 'recycle-bin' && !loading && !error && viewMode === 'list' && (
         <div
           ref={containerRef}
           style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
@@ -1707,7 +1713,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           )}
         </div>
       )}
-      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'grid' && (
+      {currentPath !== 'this-pc' && currentPath !== 'recycle-bin' && !loading && !error && viewMode === 'grid' && (
         <FileGrid
           entries={sortedEntries}
           selectedPaths={selectedPaths}
@@ -1730,7 +1736,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       )}
 
       {/* Miller Columns */}
-      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'columns' && (
+      {currentPath !== 'this-pc' && currentPath !== 'recycle-bin' && !loading && !error && viewMode === 'columns' && (
         <MillerColumns
           initialPath={currentPath}
           onNavigate={navigate}
@@ -1740,7 +1746,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       )}
 
       {/* Gallery View */}
-      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'gallery' && (
+      {currentPath !== 'this-pc' && currentPath !== 'recycle-bin' && !loading && !error && viewMode === 'gallery' && (
         <GalleryView
           entries={sortedEntries}
           selectedPaths={selectedPaths}
@@ -1751,7 +1757,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       )}
 
       {/* Tiles View */}
-      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'tiles' && (
+      {currentPath !== 'this-pc' && currentPath !== 'recycle-bin' && !loading && !error && viewMode === 'tiles' && (
         <TilesView
           entries={sortedEntries}
           selectedPaths={selectedPaths}
@@ -1762,7 +1768,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       )}
 
       {/* Flat View */}
-      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'flat' && (
+      {currentPath !== 'this-pc' && currentPath !== 'recycle-bin' && !loading && !error && viewMode === 'flat' && (
         <FlatView
           rootPath={currentPath}
           onDoubleClick={handleDoubleClick}
@@ -1771,7 +1777,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       )}
 
       {/* Treemap View */}
-      {currentPath !== 'this-pc' && !loading && !error && viewMode === 'treemap' && (
+      {currentPath !== 'this-pc' && currentPath !== 'recycle-bin' && !loading && !error && viewMode === 'treemap' && (
         <TreemapView
           rootPath={currentPath}
           onNavigate={navigate}

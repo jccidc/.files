@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { invoke } from '@tauri-apps/api/core';
 import { useExplorerStore } from '../../stores/explorer';
@@ -349,6 +349,8 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [pathEditing, setPathEditing] = useState(false);
+  const [pathSuggestions, setPathSuggestions] = useState<{ label: string; path: string }[]>([]);
+  const [pathSuggestionIdx, setPathSuggestionIdx] = useState(-1);
   const [pathValue, setPathValue] = useState(currentPath);
   const [pathCtxMenu, setPathCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [breadcrumbDropdown, setBreadcrumbDropdown] = useState<{
@@ -426,16 +428,106 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
     btn.style.color = active ? 'var(--accent)' : 'var(--t3)';
   };
 
+  // Path bar autocomplete suggestions
+  const PATH_SUGGESTIONS_SPECIAL = [
+    { label: 'Recycle Bin', path: 'recycle-bin', aliases: ['recycle', 'recyclebin', 'trash', 'bin'] },
+    { label: 'This PC', path: 'this-pc', aliases: ['thispc', 'this pc', 'my computer', 'computer'] },
+    { label: 'Desktop', path: '', aliases: ['desktop'] },
+    { label: 'Documents', path: '', aliases: ['documents', 'docs'] },
+    { label: 'Downloads', path: '', aliases: ['downloads'] },
+    { label: 'Pictures', path: '', aliases: ['pictures', 'photos'] },
+    { label: 'Music', path: '', aliases: ['music'] },
+    { label: 'Videos', path: '', aliases: ['videos'] },
+  ];
+
+  const updatePathSuggestions = useCallback(async (val: string) => {
+    const q = val.trim().toLowerCase();
+    if (!q || q.length < 1) { setPathSuggestions([]); return; }
+
+    const matches: { label: string; path: string }[] = [];
+
+    // Match special paths & known folders
+    for (const s of PATH_SUGGESTIONS_SPECIAL) {
+      if (s.label.toLowerCase().startsWith(q) || s.aliases.some(a => a.startsWith(q))) {
+        if (s.path) {
+          matches.push({ label: s.label, path: s.path });
+        } else {
+          // Known folder — resolve path from system
+          try {
+            const { getKnownFolderPaths } = await import('../../api/filesystem');
+            const folders = await getKnownFolderPaths();
+            const found = folders.find(([l]) => l === s.label);
+            if (found) matches.push({ label: s.label, path: found[1] });
+          } catch {}
+        }
+      }
+    }
+
+    // Match directory contents if typing a path with backslash
+    if (val.includes('\\') || val.includes('/')) {
+      try {
+        const normalized = val.replace(/\//g, '\\');
+        const lastSlash = normalized.lastIndexOf('\\');
+        const parentDir = normalized.substring(0, lastSlash + 1);
+        const prefix = normalized.substring(lastSlash + 1).toLowerCase();
+        if (parentDir) {
+          const listing = await invoke<DirListing>('read_dir', { path: parentDir, showHidden: false });
+          const dirMatches = listing.entries
+            .filter(e => e.is_dir && e.name.toLowerCase().startsWith(prefix))
+            .slice(0, 8)
+            .map(e => ({ label: e.name, path: e.path }));
+          matches.push(...dirMatches);
+        }
+      } catch {}
+    }
+
+    setPathSuggestions(matches.slice(0, 10));
+    setPathSuggestionIdx(-1);
+  }, []);
+
+  const acceptSuggestion = (suggestion: { label: string; path: string }) => {
+    pathSubmittedRef.current = true;
+    setPathEditing(false);
+    setPathSuggestions([]);
+    navigate(suggestion.path);
+  };
+
   const handlePathKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') { pathSubmittedRef.current = true; setPathEditing(false); navigate(pathValue); }
-    else if (e.key === 'Escape') { pathSubmittedRef.current = true; setPathEditing(false); setPathValue(currentPath); }
+    if (pathSuggestions.length > 0) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setPathSuggestionIdx(i => Math.min(i + 1, pathSuggestions.length - 1)); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setPathSuggestionIdx(i => Math.max(i - 1, -1)); return; }
+      if (e.key === 'Tab' || (e.key === 'Enter' && pathSuggestionIdx >= 0)) {
+        e.preventDefault();
+        const idx = pathSuggestionIdx >= 0 ? pathSuggestionIdx : 0;
+        acceptSuggestion(pathSuggestions[idx]);
+        return;
+      }
+    }
+    if (e.key === 'Enter') {
+      pathSubmittedRef.current = true;
+      setPathEditing(false);
+      setPathSuggestions([]);
+      // Recognize special path names
+      const val = pathValue.trim().toLowerCase();
+      if (val === 'recycle bin' || val === 'recyclebin' || val === 'trash') {
+        navigate('recycle-bin');
+      } else if (val === 'this pc' || val === 'thispc' || val === 'my computer') {
+        navigate('this-pc');
+      } else {
+        navigate(pathValue);
+      }
+    }
+    else if (e.key === 'Escape') { pathSubmittedRef.current = true; setPathEditing(false); setPathValue(currentPath); setPathSuggestions([]); }
   };
 
   const sortLabel = SORT_FIELDS.find((f) => f.key === sortField)?.label || 'Name';
   const groupLabel = GROUP_OPTIONS.find((g) => g.key === groupBy)?.label || 'None';
 
   // Build breadcrumb segments
-  const segments = currentPath.replace(/\\/g, '/').split('/').filter(Boolean);
+  const SPECIAL_PATH_LABELS: Record<string, string> = { 'this-pc': 'This PC', 'recycle-bin': 'Recycle Bin' };
+  const segments = SPECIAL_PATH_LABELS[currentPath]
+    ? [SPECIAL_PATH_LABELS[currentPath]]
+    : currentPath.replace(/\\/g, '/').split('/').filter(Boolean);
 
   return (
     <div data-toolbar style={{
@@ -809,17 +901,17 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
       {/* Bottom row: breadcrumb / editable path bar */}
       <div data-breadcrumb style={{
         display: 'flex', alignItems: 'center', gap: 2, padding: '4px 8px',
-        borderTop: '1px solid var(--border)', fontSize: 12, overflow: 'hidden',
-        minHeight: 30,
+        borderTop: '1px solid var(--border)', fontSize: 12, overflow: 'visible',
+        minHeight: 30, position: 'relative',
       }}>
         {pathEditing ? (
           <>
           <input
             ref={pathInputRef}
             value={pathValue}
-            onChange={(e) => setPathValue(e.target.value)}
+            onChange={(e) => { setPathValue(e.target.value); updatePathSuggestions(e.target.value); }}
             onKeyDown={handlePathKeyDown}
-            onBlur={() => { setTimeout(() => { if (!pathSubmittedRef.current && !pathCtxMenu) { setPathEditing(false); setPathValue(currentPath); } pathSubmittedRef.current = false; }, 200); }}
+            onBlur={() => { setTimeout(() => { if (!pathSubmittedRef.current && !pathCtxMenu) { setPathEditing(false); setPathValue(currentPath); setPathSuggestions([]); } pathSubmittedRef.current = false; }, 200); }}
             onMouseDown={(e) => {
               if (e.button === 2) {
                 e.preventDefault();
@@ -833,6 +925,29 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
               fontFamily: "'JetBrains Mono', monospace", outline: 'none',
             }}
           />
+          {pathSuggestions.length > 0 && (
+            <div style={{
+              position: 'absolute', left: 0, right: 0, top: '100%', zIndex: 9999,
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: '0 0 6px 6px', boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+              maxHeight: 200, overflowY: 'auto',
+            }}>
+              {pathSuggestions.map((s, i) => (
+                <div key={s.path}
+                  onMouseDown={(e) => { e.preventDefault(); acceptSuggestion(s); }}
+                  onMouseEnter={() => setPathSuggestionIdx(i)}
+                  style={{
+                    padding: '6px 12px', cursor: 'pointer', fontSize: 12,
+                    background: pathSuggestionIdx === i ? 'var(--hover)' : 'transparent',
+                    color: 'var(--t1)', display: 'flex', justifyContent: 'space-between', gap: 8,
+                  }}
+                >
+                  <span style={{ fontWeight: 500 }}>{s.label}</span>
+                  <span style={{ color: 'var(--t3)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.path}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {pathCtxMenu && (
             <div
               style={{
