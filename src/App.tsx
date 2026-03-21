@@ -46,12 +46,26 @@ function App() {
   // Initialize default panel on first launch
   useEffect(() => {
     load();
-    const panels = usePanelsStore.getState().panels;
-    if (!panels[DEFAULT_PANEL_ID] || Object.keys(panels).length === 0) {
-      usePanelsStore.getState().createPanel(DEFAULT_PANEL_ID, [
-        { id: crypto.randomUUID(), type: 'explorer', title: 'Explorer', path: 'C:\\', pinned: false },
-      ]);
-    }
+    // Ensure a default tab exists — runs both immediately and after persist hydration
+    const ensureDefaultTab = () => {
+      const panels = usePanelsStore.getState().panels;
+      const defaultPanel = panels[DEFAULT_PANEL_ID];
+      if (!defaultPanel || Object.keys(panels).length === 0) {
+        usePanelsStore.getState().createPanel(DEFAULT_PANEL_ID, [
+          { id: crypto.randomUUID(), type: 'explorer', title: 'Explorer', path: 'C:\\', pinned: false },
+        ]);
+      } else if (defaultPanel.tabs.length === 0) {
+        usePanelsStore.getState().addTab(DEFAULT_PANEL_ID, {
+          id: crypto.randomUUID(), type: 'explorer', title: 'Explorer', path: 'C:\\', pinned: false,
+        });
+      }
+    };
+    ensureDefaultTab();
+    // Also run after persist hydration which may overwrite initial state
+    const unsub = usePanelsStore.persist.onFinishHydration(() => {
+      ensureDefaultTab();
+    });
+    return () => unsub();
   }, []);
 
   // Listen for single-instance folder open
