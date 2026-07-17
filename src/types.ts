@@ -65,6 +65,7 @@ export interface ThemeTokens {
   yellow: string;
   purple: string;
   cyan: string;
+  rowAlt?: string; // zebra-stripe row overlay (optional for older custom themes)
 }
 
 export interface CustomFont {
@@ -123,6 +124,8 @@ export interface AppSettings {
   sort_by: string;
   sort_asc: boolean;
   default_view: string;
+  icon_scale: number;          // percent, 75-200 — scales grid/tiles icons
+
   show_tooltips: boolean;
   tooltip_delay: number;
   peek_enabled: boolean;
@@ -152,6 +155,16 @@ export interface AppSettings {
   hidden_sidebar_folders: string[];
   column_order: string[];
   file_tags: Record<string, string>;  // normalized path -> TagId
+  folder_views: Record<string, FolderViewPref>;  // normalized path -> per-folder sort/view override
+}
+
+/** Per-folder view memory (Explorer-style): overrides the global defaults for one folder */
+export interface FolderViewPref {
+  sort_by?: string;
+  sort_asc?: boolean;
+  view?: string;
+  /** Entry also applies to all subfolders ("Apply to Subfolders") */
+  recursive?: boolean;
 }
 
 export type TabType = 'explorer' | 'terminal' | 'preview';

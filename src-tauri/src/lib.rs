@@ -113,6 +113,7 @@ pub fn run() {
             shell::copy_files,
             shell::move_files,
             shell::rename_file,
+            shell::file_type_names,
             shell::resolve_shortcut,
             shell::eject_drive,
             shell::show_properties,

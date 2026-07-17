@@ -38,6 +38,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   sort_by: 'name',
   sort_asc: true,
   default_view: 'list',
+  icon_scale: 100,
   show_tooltips: true,
   tooltip_delay: 600,
   peek_enabled: true,
@@ -64,6 +65,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   hidden_sidebar_folders: [],
   column_order: ['tag', 'name', 'size', 'modified', 'created', 'accessed', 'type'],
   file_tags: {},
+  folder_views: {},
 };
 
 interface SettingsState {

@@ -76,6 +76,8 @@ pub struct AppSettings {
     pub sort_asc: bool,
     #[serde(default = "default_view")]
     pub default_view: String,
+    #[serde(default = "default_icon_scale")]
+    pub icon_scale: u16,
     #[serde(default = "default_true")]
     pub show_tooltips: bool,
     #[serde(default = "default_tooltip_delay")]
@@ -127,6 +129,8 @@ pub struct AppSettings {
     pub column_order: Vec<String>,
     #[serde(default = "default_file_tags")]
     pub file_tags: serde_json::Value,
+    #[serde(default = "default_json_object")]
+    pub folder_views: serde_json::Value,
 }
 
 fn default_theme() -> String { "dotfiles-dark".to_string() }
@@ -137,6 +141,7 @@ fn default_ui_scale() -> u8 { 100 }
 fn default_true() -> bool { true }
 fn default_sort_by() -> String { "name".to_string() }
 fn default_view() -> String { "list".to_string() }
+fn default_icon_scale() -> u16 { 100 }
 fn default_tooltip_delay() -> u16 { 600 }
 fn default_ignored() -> String { "node_modules,.git,__pycache__,.DS_Store,Thumbs.db".to_string() }
 fn default_column_widths() -> Vec<u16> { vec![0, 100, 140] }
@@ -160,6 +165,7 @@ fn default_widget_alignment() -> String { "left".to_string() }
 fn default_clock_format() -> String { "12h".to_string() }
 fn default_weather_unit() -> String { "f".to_string() }
 fn default_file_tags() -> serde_json::Value { serde_json::Value::Object(serde_json::Map::new()) }
+fn default_json_object() -> serde_json::Value { serde_json::Value::Object(serde_json::Map::new()) }
 
 impl Default for AppSettings {
     fn default() -> Self {
@@ -196,6 +202,7 @@ impl Default for AppSettings {
             sort_by: default_sort_by(),
             sort_asc: true,
             default_view: default_view(),
+            icon_scale: default_icon_scale(),
             show_tooltips: true,
             tooltip_delay: default_tooltip_delay(),
             peek_enabled: true,
@@ -221,6 +228,7 @@ impl Default for AppSettings {
             hidden_sidebar_folders: Vec::new(),
             column_order: Vec::new(),
             file_tags: default_file_tags(),
+            folder_views: default_json_object(),
         }
     }
 }

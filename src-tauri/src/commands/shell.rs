@@ -124,6 +124,37 @@ pub fn rename_file(path: String, new_name: String) -> Result<String, String> {
     Ok(target.to_string_lossy().to_string())
 }
 
+/// Friendly type names for extensions, the same way Explorer builds them:
+/// HKCR\.ext default value -> ProgID, HKCR\<ProgID> default value -> name
+/// (e.g. "Adobe Acrobat Document"). Unregistered types fall back to "EXT File".
+#[tauri::command]
+pub fn file_type_names(extensions: Vec<String>) -> std::collections::HashMap<String, String> {
+    let hkcr = winreg::RegKey::predef(winreg::enums::HKEY_CLASSES_ROOT);
+    let mut map = std::collections::HashMap::new();
+    for ext in extensions {
+        let e = ext.trim_start_matches('.').to_lowercase();
+        if e.is_empty() {
+            continue;
+        }
+        let mut name: Option<String> = None;
+        if let Ok(key) = hkcr.open_subkey(format!(".{}", e)) {
+            if let Ok(progid) = key.get_value::<String, _>("") {
+                if !progid.is_empty() {
+                    if let Ok(pk) = hkcr.open_subkey(&progid) {
+                        if let Ok(desc) = pk.get_value::<String, _>("") {
+                            if !desc.is_empty() {
+                                name = Some(desc);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        map.insert(e.clone(), name.unwrap_or_else(|| format!("{} File", e.to_uppercase())));
+    }
+    map
+}
+
 #[tauri::command]
 pub fn resolve_shortcut(path: String) -> Result<Option<String>, String> {
     let p = Path::new(&path);

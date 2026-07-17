@@ -24,6 +24,11 @@ export async function renameFile(path: string, newName: string): Promise<string>
   return invoke('rename_file', { path, newName });
 }
 
+/** Friendly Explorer-style type names per extension (e.g. pdf -> "Adobe Acrobat Document") */
+export async function fileTypeNames(extensions: string[]): Promise<Record<string, string>> {
+  return invoke('file_type_names', { extensions });
+}
+
 export async function resolveShortcut(path: string): Promise<string | null> {
   return invoke('resolve_shortcut', { path });
 }
