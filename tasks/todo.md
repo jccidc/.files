@@ -1,3 +1,47 @@
+# UI Audit Fixes -- 2026-07-03 (IMPLEMENTED, review pending)
+
+Source: 3-agent audit (score 11/20). All 4 clusters implemented. tsc --noEmit PASS, vite build PASS.
+Review complete: all confirmed findings fixed, tsc + build green. Manual smoke test pending before commit.
+
+## Adapt (responsive)
+- [x] PreviewPanel: maxWidth 50vw on wrapper; max clamp in preview.ts setPanelWidth (persisted values re-clamped)
+- [x] Sidebar: maxWidth clamp + reconcile minWidth: sidebarWidth; coordinate maxima at small windows
+- [x] Toolbar: overflow strategy for top row (collapse cluster into overflow menu / scrollable strip)
+- [x] TabBar + PanelTabBar: scrollable tab strips (overflowX auto + tab max-width ellipsis)
+- [x] ExplorerTab: name column minmax(120px, 1fr); list body overflowX auto
+- [x] TilesView: width min(260px, 100%)
+- [x] CommandPalette/FuzzySearch: maxWidth 90vw
+- [x] GalleryView: size image to container, not 100vh
+
+## Optimize (performance)
+- [x] Wire useVirtualScroll into ExplorerTab details list
+- [x] Virtualize/contain FlatView, RecycleBinView, grid views (content-visibility where row-windowing doesn't fit)
+- [x] GalleryView thumbnails: loading=lazy decoding=async
+- [x] FlatView filter: useMemo
+- [x] TabBar/PanelTabBar: granular zustand selectors
+
+## Harden (a11y/keyboard)
+- [x] ExplorerTab: ArrowUp/Down roving selection + Enter to open, Shift+F10/ContextMenu key at selection
+- [x] Global :focus-visible ring independent of .glow-enabled (tokens.css)
+- [x] ContextMenu: maxHeight + overflowY auto
+- [x] aria-labels/roles on rows + icon-only buttons missing title
+
+## Polish
+- [x] Define --row-alt token (themes) + use in ExplorerTab zebra stripe (kill rgba(255,255,255,0.01))
+- [x] TreemapView label contrast (luminance-aware, not #fff)
+- [x] Toolbar dropdowns: viewport-edge collision (copy ContextMenu approach)
+- [x] StatusBar: collapse age legend when narrow
+- [x] SettingsPanel toggle knob: transform instead of left
+- [x] Titlebar: dark-assumption borders/hover -> tokens
+
+## Verify
+- [x] npx tsc --noEmit clean
+- [x] vite build clean
+- [x] Code review pass on diff (xhigh: 10 finders + 3 verifiers + sweep; all confirmed findings fixed)
+- [x] Review section below (see vault daily note 2026-07-03)
+
+---
+
 # .files -- Next Session TODO
 
 ## Bugs to Fix
