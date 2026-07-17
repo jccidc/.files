@@ -21,6 +21,7 @@
   --yellow: #FBBF24;
   --purple: #C084FC;
   --cyan: #22D3EE;
+  --row-alt: rgba(255, 255, 255, 0.02);
   /* Visual effects defaults */
   --sidebar-opacity: 1;
   --toolbar-opacity: 1;
@@ -62,6 +63,25 @@ body,
 ::selection {
   background: var(--accent);
   color: #fff;
+}
+
+/* Keyboard focus indicator. Buttons/links/tabbable elements get outline
+   (outline-offset keeps it inside the element's box, so ancestor overflow
+   clipping can't hide it, and it doesn't clobber elevation box-shadows).
+   Inputs keep box-shadow because many set inline outline:none, which beats
+   stylesheets. */
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible,
+[role="option"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
 /* Glow effect on active/focused elements */

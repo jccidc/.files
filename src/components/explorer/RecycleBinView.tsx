@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { listRecycleBin, emptyRecycleBin, restoreFromBin } from '../../api/extras';
+import { useVirtualScroll } from '../../hooks/useVirtualScroll';
 
 function formatSize(bytes: number): string {
   if (!bytes || isNaN(bytes)) return '--';
@@ -8,6 +9,8 @@ function formatSize(bytes: number): string {
   if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
   return `${(bytes / 1073741824).toFixed(2)} GB`;
 }
+
+const ROW_HEIGHT = 28;
 
 export function RecycleBinView({ onNavigate: _onNavigate }: { onNavigate: (path: string) => void }) {
   const [items, setItems] = useState<{ name: string; path: string; size: number }[]>([]);
@@ -70,6 +73,9 @@ export function RecycleBinView({ onNavigate: _onNavigate }: { onNavigate: (path:
 
   const totalSize = items.reduce((sum, i) => sum + i.size, 0);
 
+  const { startIndex, endIndex, totalHeight, offsetY, containerRef, onScroll } =
+    useVirtualScroll(items.length, ROW_HEIGHT);
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
       onClick={() => setCtxMenu(null)}
@@ -130,33 +136,39 @@ export function RecycleBinView({ onNavigate: _onNavigate }: { onNavigate: (path:
       </div>
 
       {/* Items */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 24px' }}>
+      <div ref={containerRef} onScroll={onScroll} style={{ flex: 1, overflowY: 'auto', padding: '0 24px' }}>
         {loading && <div style={{ padding: 24, color: 'var(--t3)', textAlign: 'center' }}>Loading...</div>}
         {!loading && items.length === 0 && (
           <div style={{ padding: 48, color: 'var(--t3)', textAlign: 'center' }}>
             Recycle Bin is empty
           </div>
         )}
-        {!loading && items.map((item) => (
-          <div key={item.path}
-            onClick={(e) => handleRowClick(item.name, e)}
-            onMouseDown={(e) => handleRowMouseDown(item.name, e)}
-            style={{
-              display: 'grid', gridTemplateColumns: '1fr 100px',
-              padding: '6px 0', borderBottom: '1px solid var(--border)',
-              cursor: 'pointer', userSelect: 'none', fontSize: 12,
-              background: selected.has(item.name) ? 'var(--active)' : 'transparent',
-              borderRadius: 3,
-            }}
-            onMouseEnter={(e) => { if (!selected.has(item.name)) e.currentTarget.style.background = 'var(--hover)'; }}
-            onMouseLeave={(e) => { if (!selected.has(item.name)) e.currentTarget.style.background = 'transparent'; }}
-          >
-            <span style={{ color: 'var(--t1)', paddingLeft: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {item.name}
-            </span>
-            <span style={{ color: 'var(--t3)', textAlign: 'right', paddingRight: 4 }}>{formatSize(item.size)}</span>
+        {!loading && items.length > 0 && (
+          <div style={{ height: totalHeight, position: 'relative' }}>
+            <div style={{ transform: `translateY(${offsetY}px)` }}>
+              {items.slice(startIndex, endIndex).map((item) => (
+                <div key={item.path}
+                  onClick={(e) => handleRowClick(item.name, e)}
+                  onMouseDown={(e) => handleRowMouseDown(item.name, e)}
+                  style={{
+                    display: 'grid', gridTemplateColumns: '1fr 100px', alignItems: 'center',
+                    height: ROW_HEIGHT, borderBottom: '1px solid var(--border)',
+                    cursor: 'pointer', userSelect: 'none', fontSize: 12,
+                    background: selected.has(item.name) ? 'var(--active)' : 'transparent',
+                    borderRadius: 3,
+                  }}
+                  onMouseEnter={(e) => { if (!selected.has(item.name)) e.currentTarget.style.background = 'var(--hover)'; }}
+                  onMouseLeave={(e) => { if (!selected.has(item.name)) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span style={{ color: 'var(--t1)', paddingLeft: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.name}
+                  </span>
+                  <span style={{ color: 'var(--t3)', textAlign: 'right', paddingRight: 4 }}>{formatSize(item.size)}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Right-click context menu */}

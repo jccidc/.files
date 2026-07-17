@@ -100,7 +100,7 @@ function FlipDigit({ value, prev }: { value: string; prev: string }) {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    ...(top ? { top: 0, borderBottom: '0.5px solid rgba(0,0,0,0.3)' } : { bottom: 0 }),
+    ...(top ? { top: 0, borderBottom: '0.5px solid var(--border)' } : { bottom: 0 }),
   });
 
   return (
@@ -118,7 +118,7 @@ function FlipDigit({ value, prev }: { value: string; prev: string }) {
           animation: 'flip-top 0.3s ease-in forwards',
           zIndex: 2, background: 'var(--deep)', borderRadius: '2px 2px 0 0',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          borderBottom: '0.5px solid rgba(0,0,0,0.3)',
+          borderBottom: '0.5px solid var(--border)',
         }}>
           <span style={{ transform: 'translateY(25%)' }}>{prev}</span>
         </div>
@@ -796,6 +796,8 @@ export function Titlebar({ onOpenSettings }: Props) {
           onClick={() => appWindow.close()}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--red)';
+            // Fixed white, not var(--t1): light themes have a dark t1, which
+            // would render dark-on-red; white-on-red is correct in every theme.
             e.currentTarget.style.color = '#fff';
           }}
           onMouseLeave={(e) => {

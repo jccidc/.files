@@ -37,7 +37,9 @@ export function PreviewPanel() {
     e.preventDefault();
     dragging.current = true;
     startX.current = e.clientX;
-    startWidth.current = panelWidth;
+    // Seed from the rendered width, not the stored one: a persisted width from a
+    // larger window can exceed the CSS 50vw clamp, which would create a drag dead zone.
+    startWidth.current = (e.currentTarget as HTMLElement).parentElement?.getBoundingClientRect().width ?? panelWidth;
 
     const handleMove = (ev: MouseEvent) => {
       if (!dragging.current) return;
@@ -62,7 +64,7 @@ export function PreviewPanel() {
 
   return (
     <div style={{
-      width: panelWidth, minWidth: 250, height: '100%',
+      width: panelWidth, minWidth: 250, maxWidth: '50vw', height: '100%',
       display: 'flex', flexDirection: 'column',
       borderLeft: '1px solid var(--border)',
       background: 'var(--surface)',

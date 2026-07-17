@@ -22,6 +22,7 @@ export function useTheme() {
   const borderRadius = useSettingsStore((s) => s.settings.border_radius);
   const density = useSettingsStore((s) => s.settings.density);
   const fontSize = useSettingsStore((s) => s.settings.font_size);
+  const iconScale = useSettingsStore((s) => s.settings.icon_scale);
   const bgPattern = useSettingsStore((s) => s.settings.bg_pattern);
   const bgCustomUrl = useSettingsStore((s) => s.settings.bg_custom_url);
   const bgOpacity = useSettingsStore((s) => s.settings.bg_opacity);
@@ -80,7 +81,11 @@ export function useTheme() {
       spacious:    { rowH: '38px', padY: '8px', padX: '16px', gap: '12px' },
     };
     const d = densityMap[density] || densityMap.comfortable;
-    r.style.setProperty('--row-height', d.rowH);
+    // List icons grow with the Icon Size setting; grow rows by the same delta
+    // so scaled icons never clip (density stays the baseline row size)
+    const iconPx = Math.round(16 * ((iconScale || 100) / 100));
+    const rowH = parseInt(d.rowH) + Math.max(0, iconPx - 16);
+    r.style.setProperty('--row-height', `${rowH}px`);
     r.style.setProperty('--density-pad-y', d.padY);
     r.style.setProperty('--density-pad-x', d.padX);
     r.style.setProperty('--density-gap', d.gap);
@@ -96,7 +101,7 @@ export function useTheme() {
 
     // Glow
     r.classList.toggle('glow-enabled', enableGlow !== false);
-  }, [sidebarOpacity, toolbarOpacity, terminalOpacity, baseOpacity, blurAmount, borderRadius, animationSpeed, enableAnimations, density, enableGlow, fontSize, fontFamily]);
+  }, [sidebarOpacity, toolbarOpacity, terminalOpacity, baseOpacity, blurAmount, borderRadius, animationSpeed, enableAnimations, density, enableGlow, fontSize, fontFamily, iconScale]);
 
   // Radical theming effects (CSS class toggles + injected styles)
   useEffect(() => {

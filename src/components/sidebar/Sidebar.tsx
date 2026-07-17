@@ -302,7 +302,7 @@ export function Sidebar() {
   };
 
   const handleCopyPath = (path: string) => {
-    navigator.clipboard.writeText(path).catch(() => {});
+    navigator.clipboard.writeText(`"${path}"`).catch(() => {});
   };
 
   const handlePinPointerDown = (idx: number, e: React.PointerEvent) => {
@@ -437,7 +437,9 @@ export function Sidebar() {
     (e: React.MouseEvent) => {
       resizing.current = true;
       startX.current = e.clientX;
-      startW.current = sidebarWidth;
+      // Seed from the rendered width: the store can hold up to 400 while the CSS
+      // min(400px, 25vw) clamp renders less, which would create a drag dead zone.
+      startW.current = (e.currentTarget as HTMLElement).parentElement?.getBoundingClientRect().width ?? sidebarWidth;
       e.preventDefault();
 
       const onMove = (ev: MouseEvent) => {
@@ -742,7 +744,8 @@ export function Sidebar() {
       data-sidebar
       style={{
         width: sidebarWidth,
-        minWidth: sidebarWidth,
+        maxWidth: 'min(400px, 25vw)',
+        flexShrink: 0,
         background: 'var(--sidebar-bg, var(--surface))',
         borderRight: '1px solid var(--border)',
         display: 'flex',

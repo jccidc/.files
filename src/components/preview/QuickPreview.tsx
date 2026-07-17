@@ -27,7 +27,7 @@ function getTypeBadge(entry: FileEntry): string {
   }
 }
 
-export function QuickPreview({ entry, onClose }: { entry: FileEntry; onClose: () => void }) {
+export function QuickPreview({ entry, onClose, onContextMenu }: { entry: FileEntry; onClose: () => void; onContextMenu?: (e: React.MouseEvent) => void }) {
   const showPanel = usePreviewStore((s) => s.showPanel);
   const setPreviewEntry = usePreviewStore((s) => s.setPreviewEntry);
 
@@ -73,6 +73,10 @@ export function QuickPreview({ entry, onClose }: { entry: FileEntry; onClose: ()
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => { if (e.button === 2) e.stopPropagation(); }}
+        onContextMenu={(e) => {
+          if (onContextMenu) { e.preventDefault(); e.stopPropagation(); onContextMenu(e); }
+        }}
         style={{
           width: '70%', maxWidth: 900, maxHeight: '80vh',
           background: 'var(--surface)',

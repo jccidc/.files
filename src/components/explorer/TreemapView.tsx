@@ -71,6 +71,13 @@ function getTypeColor(_ext: string | null, isDir: boolean, size: number): string
 }
 
 
+// Relative luminance (0-1) of an 'rgb(r,g,b)' color string
+function getLuminance(color: string): number {
+  const m = color.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (!m) return 0;
+  return (0.2126 * Number(m[1]) + 0.7152 * Number(m[2]) + 0.0722 * Number(m[3])) / 255;
+}
+
 function formatSize(bytes: number): string {
   if (bytes === 0) return '0 B';
   if (bytes < 1024) return bytes + ' B';
@@ -274,6 +281,8 @@ export function TreemapView({ rootPath, onNavigate, onOpenFile, onContextMenu }:
           {rects.map((rect) => {
             const isHovered = hovered === rect.node.path;
             const color = getTypeColor(rect.node.extension, rect.node.is_dir, rect.node.size);
+            // Dark text on light tiles, white text (with shadow) on dark tiles
+            const lightTile = getLuminance(color) > 0.55;
             const showLabel = rect.w > 40 && rect.h > 20;
             const showSize = rect.w > 60 && rect.h > 32;
             return (
@@ -306,9 +315,9 @@ export function TreemapView({ rootPath, onNavigate, onOpenFile, onContextMenu }:
                 {showLabel && (
                   <div style={{
                     fontSize: Math.min(11, rect.w / 8),
-                    color: '#fff',
+                    color: lightTile ? 'rgba(0,0,0,0.85)' : '#fff',
                     fontWeight: 600,
-                    textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                    textShadow: lightTile ? 'none' : '0 1px 2px rgba(0,0,0,0.6)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -319,8 +328,8 @@ export function TreemapView({ rootPath, onNavigate, onOpenFile, onContextMenu }:
                 {showSize && (
                   <div style={{
                     fontSize: Math.min(9, rect.w / 10),
-                    color: 'rgba(255,255,255,0.7)',
-                    textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                    color: lightTile ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.7)',
+                    textShadow: lightTile ? 'none' : '0 1px 2px rgba(0,0,0,0.6)',
                   }}>
                     {formatSize(rect.node.size)}
                   </div>

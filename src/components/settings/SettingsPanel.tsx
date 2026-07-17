@@ -346,7 +346,7 @@ export function SettingsPanel({ open, onClose }: Props) {
 
   const toggleDot = (on: boolean): React.CSSProperties => ({
     width: 14, height: 14, borderRadius: 7, background: '#fff', position: 'absolute',
-    top: 3, left: on ? 19 : 3, transition: 'left 0.15s',
+    top: 3, left: 3, transform: on ? 'translateX(16px)' : 'translateX(0)', transition: 'transform 0.15s',
   });
 
   const rowStyle: React.CSSProperties = {
@@ -1207,7 +1207,35 @@ export function SettingsPanel({ open, onClose }: Props) {
                 <select value={settings.default_view} onChange={(e) => update({ default_view: e.target.value })} style={{ ...selectStyle, width: 120 }}>
                   <option value="list">List</option>
                   <option value="grid">Grid</option>
+                  <option value="tiles">Tiles</option>
+                  <option value="gallery">Gallery</option>
                 </select>
+              </div>
+              <div style={rowStyle}>
+                <span style={{ fontSize: 12, color: 'var(--t1)' }}>Default Sort</span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <select value={settings.sort_by} onChange={(e) => update({ sort_by: e.target.value })} style={{ ...selectStyle, width: 110 }}>
+                    <option value="name">Name</option>
+                    <option value="size">Size</option>
+                    <option value="modified">Modified</option>
+                    <option value="type">Type</option>
+                  </select>
+                  <select value={settings.sort_asc ? 'asc' : 'desc'} onChange={(e) => update({ sort_asc: e.target.value === 'asc' })} style={{ ...selectStyle, width: 110 }}>
+                    <option value="asc">Ascending</option>
+                    <option value="desc">Descending</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--t3)', padding: '0 0 8px', lineHeight: 1.5 }}>
+                Folders remember their own sort and view once you change them. Use "Apply to Subfolders" in the toolbar sort menu to push the current folder's sort and view down to everything inside it.
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <label style={labelStyle}>Icon Size (List, Grid & Tiles): {settings.icon_scale ?? 100}%</label>
+                <input
+                  type="range" min="75" max="200" step="5" value={settings.icon_scale ?? 100}
+                  onChange={(e) => update({ icon_scale: Number(e.target.value) })}
+                  style={{ width: '100%', accentColor: 'var(--accent)' }}
+                />
               </div>
 
               {sectionTitle('Visibility')}

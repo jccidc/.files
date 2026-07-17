@@ -25,6 +25,7 @@ export const THEMES: Record<string, ThemeTokens> = {
     yellow: '#FBBF24',
     purple: '#C084FC',
     cyan: '#22D3EE',
+    rowAlt: 'rgba(255,255,255,0.02)',
   },
 
   'dotfiles-light': {
@@ -50,6 +51,7 @@ export const THEMES: Record<string, ThemeTokens> = {
     yellow: '#CA8A04',
     purple: '#9333EA',
     cyan: '#0891B2',
+    rowAlt: 'rgba(0,0,0,0.025)',
   },
 
   'high-contrast': {
@@ -75,6 +77,7 @@ export const THEMES: Record<string, ThemeTokens> = {
     yellow: '#FFD700',
     purple: '#DA70D6',
     cyan: '#00FFFF',
+    rowAlt: 'rgba(255,255,255,0.07)',
   },
 
   'midnight-blue': {
@@ -100,6 +103,7 @@ export const THEMES: Record<string, ThemeTokens> = {
     yellow: '#FFD06B',
     purple: '#B894F6',
     cyan: '#4DD8E8',
+    rowAlt: 'rgba(255,255,255,0.02)',
   },
 
   'monokai-pro': {
@@ -125,6 +129,7 @@ export const THEMES: Record<string, ThemeTokens> = {
     yellow: '#FFD866',
     purple: '#AB9DF2',
     cyan: '#78DCE8',
+    rowAlt: 'rgba(255,255,255,0.02)',
   },
 
   'dracula': {
@@ -150,6 +155,7 @@ export const THEMES: Record<string, ThemeTokens> = {
     yellow: '#F1FA8C',
     purple: '#BD93F9',
     cyan: '#8BE9FD',
+    rowAlt: 'rgba(255,255,255,0.02)',
   },
 
   'nord': {
@@ -175,6 +181,7 @@ export const THEMES: Record<string, ThemeTokens> = {
     yellow: '#EBCB8B',
     purple: '#B48EAD',
     cyan: '#8FBCBB',
+    rowAlt: 'rgba(255,255,255,0.02)',
   },
 
   'catppuccin-mocha': {
@@ -200,6 +207,7 @@ export const THEMES: Record<string, ThemeTokens> = {
     yellow: '#F9E2AF',
     purple: '#CBA6F7',
     cyan: '#94E2D5',
+    rowAlt: 'rgba(255,255,255,0.02)',
   },
 
   'solarized-dark': {
@@ -225,6 +233,7 @@ export const THEMES: Record<string, ThemeTokens> = {
     yellow: '#B58900',
     purple: '#6C71C4',
     cyan: '#2AA198',
+    rowAlt: 'rgba(255,255,255,0.02)',
   },
 
   'cyberpunk': {
@@ -250,6 +259,7 @@ export const THEMES: Record<string, ThemeTokens> = {
     yellow: '#FFE500',
     purple: '#BF00FF',
     cyan: '#00F0FF',
+    rowAlt: 'rgba(255,255,255,0.02)',
   },
 
   'synthwave': {
@@ -275,6 +285,7 @@ export const THEMES: Record<string, ThemeTokens> = {
     yellow: '#FEDE5D',
     purple: '#F834FF',
     cyan: '#36F9F6',
+    rowAlt: 'rgba(255,255,255,0.02)',
   },
 
   'claude': {
@@ -300,6 +311,7 @@ export const THEMES: Record<string, ThemeTokens> = {
     yellow: '#DAA54E',
     purple: '#B48CC8',
     cyan: '#5CB8C4',
+    rowAlt: 'rgba(255,255,255,0.02)',
   },
 
   'emerald-matrix': {
@@ -325,6 +337,189 @@ export const THEMES: Record<string, ThemeTokens> = {
     yellow: '#D4FF00',
     purple: '#00FFC8',
     cyan: '#00E5FF',
+    rowAlt: 'rgba(255,255,255,0.02)',
+  },
+
+  'tokyo-night': {
+    id: 'tokyo-night',
+    name: 'Tokyo Night',
+    void: '#13141C',
+    deepest: '#16161E',
+    deep: '#1A1B26',
+    base: '#1F2029',
+    surface: '#24283B',
+    raised: '#2A2E42',
+    hover: '#32384F',
+    active: '#3B4261',
+    border: '#292E42',
+    t1: '#C0CAF5',
+    t2: '#7982A9',
+    t3: '#4E5579',
+    accent: '#7AA2F7',
+    aglow: 'rgba(122,162,247,0.12)',
+    warm: '#E0AF68',
+    green: '#9ECE6A',
+    red: '#F7768E',
+    yellow: '#E0AF68',
+    purple: '#BB9AF7',
+    cyan: '#7DCFFF',
+    rowAlt: 'rgba(255,255,255,0.02)',
+  },
+
+  'gruvbox': {
+    id: 'gruvbox',
+    name: 'Gruvbox',
+    void: '#1B1B18',
+    deepest: '#21201C',
+    deep: '#282828',
+    base: '#2E2C28',
+    surface: '#3C3836',
+    raised: '#45403D',
+    hover: '#504945',
+    active: '#5A524C',
+    border: '#3C3836',
+    t1: '#EBDBB2',
+    t2: '#A89984',
+    t3: '#7C6F64',
+    accent: '#FE8019',
+    aglow: 'rgba(254,128,25,0.12)',
+    warm: '#FABD2F',
+    green: '#B8BB26',
+    red: '#FB4934',
+    yellow: '#FABD2F',
+    purple: '#D3869B',
+    cyan: '#8EC07C',
+    rowAlt: 'rgba(255,255,255,0.025)',
+  },
+
+  'rose-pine': {
+    id: 'rose-pine',
+    name: 'Rose Pine',
+    void: '#16141F',
+    deepest: '#191724',
+    deep: '#1D1B2A',
+    base: '#211F30',
+    surface: '#26233A',
+    raised: '#2D2A45',
+    hover: '#363252',
+    active: '#403D5E',
+    border: '#2A2740',
+    t1: '#E0DEF4',
+    t2: '#908CAA',
+    t3: '#5D5A78',
+    accent: '#EBBCBA',
+    aglow: 'rgba(235,188,186,0.12)',
+    warm: '#F6C177',
+    green: '#9CCFD8',
+    red: '#EB6F92',
+    yellow: '#F6C177',
+    purple: '#C4A7E7',
+    cyan: '#9CCFD8',
+    rowAlt: 'rgba(255,255,255,0.02)',
+  },
+
+  'crimson-ember': {
+    id: 'crimson-ember',
+    name: 'Crimson Ember',
+    void: '#0D0507',
+    deepest: '#120709',
+    deep: '#17090C',
+    base: '#1C0C10',
+    surface: '#241014',
+    raised: '#2D141A',
+    hover: '#381A21',
+    active: '#452129',
+    border: '#2E1319',
+    t1: '#F2DEDF',
+    t2: '#B08A8E',
+    t3: '#6E5054',
+    accent: '#F43F5E',
+    aglow: 'rgba(244,63,94,0.12)',
+    warm: '#FB923C',
+    green: '#4ADE80',
+    red: '#FF5C5C',
+    yellow: '#FBBF24',
+    purple: '#E879F9',
+    cyan: '#22D3EE',
+    rowAlt: 'rgba(255,255,255,0.02)',
+  },
+
+  'aurora-teal': {
+    id: 'aurora-teal',
+    name: 'Aurora',
+    void: '#04100F',
+    deepest: '#061514',
+    deep: '#081A19',
+    base: '#0B211F',
+    surface: '#0F2B28',
+    raised: '#143532',
+    hover: '#1A413D',
+    active: '#20504A',
+    border: '#12302D',
+    t1: '#D7F5EE',
+    t2: '#7FB5AA',
+    t3: '#487068',
+    accent: '#2DD4BF',
+    aglow: 'rgba(45,212,191,0.12)',
+    warm: '#F5C518',
+    green: '#6EE7B7',
+    red: '#FB7185',
+    yellow: '#FDE047',
+    purple: '#A78BFA',
+    cyan: '#67E8F9',
+    rowAlt: 'rgba(255,255,255,0.02)',
+  },
+
+  'amoled-gold': {
+    id: 'amoled-gold',
+    name: 'AMOLED Gold',
+    void: '#000000',
+    deepest: '#000000',
+    deep: '#050505',
+    base: '#0A0A0A',
+    surface: '#121212',
+    raised: '#1A1A1A',
+    hover: '#242424',
+    active: '#2E2A1E',
+    border: '#242018',
+    t1: '#EDE6D6',
+    t2: '#9E9788',
+    t3: '#5C574C',
+    accent: '#F5C518',
+    aglow: 'rgba(245,197,24,0.12)',
+    warm: '#F5C518',
+    green: '#A3E635',
+    red: '#FF6B6B',
+    yellow: '#FDE047',
+    purple: '#C084FC',
+    cyan: '#5EEAD4',
+    rowAlt: 'rgba(255,255,255,0.02)',
+  },
+
+  'paper-cream': {
+    id: 'paper-cream',
+    name: 'Paper Cream',
+    void: '#F7F1E3',
+    deepest: '#F2EBDB',
+    deep: '#EDE4D1',
+    base: '#FBF6EA',
+    surface: '#F2EAD9',
+    raised: '#EAE0CC',
+    hover: '#E2D6BE',
+    active: '#D8C9AC',
+    border: '#D9CDB4',
+    t1: '#3D3427',
+    t2: '#7A6E5A',
+    t3: '#A2967F',
+    accent: '#C2571B',
+    aglow: 'rgba(194,87,27,0.10)',
+    warm: '#A16207',
+    green: '#3F6212',
+    red: '#B91C1C',
+    yellow: '#A16207',
+    purple: '#7E22CE',
+    cyan: '#0E7490',
+    rowAlt: 'rgba(0,0,0,0.03)',
   },
 };
 
@@ -382,6 +577,7 @@ export function applyTheme(theme: ThemeTokens, accentOverride?: string, secondar
   root.style.setProperty('--yellow', theme.yellow);
   root.style.setProperty('--purple', theme.purple);
   root.style.setProperty('--cyan', theme.cyan);
+  root.style.setProperty('--row-alt', theme.rowAlt || deriveRowAlt(theme.base));
 }
 
 // ---------------------------------------------------------------------------
@@ -428,6 +624,13 @@ function mixColors(a: string, b: string, t: number): string {
   );
 }
 
+/** Subtle zebra-stripe overlay derived from base color luminance */
+function deriveRowAlt(base: string): string {
+  const [r, g, b] = hexToRgb(base);
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return lum > 0.5 ? 'rgba(0,0,0,0.025)' : 'rgba(255,255,255,0.02)';
+}
+
 // ---------------------------------------------------------------------------
 // Theme derivation, resolution, and validation (exported)
 // ---------------------------------------------------------------------------
@@ -467,6 +670,7 @@ export function deriveTokens(
     yellow: baseTheme.yellow,
     purple: baseTheme.purple,
     cyan: baseTheme.cyan,
+    rowAlt: deriveRowAlt(base),
   };
 }
 

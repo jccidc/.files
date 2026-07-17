@@ -28,9 +28,12 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // Suppress native WebView2 context menu globally, but allow it on text inputs
+// and on highlighted text (so Copy is reachable by mouse, e.g. in previews)
 document.addEventListener('contextmenu', (e) => {
   const tag = (e.target as HTMLElement)?.tagName;
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed && sel.containsNode(e.target as Node, true)) return;
   e.preventDefault();
 });
 

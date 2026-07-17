@@ -90,7 +90,7 @@ export function FuzzySearch({ open, onClose }: { open: boolean; onClose: () => v
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 520,
+          width: 'min(520px, 90vw)',
           maxHeight: 420,
           background: 'var(--surface)',
           border: '1px solid var(--border)',

@@ -156,7 +156,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 480, maxHeight: 360, background: 'var(--surface)',
+          width: 'min(480px, 90vw)', maxHeight: 360, background: 'var(--surface)',
           border: '1px solid var(--border)', borderRadius: 8,
           overflow: 'hidden', boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
           display: 'flex', flexDirection: 'column',

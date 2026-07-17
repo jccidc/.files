@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useTabsStore } from '../../stores/tabs';
 import type { Tab } from '../../types';
 
@@ -37,11 +38,20 @@ function IconPlus() {
 }
 
 function TabItem({ tab }: { tab: Tab }) {
-  const { activeTabId, setActiveTab, closeTab } = useTabsStore();
+  const activeTabId = useTabsStore((s) => s.activeTabId);
+  const setActiveTab = useTabsStore((s) => s.setActiveTab);
+  const closeTab = useTabsStore((s) => s.closeTab);
   const isActive = tab.id === activeTabId;
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Keep the active tab visible when the strip scrolls
+  useEffect(() => {
+    if (isActive) ref.current?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  }, [isActive]);
 
   return (
     <div
+      ref={ref}
       onClick={() => setActiveTab(tab.id)}
       onMouseDown={(e) => {
         if (e.button === 1) {
@@ -62,6 +72,9 @@ function TabItem({ tab }: { tab: Tab }) {
         fontSize: 12,
         whiteSpace: 'nowrap',
         position: 'relative',
+        maxWidth: 180,
+        minWidth: 0,
+        flexShrink: 0,
       }}
       onMouseEnter={(e) => {
         if (!isActive) e.currentTarget.style.background = 'var(--hover)';
@@ -71,7 +84,7 @@ function TabItem({ tab }: { tab: Tab }) {
       }}
     >
       {tab.type === 'explorer' ? <IconFolder /> : <IconTerminal />}
-      <span>{tab.title}</span>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{tab.title}</span>
       {!tab.pinned && (
         <div
           onClick={(e) => {
@@ -87,6 +100,7 @@ function TabItem({ tab }: { tab: Tab }) {
             borderRadius: 4,
             color: 'var(--t3)',
             marginLeft: 2,
+            flexShrink: 0,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--active)';
@@ -114,7 +128,8 @@ function IconTerminalSmall() {
 }
 
 export function TabBar() {
-  const { tabs, addTab } = useTabsStore();
+  const tabs = useTabsStore((s) => s.tabs);
+  const addTab = useTabsStore((s) => s.addTab);
 
   const handleNewExplorer = () => {
     addTab({
@@ -159,7 +174,7 @@ export function TabBar() {
         overflow: 'hidden',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'stretch', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'stretch', flex: 1, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none' }}>
         {tabs.map((tab) => (
           <TabItem key={tab.id} tab={tab} />
         ))}

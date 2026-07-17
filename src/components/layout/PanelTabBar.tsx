@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { usePanelsStore } from '../../stores/panels';
 import { useLayoutStore } from '../../stores/layout';
 import type { Tab } from '../../types';
@@ -65,10 +66,17 @@ function IconSplitV() {
 }
 
 function PanelTabItem({ tab, panelId }: { tab: Tab; panelId: string }) {
-  const { setActiveTab, closeTab } = usePanelsStore();
+  const setActiveTab = usePanelsStore((s) => s.setActiveTab);
+  const closeTab = usePanelsStore((s) => s.closeTab);
   const focusPanel = usePanelsStore((s) => s.focusPanel);
   const activeTabId = usePanelsStore((s) => s.panels[panelId]?.activeTabId);
   const isActive = tab.id === activeTabId;
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Keep the active tab visible when the strip scrolls
+  useEffect(() => {
+    if (isActive) ref.current?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  }, [isActive]);
 
   const handleDragStart = (e: React.DragEvent) => {
     e.dataTransfer.setData('application/panel-tab', JSON.stringify({ panelId, tabId: tab.id }));
@@ -77,6 +85,7 @@ function PanelTabItem({ tab, panelId }: { tab: Tab; panelId: string }) {
 
   return (
     <div
+      ref={ref}
       draggable
       onDragStart={handleDragStart}
       onClick={() => { setActiveTab(panelId, tab.id); focusPanel(panelId); }}
@@ -93,18 +102,19 @@ function PanelTabItem({ tab, panelId }: { tab: Tab; panelId: string }) {
         borderBottom: isActive ? '2px solid var(--accent)' : '2px solid transparent',
         color: isActive ? 'var(--t1)' : 'var(--t2)',
         fontSize: 12, whiteSpace: 'nowrap',
+        maxWidth: 180, minWidth: 0, flexShrink: 0,
       }}
       onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--hover)'; }}
       onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
     >
       {tab.type === 'explorer' ? <IconFolder /> : tab.type === 'terminal' ? <IconTerminal /> : <IconPreview />}
-      <span>{tab.title}</span>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{tab.title}</span>
       {!tab.pinned && (
         <div
           onClick={(e) => { e.stopPropagation(); closeTab(panelId, tab.id); }}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 16, height: 16, borderRadius: 3, color: 'var(--t3)',
+            width: 16, height: 16, borderRadius: 3, color: 'var(--t3)', flexShrink: 0,
           }}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--active)'; e.currentTarget.style.color = 'var(--t1)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--t3)'; }}
@@ -122,7 +132,8 @@ interface Props {
 
 export function PanelTabBar({ panelId }: Props) {
   const panel = usePanelsStore((s) => s.panels[panelId]);
-  const { addTab, focusPanel } = usePanelsStore();
+  const addTab = usePanelsStore((s) => s.addTab);
+  const focusPanel = usePanelsStore((s) => s.focusPanel);
   const splitPanel = useLayoutStore((s) => s.splitPanel);
   const focusedPanelId = usePanelsStore((s) => s.focusedPanelId);
   const isFocused = focusedPanelId === panelId;
@@ -194,7 +205,7 @@ export function PanelTabBar({ panelId }: Props) {
         overflow: 'hidden',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'stretch', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'stretch', flex: 1, overflowX: 'auto', overflowY: 'hidden', scrollbarWidth: 'none' }}>
         {tabs.map((tab) => (
           <PanelTabItem key={tab.id} tab={tab} panelId={panelId} />
         ))}

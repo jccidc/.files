@@ -35,7 +35,9 @@ export const usePreviewStore = create<PreviewState>()(
       togglePanel: () => set((s) => ({ panelVisible: !s.panelVisible })),
       showPanel: () => set({ panelVisible: true }),
       hidePanel: () => set({ panelVisible: false }),
-      setPanelWidth: (width) => set({ panelWidth: Math.max(250, width) }),
+      setPanelWidth: (width) => set({
+        panelWidth: Math.max(250, typeof window !== 'undefined' ? Math.min(width, window.innerWidth * 0.5) : width),
+      }),
       setOverlayEntry: (entry) => set({ overlayEntry: entry }),
 
       followSelection: (entry) => {

@@ -12,10 +12,14 @@ function rainbowColor(name: string): string {
   return RAINBOW_PALETTE[Math.abs(hash) % RAINBOW_PALETTE.length];
 }
 
-// Smaller icon for list view (16x16)
-export function FileIcon({ entry, size = 16 }: { entry: FileEntry; size?: number }) {
+// Smaller icon for list view (16x16 at 100% icon scale)
+export function FileIcon({ entry, size }: { entry: FileEntry; size?: number }) {
   const iconTheme = useSettingsStore((s) => s.settings.icon_theme) || 'minimal';
   const rainbowFolders = useSettingsStore((s) => s.settings.rainbow_folders);
+  const iconScale = useSettingsStore((s) => s.settings.icon_scale);
+  // No explicit size = list-view default, which follows the Icon Size setting
+  // (grid/tiles pass explicit pre-scaled sizes)
+  size = size ?? Math.round(16 * ((iconScale || 100) / 100));
   // Must call hooks unconditionally (React rules of hooks)
   const materialSvg = useMemo(() => {
     if (entry.is_dir || (entry.extension || '').toLowerCase() === 'lnk') return '';

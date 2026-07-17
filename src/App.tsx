@@ -217,6 +217,7 @@ function App() {
       {
         key: 'c',
         ctrl: true,
+        unlessTextSelected: true,
         handler: () => {
           const s = useExplorerStore.getState();
           const tid = s.activeTabId;
@@ -228,6 +229,7 @@ function App() {
       {
         key: 'x',
         ctrl: true,
+        unlessTextSelected: true,
         handler: () => {
           const s = useExplorerStore.getState();
           const tid = s.activeTabId;
