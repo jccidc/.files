@@ -57,7 +57,9 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
         onClose();
       }
     };
-    const escHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    // stopPropagation: Escape closes only the menu (topmost layer), not whatever
+    // is underneath it (e.g. QuickPreview's window-level Escape handler)
+    const escHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
     // Use requestAnimationFrame to avoid catching the same mousedown that opened us
     requestAnimationFrame(() => {
       document.addEventListener('mousedown', handler);
@@ -205,11 +207,12 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
   items.push({ label: 'Refresh', shortcut: 'F5', action: () => { onRefresh(); onClose(); } });
 
   const [hoveredSubmenu, setHoveredSubmenu] = useState<number | null>(null);
+  const [submenuAnchor, setSubmenuAnchor] = useState<{ top: number; left: number; right: number } | null>(null);
 
   const menuWidth = 220;
   const menuHeight = items.reduce((h, item) => h + (item.separator ? 9 + (item.label ? 18 : 0) : 32), 8);
   const adjustedX = x + menuWidth > window.innerWidth ? x - menuWidth : x;
-  const adjustedY = y + menuHeight > window.innerHeight ? Math.max(0, y - menuHeight) : y;
+  const adjustedY = y + menuHeight > window.innerHeight ? Math.max(8, y - menuHeight) : y;
 
   return createPortal(
     <div
@@ -218,6 +221,13 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
         position: 'fixed', left: adjustedX, top: adjustedY, zIndex: 1000,
         minWidth: menuWidth, background: 'var(--surface)', border: '1px solid var(--border)',
         borderRadius: 6, padding: '4px 0', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+        maxHeight: 'calc(100vh - 16px)', overflowY: 'auto',
+      }}
+      onScroll={() => {
+        // Submenus are position:fixed and anchored at mouseenter time; scrolling
+        // the root menu would leave them detached from their parent row.
+        setHoveredSubmenu(null);
+        setSubmenuAnchor(null);
       }}
     >
       {items.map((item, i) =>
@@ -234,7 +244,11 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
           <div
             key={i}
             style={{ position: 'relative' }}
-            onMouseEnter={() => setHoveredSubmenu(i)}
+            onMouseEnter={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setSubmenuAnchor({ top: rect.top, left: rect.left, right: rect.right });
+              setHoveredSubmenu(i);
+            }}
             onMouseLeave={() => setHoveredSubmenu(null)}
           >
             <div
@@ -248,14 +262,16 @@ export function ContextMenu({ x, y, entry, onClose, onOpen, onCopyPath, onRefres
               <span>{item.label}</span>
               <span style={{ fontSize: 10, color: 'var(--t3)' }}>{'\u25B6'}</span>
             </div>
-            {hoveredSubmenu === i && (
+            {hoveredSubmenu === i && submenuAnchor && (
               <div style={{
-                position: 'absolute',
-                left: adjustedX + menuWidth > window.innerWidth - 180 ? -178 : menuWidth - 2,
-                top: -4,
+                // Fixed so the menu's overflowY:auto doesn't clip it
+                position: 'fixed',
+                left: submenuAnchor.right + 176 > window.innerWidth - 8 ? submenuAnchor.left - 178 : submenuAnchor.right - 2,
+                top: Math.max(8, Math.min(submenuAnchor.top - 4, window.innerHeight - 8 - (item.submenu.length * 29 + 10))),
                 minWidth: 176, background: 'var(--surface)', border: '1px solid var(--border)',
                 borderRadius: 6, padding: '4px 0', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
                 zIndex: 1001,
+                maxHeight: 'calc(100vh - 16px)', overflowY: 'auto',
               }}>
                 {item.submenu.map((sub, si) => (
                   <div

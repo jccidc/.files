@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { invoke } from '@tauri-apps/api/core';
-import { useExplorerStore } from '../../stores/explorer';
+import { useExplorerStore, type ViewMode } from '../../stores/explorer';
+import { applyToSubtree } from '../../stores/folderViews';
 import { usePreviewStore } from '../../stores/preview';
 import { TAG_TYPES, type TagId, type DirListing } from '../../types';
 
@@ -55,6 +56,15 @@ function IconHome() {
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M2 7L7 2L12 7" />
       <path d="M3 7V12H6V9H8V12H11V7" />
+    </svg>
+  );
+}
+
+function IconRefresh() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 7a5 5 0 1 1-1.5-3.5" />
+      <path d="M12 1v3h-3" />
     </svg>
   );
 }
@@ -208,6 +218,16 @@ function IconSortDesc() {
   );
 }
 
+function IconMore() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" stroke="none">
+      <circle cx="3" cy="7" r="1.2" />
+      <circle cx="7" cy="7" r="1.2" />
+      <circle cx="11" cy="7" r="1.2" />
+    </svg>
+  );
+}
+
 // -- Styles --
 
 const btnBase: React.CSSProperties = {
@@ -261,6 +281,50 @@ const GROUP_OPTIONS: { key: GroupBy; label: string }[] = [
   { key: 'letter', label: 'First Letter' },
 ];
 
+const VIEW_MODES: { key: ViewMode; label: string }[] = [
+  { key: 'list', label: 'List' },
+  { key: 'grid', label: 'Grid' },
+  { key: 'columns', label: 'Columns' },
+  { key: 'gallery', label: 'Gallery' },
+  { key: 'tiles', label: 'Tiles' },
+  { key: 'flat', label: 'Flat' },
+  { key: 'treemap', label: 'Treemap' },
+];
+
+// -- Overflow ("...") menu building blocks --
+
+function OverflowSectionLabel({ label }: { label: string }) {
+  return (
+    <div style={{ fontSize: 9, color: 'var(--t3)', padding: '6px 12px 2px', userSelect: 'none' }}>{label}</div>
+  );
+}
+
+function OverflowMenuItem({ label, active, disabled, onClick, trailing }: {
+  label: string;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  trailing?: React.ReactNode;
+}) {
+  return (
+    <div
+      onClick={disabled ? undefined : onClick}
+      style={{
+        padding: '6px 12px', fontSize: 12,
+        color: active ? 'var(--accent)' : 'var(--t2)',
+        opacity: disabled ? 0.4 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+      }}
+      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = 'var(--hover)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+    >
+      <span>{label}</span>
+      {trailing}
+    </div>
+  );
+}
+
 // -- Breadcrumb Dropdown --
 
 function BreadcrumbDropdown({ x, y, items, currentFolder, onSelect, onClose }: {
@@ -273,6 +337,18 @@ function BreadcrumbDropdown({ x, y, items, currentFolder, onSelect, onClose }: {
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [highlightIdx, setHighlightIdx] = useState(-1);
+  const [pos, setPos] = useState({ x, y });
+
+  // Clamp to viewport edges (same flip/clamp approach as ContextMenu)
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setPos({
+      x: x + rect.width > window.innerWidth ? Math.max(0, window.innerWidth - rect.width - 8) : x,
+      y: y + rect.height > window.innerHeight ? Math.max(0, y - rect.height - 4) : y,
+    });
+  }, [x, y, items]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -295,7 +371,7 @@ function BreadcrumbDropdown({ x, y, items, currentFolder, onSelect, onClose }: {
 
   return (
     <div ref={ref} style={{
-      position: 'fixed', left: x, top: y, zIndex: 9999,
+      position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999,
       background: 'var(--surface)', border: '1px solid var(--border)',
       borderRadius: 6, padding: '4px 0', minWidth: 160, maxHeight: 300,
       overflowY: 'auto', boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
@@ -337,7 +413,8 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
   const goForward = () => useExplorerStore.getState().goForward(tabId);
   const goUp = () => useExplorerStore.getState().goUp(tabId);
   const goHome = () => useExplorerStore.getState().goHome(tabId);
-  const setViewMode = (mode: string) => useExplorerStore.getState().setViewMode(tabId, mode as any);
+  const refreshTab = () => useExplorerStore.getState().refresh(tabId);
+  const setViewMode = (mode: ViewMode) => useExplorerStore.getState().setViewMode(tabId, mode);
   const copyPaths = (paths: string[]) => useExplorerStore.getState().copyPaths(paths);
   const cutPaths = (paths: string[]) => useExplorerStore.getState().cutPaths(paths);
   const paste = () => useExplorerStore.getState().paste(tabId);
@@ -348,6 +425,13 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
   const [groupOpen, setGroupOpen] = useState(false);
   const [tagFilterOpen, setTagFilterOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [overflowOpen, setOverflowOpen] = useState(false);
+  const [sortAlignRight, setSortAlignRight] = useState(false);
+  const [groupAlignRight, setGroupAlignRight] = useState(false);
+  const [tagAlignRight, setTagAlignRight] = useState(false);
+  // 0 = nothing collapsed, 1 = view cluster, 2 = +extras, 3 = +actions.
+  // Bucketed so the ResizeObserver only re-renders when a threshold is crossed.
+  const [collapseBucket, setCollapseBucket] = useState(0);
   const [pathEditing, setPathEditing] = useState(false);
   const [pathSuggestions, setPathSuggestions] = useState<{ label: string; path: string }[]>([]);
   const [pathSuggestionIdx, setPathSuggestionIdx] = useState(-1);
@@ -362,6 +446,8 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
   const sortRef = useRef<HTMLDivElement>(null);
   const groupRef = useRef<HTMLDivElement>(null);
   const tagFilterRef = useRef<HTMLDivElement>(null);
+  const overflowRef = useRef<HTMLDivElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
   const filterInputRef = useRef<HTMLInputElement>(null);
   const pathInputRef = useRef<HTMLInputElement>(null);
   const pathSubmittedRef = useRef(false);
@@ -392,15 +478,40 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
 
   // Close dropdowns on outside click
   useEffect(() => {
-    if (!sortOpen && !groupOpen && !tagFilterOpen) return;
+    if (!sortOpen && !groupOpen && !tagFilterOpen && !overflowOpen) return;
     const handler = (e: MouseEvent) => {
       if (sortOpen && sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false);
       if (groupOpen && groupRef.current && !groupRef.current.contains(e.target as Node)) setGroupOpen(false);
       if (tagFilterOpen && tagFilterRef.current && !tagFilterRef.current.contains(e.target as Node)) setTagFilterOpen(false);
+      if (overflowOpen && overflowRef.current && !overflowRef.current.contains(e.target as Node)) setOverflowOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [sortOpen, groupOpen, tagFilterOpen]);
+  }, [sortOpen, groupOpen, tagFilterOpen, overflowOpen]);
+
+  // Measure top row width to collapse lower-priority clusters into the "..." menu
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = entry.contentRect.width;
+        setCollapseBucket(w < 420 ? 3 : w < 560 ? 2 : w < 760 ? 1 : 0);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Width-gated menus unmount when their cluster collapses/expands; without this
+  // the open-state survives (outside-click can't clear it while the ref is null)
+  // and the menu spontaneously re-opens when the threshold is re-crossed.
+  useEffect(() => {
+    setOverflowOpen(false);
+    setSortOpen(false);
+    setGroupOpen(false);
+    setTagFilterOpen(false);
+  }, [collapseBucket]);
 
   // Close path context menu on outside click
   useEffect(() => {
@@ -492,6 +603,28 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
     navigate(suggestion.path);
   };
 
+  // Explorer parity: submitting a FILE path launches the file and navigates to
+  // its folder; anything else is treated as a directory to navigate into.
+  const submitPath = async (raw: string) => {
+    let parent = raw.replace(/[\\/]+$/, '').replace(/[\\/][^\\/]*$/, '');
+    if (/^[a-zA-Z]:$/.test(parent)) parent += '\\';
+    if (parent && parent !== raw) {
+      try {
+        const { readDir } = await import('../../api/filesystem');
+        const listing = await readDir(parent, true);
+        const norm = (p: string) => p.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase();
+        const hit = listing.entries.find((en) => norm(en.path) === norm(raw));
+        if (hit && !hit.is_dir) {
+          const { openFile } = await import('../../api/shell');
+          openFile(hit.path).catch(() => {});
+          navigate(parent);
+          return;
+        }
+      } catch {}
+    }
+    navigate(raw);
+  };
+
   const handlePathKeyDown = (e: React.KeyboardEvent) => {
     if (pathSuggestions.length > 0) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setPathSuggestionIdx(i => Math.min(i + 1, pathSuggestions.length - 1)); return; }
@@ -507,14 +640,16 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
       pathSubmittedRef.current = true;
       setPathEditing(false);
       setPathSuggestions([]);
+      // Strip whitespace and surrounding quotes (Copy Path wraps paths in quotes)
+      const raw = pathValue.trim().replace(/^"([\s\S]*)"$/, '$1').trim();
       // Recognize special path names
-      const val = pathValue.trim().toLowerCase();
+      const val = raw.toLowerCase();
       if (val === 'recycle bin' || val === 'recyclebin' || val === 'trash') {
         navigate('recycle-bin');
       } else if (val === 'this pc' || val === 'thispc' || val === 'my computer') {
         navigate('this-pc');
       } else {
-        navigate(pathValue);
+        submitPath(raw);
       }
     }
     else if (e.key === 'Escape') { pathSubmittedRef.current = true; setPathEditing(false); setPathValue(currentPath); setPathSuggestions([]); }
@@ -522,6 +657,12 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
 
   const sortLabel = SORT_FIELDS.find((f) => f.key === sortField)?.label || 'Name';
   const groupLabel = GROUP_OPTIONS.find((g) => g.key === groupBy)?.label || 'None';
+
+  // Responsive collapse: hide lower-priority clusters below width thresholds
+  // (bucketed in the ResizeObserver: <760 = 1, <560 = 2, <420 = 3).
+  const collapseView = collapseBucket >= 1;
+  const collapseExtras = collapseBucket >= 2;
+  const collapseActions = collapseBucket >= 3;
 
   // Build breadcrumb segments
   const SPECIAL_PATH_LABELS: Record<string, string> = { 'this-pc': 'This PC', 'recycle-bin': 'Recycle Bin' };
@@ -538,7 +679,7 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
       flexShrink: 0,
     }}>
       {/* Top row: nav + actions + view + sort + group + filter */}
-      <div style={{
+      <div ref={rowRef} style={{
         height: 36,
         display: 'flex',
         flexDirection: 'row',
@@ -585,10 +726,20 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
         >
           <IconHome />
         </button>
+        <button
+          style={btnBase}
+          onClick={refreshTab}
+          onMouseEnter={handleBtnHover}
+          onMouseLeave={(e) => handleBtnLeave(e)}
+          title="Refresh"
+        >
+          <IconRefresh />
+        </button>
 
         <div style={dividerStyle} />
 
         {/* File Actions */}
+        {!collapseActions && (<>
         <button
           style={hasSelection ? btnBase : btnDisabled}
           disabled={!hasSelection}
@@ -641,8 +792,10 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
         </button>
 
         <div style={dividerStyle} />
+        </>)}
 
         {/* View toggles */}
+        {!collapseView && (<>
         <button
           style={viewMode === 'list' ? btnActive : btnBase}
           onClick={() => setViewMode('list')}
@@ -708,7 +861,9 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
         </button>
 
         <div style={dividerStyle} />
+        </>)}
 
+        {!collapseExtras && (<>
         <button
           style={previewVisible ? btnActive : btnBase}
           onClick={togglePreview}
@@ -725,7 +880,12 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
         <div ref={sortRef} style={{ position: 'relative' }}>
           <button
             style={{ ...btnBase, width: 'auto', padding: '0 6px', gap: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}
-            onClick={() => setSortOpen(!sortOpen)}
+            onClick={() => {
+              if (!sortOpen && sortRef.current) {
+                setSortAlignRight(sortRef.current.getBoundingClientRect().left + 140 > window.innerWidth - 8);
+              }
+              setSortOpen(!sortOpen);
+            }}
             onMouseEnter={handleBtnHover}
             onMouseLeave={(e) => handleBtnLeave(e)}
             title="Sort"
@@ -736,7 +896,7 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
           </button>
           {sortOpen && (
             <div style={{
-              position: 'absolute', top: 30, left: 0,
+              position: 'absolute', top: 30, ...(sortAlignRight ? { right: 0 } : { left: 0 }),
               background: 'var(--raised)', border: '1px solid var(--border)',
               borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
               zIndex: 100, minWidth: 140, padding: '4px 0',
@@ -761,6 +921,25 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
                   )}
                 </div>
               ))}
+              <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
+              <div
+                onClick={() => {
+                  // This folder's sort + view become the default for its whole subtree
+                  const tab = useExplorerStore.getState().getTab(tabId);
+                  applyToSubtree(tab.currentPath, {
+                    sort_by: sortField,
+                    sort_asc: sortAsc,
+                    view: tab.viewMode,
+                  });
+                  setSortOpen(false);
+                }}
+                title="Use this folder's sort and view for all folders inside it"
+                style={{ padding: '6px 12px', fontSize: 12, color: 'var(--t2)', cursor: 'pointer' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                Apply to Subfolders
+              </div>
             </div>
           )}
         </div>
@@ -769,7 +948,12 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
         <div ref={groupRef} style={{ position: 'relative' }}>
           <button
             style={{ ...btnBase, width: 'auto', padding: '0 6px', gap: 4, fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}
-            onClick={() => setGroupOpen(!groupOpen)}
+            onClick={() => {
+              if (!groupOpen && groupRef.current) {
+                setGroupAlignRight(groupRef.current.getBoundingClientRect().left + 160 > window.innerWidth - 8);
+              }
+              setGroupOpen(!groupOpen);
+            }}
             onMouseEnter={handleBtnHover}
             onMouseLeave={(e) => handleBtnLeave(e, groupBy !== 'none')}
             title="Group by"
@@ -779,7 +963,7 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
           </button>
           {groupOpen && (
             <div style={{
-              position: 'absolute', top: 30, left: 0,
+              position: 'absolute', top: 30, ...(groupAlignRight ? { right: 0 } : { left: 0 }),
               background: 'var(--raised)', border: '1px solid var(--border)',
               borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
               zIndex: 100, minWidth: 160, padding: '4px 0',
@@ -807,7 +991,12 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
         <div ref={tagFilterRef} style={{ position: 'relative' }}>
           <button
             style={tagFilter !== 'all' ? { ...btnBase, color: 'var(--accent)' } : btnBase}
-            onClick={() => setTagFilterOpen(!tagFilterOpen)}
+            onClick={() => {
+              if (!tagFilterOpen && tagFilterRef.current) {
+                setTagAlignRight(tagFilterRef.current.getBoundingClientRect().left + 160 > window.innerWidth - 8);
+              }
+              setTagFilterOpen(!tagFilterOpen);
+            }}
             onMouseEnter={handleBtnHover}
             onMouseLeave={(e) => handleBtnLeave(e, tagFilter !== 'all')}
             title="Filter by tag"
@@ -819,7 +1008,7 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
           </button>
           {tagFilterOpen && (
             <div style={{
-              position: 'absolute', top: 30, left: 0,
+              position: 'absolute', top: 30, ...(tagAlignRight ? { right: 0 } : { left: 0 }),
               background: 'var(--raised)', border: '1px solid var(--border)',
               borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
               zIndex: 100, minWidth: 160, padding: '4px 0',
@@ -865,6 +1054,7 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
         </div>
 
         <div style={dividerStyle} />
+        </>)}
 
         {/* Filter */}
         <button
@@ -895,6 +1085,70 @@ export function Toolbar({ tabId, onRename, onDelete, sortField, sortAsc, onSort,
             onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
             onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; }}
           />
+        )}
+
+        {/* Overflow ("...") menu for collapsed clusters */}
+        {collapseView && (
+          <div ref={overflowRef} style={{ position: 'relative', marginLeft: 'auto' }}>
+            <button
+              style={overflowOpen ? btnActive : btnBase}
+              onClick={() => setOverflowOpen(!overflowOpen)}
+              onMouseEnter={handleBtnHover}
+              onMouseLeave={(e) => handleBtnLeave(e, overflowOpen)}
+              title="More tools"
+            >
+              <IconMore />
+            </button>
+            {overflowOpen && (
+              <div style={{
+                position: 'absolute', top: 30, right: 0,
+                background: 'var(--raised)', border: '1px solid var(--border)',
+                borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                zIndex: 100, minWidth: 180, padding: '4px 0',
+                maxHeight: 420, overflowY: 'auto',
+              }}>
+                {collapseActions && (<>
+                  <OverflowSectionLabel label="Actions" />
+                  <OverflowMenuItem label="Copy" disabled={!hasSelection} onClick={() => { copyPaths([...selectedPaths]); setOverflowOpen(false); }} />
+                  <OverflowMenuItem label="Cut" disabled={!hasSelection} onClick={() => { cutPaths([...selectedPaths]); setOverflowOpen(false); }} />
+                  <OverflowMenuItem label="Paste" disabled={!hasClipboard} onClick={() => { paste(); setOverflowOpen(false); }} />
+                  <OverflowMenuItem label="Rename" disabled={!hasSingleSelection} onClick={() => { onRename(); setOverflowOpen(false); }} />
+                  <OverflowMenuItem label="Delete" disabled={!hasSelection} onClick={() => { onDelete(); setOverflowOpen(false); }} />
+                </>)}
+                {collapseView && (<>
+                  <OverflowSectionLabel label="View" />
+                  {VIEW_MODES.map((m) => (
+                    <OverflowMenuItem key={m.key} label={m.label} active={viewMode === m.key} onClick={() => { setViewMode(m.key); setOverflowOpen(false); }} />
+                  ))}
+                </>)}
+                {collapseExtras && (<>
+                  <OverflowSectionLabel label="Panels" />
+                  <OverflowMenuItem label="Preview panel" active={previewVisible} onClick={() => { togglePreview(); setOverflowOpen(false); }} />
+                  <OverflowSectionLabel label="Sort by" />
+                  {SORT_FIELDS.map((f) => (
+                    <OverflowMenuItem
+                      key={f.key}
+                      label={f.label}
+                      active={sortField === f.key}
+                      onClick={() => { onSort(f.key); setOverflowOpen(false); }}
+                      trailing={sortField === f.key ? (sortAsc ? <IconSortAsc /> : <IconSortDesc />) : undefined}
+                    />
+                  ))}
+                  <OverflowSectionLabel label="Group by" />
+                  {GROUP_OPTIONS.map((g) => (
+                    <OverflowMenuItem key={g.key} label={g.label} active={groupBy === g.key} onClick={() => { onGroupByChange(g.key); setOverflowOpen(false); }} />
+                  ))}
+                  <OverflowSectionLabel label="Tag filter" />
+                  <OverflowMenuItem label="All Files" active={tagFilter === 'all'} onClick={() => { onTagFilterChange('all'); setOverflowOpen(false); }} />
+                  <OverflowMenuItem label="Any Tagged" active={tagFilter === 'any-tagged'} onClick={() => { onTagFilterChange('any-tagged'); setOverflowOpen(false); }} />
+                  <OverflowMenuItem label="Untagged" active={tagFilter === 'untagged'} onClick={() => { onTagFilterChange('untagged'); setOverflowOpen(false); }} />
+                  {(Object.entries(TAG_TYPES) as [TagId, typeof TAG_TYPES[TagId]][]).map(([id, tag]) => (
+                    <OverflowMenuItem key={id} label={`${tag.icon} ${tag.label}`} active={tagFilter === id} onClick={() => { onTagFilterChange(id); setOverflowOpen(false); }} />
+                  ))}
+                </>)}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

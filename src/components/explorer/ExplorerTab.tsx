@@ -1,12 +1,15 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useVirtualScroll } from '../../hooks/useVirtualScroll';
 import { useExplorerStore } from '../../stores/explorer';
 import { useSettingsStore } from '../../stores/settings';
 import { usePanelsStore } from '../../stores/panels';
 import { watchDir, unwatchDir, onFsChange } from '../../api/watcher';
-import { deleteToTrash, renameFile, resolveShortcut, openFile } from '../../api/shell';
+import { deleteToTrash, renameFile, resolveShortcut, openFile, fileTypeNames } from '../../api/shell';
 import { readDir } from '../../api/filesystem';
 import { ContextMenu } from './ContextMenu';
+import { InlineRename } from './InlineRename';
+import { resolveFolderView, saveFolderView } from '../../stores/folderViews';
 import { ConflictDialog } from './ConflictDialog';
 import { ThisPcView } from './ThisPcView';
 import { RecycleBinView } from './RecycleBinView';
@@ -117,38 +120,8 @@ function HoverTooltip({ entry, x, y }: { entry: FileEntry; x: number; y: number 
   );
 }
 
-// ---- Inline Rename ----
-
-function InlineRename({ entry, onDone }: { entry: FileEntry; onDone: (newName: string | null) => void }) {
-  const [value, setValue] = useState(entry.name);
-  const ref = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (ref.current) {
-      ref.current.focus();
-      const dotIdx = entry.name.lastIndexOf('.');
-      ref.current.setSelectionRange(0, dotIdx > 0 ? dotIdx : entry.name.length);
-    }
-  }, []);
-
-  return (
-    <input
-      ref={ref} value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') onDone(value);
-        else if (e.key === 'Escape') onDone(null);
-      }}
-      onBlur={() => onDone(null)}
-      style={{
-        background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 3,
-        padding: '1px 4px', color: 'var(--t1)', fontSize: 12,
-        fontFamily: "'JetBrains Mono', monospace", outline: 'none',
-        flex: 1, minWidth: 0, height: 22, boxSizing: 'border-box',
-      }}
-    />
-  );
-}
+// Extension aliases that are the same real type (merged before type-name lookup)
+const EXT_ALIAS: Record<string, string> = { jpeg: 'jpg', tif: 'tiff', htm: 'html' };
 
 // ---- Peek Row (inline folder expand) ----
 
@@ -275,6 +248,7 @@ interface FileRowProps {
   onHoverEnd: () => void;
   onPeekToggle: () => void;
   onPointerDragStart: (e: React.PointerEvent) => void;
+  domId?: string;
 }
 
 const gitStatusColors: Record<string, string> = {
@@ -285,9 +259,12 @@ const gitStatusLetters: Record<string, string> = {
   modified: 'M', added: 'A', deleted: 'D', renamed: 'R', untracked: '?', conflict: '!', typechange: 'T',
 };
 
-function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWidths, columns, gitStatus: gs, folderSize, onClick, onDoubleClick, onContextMenu, onRenameDone, onHover, onHoverEnd, onPeekToggle, onPointerDragStart, onMiddleClick }: FileRowProps & { onMiddleClick?: (entry: FileEntry) => void }) {
+function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWidths, columns, gitStatus: gs, folderSize, onClick, onDoubleClick, onContextMenu, onRenameDone, onHover, onHoverEnd, onPeekToggle, onPointerDragStart, onMiddleClick, domId }: FileRowProps & { onMiddleClick?: (entry: FileEntry) => void }) {
   return (
     <div
+      id={domId}
+      role="option"
+      aria-selected={selected}
       className={selected ? 'file-row-selected' : undefined}
       data-drop-folder={entry.is_dir ? entry.path : undefined}
       data-filepath={entry.path}
@@ -305,14 +282,14 @@ function FileRow({ entry, selected, even, renaming, peekOpen, peekEnabled, colWi
         onHover(entry, e.clientX, e.clientY);
       }}
       onMouseLeave={(e) => {
-        if (!selected) e.currentTarget.style.background = even ? 'transparent' : 'rgba(255,255,255,0.01)';
+        if (!selected) e.currentTarget.style.background = even ? 'transparent' : 'var(--row-alt)';
         onHoverEnd();
       }}
       onMouseMove={(e) => onHover(entry, e.clientX, e.clientY)}
       style={{
         display: 'grid', gridTemplateColumns: colWidths, alignItems: 'center',
         height: 'var(--row-height)',
-        background: selected ? 'var(--active)' : even ? 'transparent' : 'rgba(255,255,255,0.01)',
+        background: selected ? 'var(--active)' : even ? 'transparent' : 'var(--row-alt)',
         cursor: 'pointer', borderRadius: 2, userSelect: 'none',
       }}
     >
@@ -739,19 +716,43 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortAsc, setSortAsc] = useState(true);
+
+  // Apply this folder's remembered sort (or an ancestor's subtree pref), else the global default
+  useEffect(() => {
+    const s = useSettingsStore.getState().settings;
+    const o = resolveFolderView(currentPath);
+    setSortField((o?.sort_by ?? s.sort_by ?? 'name') as SortField);
+    setSortAsc(o?.sort_asc ?? s.sort_asc ?? true);
+  }, [currentPath]);
   const [tooltip, setTooltip] = useState<{ entry: FileEntry; x: number; y: number } | null>(null);
   const previewEntry = usePreviewStore((s) => s.overlayEntry);
   const setPreviewEntry = usePreviewStore((s) => s.setOverlayEntry);
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  // Bumped after a rename so views that fetch their own listing (FlatView) reload
+  const [fsVersion, setFsVersion] = useState(0);
   const [peekPaths, setPeekPaths] = useState<Set<string>>(new Set());
   const [peekChildren, setPeekChildren] = useState<Record<string, FileEntry[]>>({});
   // dropHighlight removed -- pointer-event drag system handles visuals globally
   const [filterText, setFilterText] = useState('');
   const [folderSizes, setFolderSizes] = useState<Record<string, number>>({});
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
+  // Friendly Explorer-style type names (ext -> "Adobe Acrobat Document") for group headers
+  const [typeNames, setTypeNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (groupBy !== 'type') return;
+    const missing = [...new Set(
+      entries
+        .filter((e) => !e.is_dir)
+        .map((e) => { const x = (e.extension || '').toLowerCase(); return EXT_ALIAS[x] || x; })
+        .filter((x) => x && !(x in typeNames))
+    )];
+    if (missing.length === 0) return;
+    fileTypeNames(missing).then((m) => setTypeNames((prev) => ({ ...prev, ...m }))).catch(() => {});
+  }, [groupBy, entries, typeNames]);
   const [tagFilter, setTagFilter] = useState<TagFilter>('all');
   const tooltipTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const lastClickedIndex = useRef<number>(-1);
+  const focusedIndex = useRef<number>(-1);
   const slowClickTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const slowClickPath = useRef<string | null>(null);
   const watcherIdRef = useRef(tab.id);
@@ -776,7 +777,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
 
   const getColWidth = (col: ColumnDef) => colWidthOverrides[col.id] ?? col.defaultWidth;
 
-  const colWidths = activeColumns.map(c => c.defaultWidth === 0 ? '1fr' : `${getColWidth(c)}px`).join(' ');
+  const colWidths = activeColumns.map(c => c.defaultWidth === 0 ? `minmax(${c.minWidth}px, 1fr)` : `${getColWidth(c)}px`).join(' ');
 
   const persistColumnOrder = useCallback((cols: ColumnId[]) => {
     setVisibleCols(cols);
@@ -862,9 +863,9 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     }
   }
 
-  const sortedEntriesRaw = sortEntries(entries, sortField, sortAsc);
+  const sortedEntriesRaw = useMemo(() => sortEntries(entries, sortField, sortAsc), [entries, sortField, sortAsc]);
   const tagsMap = fileTags || {};
-  const sortedEntries = sortedEntriesRaw.filter((e) => {
+  const sortedEntries = useMemo(() => sortedEntriesRaw.filter((e) => {
     // Tag filter
     if (tagFilter !== 'all') {
       const norm = e.path.replace(/\\/g, '/');
@@ -885,14 +886,18 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       return name.includes(filter);
     }
     return true;
-  });
+  }), [sortedEntriesRaw, tagFilter, filterText, fileTags]);
 
   // Group-by logic
   function getGroupKey(entry: FileEntry): string {
     switch (groupBy) {
-      case 'type':
-        if (entry.is_dir) return 'Folders';
-        return (entry.extension || 'No extension').toUpperCase();
+      case 'type': {
+        if (entry.is_dir) return 'File folder';
+        const ext = (entry.extension || '').toLowerCase();
+        const norm = EXT_ALIAS[ext] || ext;
+        if (!norm) return 'File';
+        return typeNames[norm] || `${norm.toUpperCase()} File`;
+      }
       case 'date': {
         if (!entry.modified) return 'Unknown';
         const d = new Date(entry.modified);
@@ -926,27 +931,76 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   // Build flat list with peek children and group headers
   const PEEK_VISIBLE = 5;
   type FlatItem = { entry: FileEntry; depth: number; isPeek: boolean; peekParent?: string; groupHeader?: string; sortedIndex?: number };
-  const flatList: FlatItem[] = [];
-  let lastGroup = '';
-  for (let si = 0; si < sortedEntries.length; si++) {
-    const entry = sortedEntries[si];
+  const flatList: FlatItem[] = useMemo(() => {
+    const list: FlatItem[] = [];
+    // When grouping, bucket entries by group key first (keeping the current sort
+    // order within each group) so a group can never appear twice. Groups are
+    // ordered by their first entry in the current sort.
+    let ordered = sortedEntries.map((entry, si) => ({ entry, si }));
     if (groupBy !== 'none') {
-      const gk = getGroupKey(entry);
-      if (gk !== lastGroup) {
-        flatList.push({ entry, depth: 0, isPeek: false, groupHeader: gk });
-        lastGroup = gk;
+      const buckets = new Map<string, { entry: FileEntry; si: number }[]>();
+      for (const item of ordered) {
+        const gk = getGroupKey(item.entry);
+        const b = buckets.get(gk);
+        if (b) b.push(item);
+        else buckets.set(gk, [item]);
+      }
+      // Native-style group order: alphabetical for type/letter, natural bucket
+      // order for date/size
+      const keys = [...buckets.keys()];
+      if (groupBy === 'type' || groupBy === 'letter') {
+        keys.sort((a, b) => a.localeCompare(b));
+      } else if (groupBy === 'date') {
+        const order = ['Today', 'Yesterday', 'This Week', 'This Month', 'This Year', 'Older', 'Unknown'];
+        keys.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+      } else if (groupBy === 'size') {
+        const order = ['Folders', 'Large (100 MB+)', 'Medium (< 100 MB)', 'Small (< 1 MB)', 'Tiny (< 1 KB)', 'Empty'];
+        keys.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+      }
+      ordered = keys.flatMap((k) => buckets.get(k)!);
+    }
+    let lastGroup = '';
+    for (const { entry, si } of ordered) {
+      if (groupBy !== 'none') {
+        const gk = getGroupKey(entry);
+        if (gk !== lastGroup) {
+          list.push({ entry, depth: 0, isPeek: false, groupHeader: gk });
+          lastGroup = gk;
+        }
+      }
+      list.push({ entry, depth: 0, isPeek: false, sortedIndex: si });
+      if (peekPaths.has(entry.path) && peekChildren[entry.path]) {
+        const children = peekChildren[entry.path];
+        for (const child of children) {
+          list.push({ entry: child, depth: 1, isPeek: true, peekParent: entry.path });
+        }
       }
     }
-    flatList.push({ entry, depth: 0, isPeek: false, sortedIndex: si });
-    if (peekPaths.has(entry.path) && peekChildren[entry.path]) {
-      const children = peekChildren[entry.path];
-      for (const child of children) {
-        flatList.push({ entry: child, depth: 1, isPeek: true, peekParent: entry.path });
-      }
-    }
-  }
+    return list;
+  }, [sortedEntries, groupBy, peekPaths, peekChildren, typeNames]);
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Virtualize the list when rows are uniform height (no group headers, no open peeks)
+  const virtualizable = groupBy === 'none' && peekPaths.size === 0;
+  const density = useSettingsStore((s) => s.settings.density);
+  const iconScaleSetting = useSettingsStore((s) => s.settings.icon_scale);
+  const readRowHeight = () => {
+    const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--row-height'));
+    return Number.isFinite(v) && v > 0 ? v : 28;
+  };
+  const [rowHeightPx, setRowHeightPx] = useState(readRowHeight);
+  useEffect(() => {
+    // rAF so this reads --row-height after useTheme's effect has applied the new density/icon scale
+    const id = requestAnimationFrame(() => setRowHeightPx(readRowHeight()));
+    return () => cancelAnimationFrame(id);
+  }, [density, iconScaleSetting]);
+  const virt = useVirtualScroll(virtualizable ? flatList.length : 0, rowHeightPx);
+
+  // Reset scroll position when navigating to a different directory
+  useEffect(() => {
+    if (virt.containerRef.current) virt.containerRef.current.scrollTop = 0;
+  }, [currentPath]);
 
   // Navigate on mount
   useEffect(() => {
@@ -1046,6 +1100,9 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   // Space bar quick preview
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Don't hijack space while typing (e.g. inline rename input)
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (e.key === ' ' && !previewEntry && selectedPaths.size === 1) {
         e.preventDefault();
         const path = [...selectedPaths][0];
@@ -1080,8 +1137,12 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         return;
       }
 
-      // Ctrl+C — copy selected to system clipboard
+      // Ctrl+C — copy selected to system clipboard. If the user has text
+      // highlighted (e.g. in the preview panel), let the native copy handle it
+      // instead of hijacking the shortcut for file-copy.
       if (e.ctrlKey && !e.shiftKey && (e.key === 'c' || e.key === 'C')) {
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed) return;
         if (selectedPaths.size > 0) {
           e.preventDefault();
           const paths = [...selectedPaths];
@@ -1093,8 +1154,11 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         return;
       }
 
-      // Ctrl+X — cut selected to system clipboard
+      // Ctrl+X — cut selected to system clipboard (skip when text is highlighted,
+      // same as Ctrl+C above)
       if (e.ctrlKey && !e.shiftKey && (e.key === 'x' || e.key === 'X')) {
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed) return;
         if (selectedPaths.size > 0) {
           e.preventDefault();
           const paths = [...selectedPaths];
@@ -1139,7 +1203,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       if (e.ctrlKey && e.shiftKey && e.key === 'C') {
         if (selectedPaths.size === 1) {
           e.preventDefault();
-          navigator.clipboard.writeText([...selectedPaths][0]);
+          navigator.clipboard.writeText(`"${[...selectedPaths][0]}"`);
         }
         return;
       }
@@ -1184,11 +1248,91 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         e.preventDefault();
         setRenamingPath([...selectedPaths][0]);
       }
+
+      // Keyboard nav targets the focused panel's active tab (panels store is the
+      // focus authority in split layouts; explorer's activeTabId can go stale --
+      // see Sidebar.tsx which works around the same thing).
+      const isKeyboardTarget = () => {
+        if (panelId) {
+          const ps = usePanelsStore.getState();
+          return ps.focusedPanelId === panelId && ps.panels[panelId]?.activeTabId === tabId;
+        }
+        return store.getState().activeTabId === tabId;
+      };
+
+      // ArrowUp/ArrowDown -- move selection through the list (active tab only; Shift extends)
+      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (!isKeyboardTarget()) return;
+        if (sortedEntries.length === 0) return;
+        e.preventDefault();
+        const delta = e.key === 'ArrowDown' ? 1 : -1;
+        let cur = focusedIndex.current;
+        if (cur < 0 || cur >= sortedEntries.length || !selectedPaths.has(sortedEntries[cur].path)) {
+          cur = sortedEntries.findIndex((en) => selectedPaths.has(en.path));
+        }
+        const next = cur === -1
+          ? (delta === 1 ? 0 : sortedEntries.length - 1)
+          : Math.max(0, Math.min(sortedEntries.length - 1, cur + delta));
+        if (e.shiftKey) {
+          const anchor = lastClickedIndex.current >= 0 && lastClickedIndex.current < sortedEntries.length
+            ? lastClickedIndex.current : next;
+          const start = Math.min(anchor, next);
+          const end = Math.max(anchor, next);
+          setSelected(new Set(sortedEntries.slice(start, end + 1).map((en) => en.path)));
+        } else {
+          setSelected(new Set([sortedEntries[next].path]));
+          lastClickedIndex.current = next;
+        }
+        focusedIndex.current = next;
+        // Keep the focused row visible
+        const targetPath = sortedEntries[next].path;
+        requestAnimationFrame(() => {
+          const el = virt.containerRef.current;
+          if (!el) return;
+          if (virtualizable) {
+            const top = next * rowHeightPx;
+            if (top < el.scrollTop) el.scrollTop = top;
+            else if (top + rowHeightPx > el.scrollTop + el.clientHeight) el.scrollTop = top + rowHeightPx - el.clientHeight;
+          } else {
+            el.querySelector(`[data-filepath="${CSS.escape(targetPath)}"]`)?.scrollIntoView({ block: 'nearest' });
+          }
+        });
+        return;
+      }
+
+      // Enter -- open the selected item (active tab only)
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+        if (!isKeyboardTarget()) return;
+        if (selectedPaths.size !== 1) return;
+        const path = [...selectedPaths][0];
+        const entry = entries.find((en) => en.path === path)
+          ?? Object.values(peekChildren).flat().find((en) => en.path === path);
+        if (entry) {
+          e.preventDefault();
+          handleDoubleClick(entry);
+        }
+        return;
+      }
+
+      // Shift+F10 / ContextMenu key -- open context menu at the selected row
+      if ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
+        if (!isKeyboardTarget()) return;
+        if (selectedPaths.size === 0) return;
+        e.preventDefault();
+        const path = [...selectedPaths][0];
+        const entry = entries.find((en) => en.path === path)
+          ?? Object.values(peekChildren).flat().find((en) => en.path === path);
+        if (!entry) return;
+        const rowEl = virt.containerRef.current?.querySelector(`[data-filepath="${CSS.escape(path)}"]`);
+        const rect = rowEl?.getBoundingClientRect();
+        setCtxMenu({ x: rect ? rect.left + 60 : 100, y: rect ? rect.bottom : 100, entry });
+        return;
+      }
     };
     // Use capture phase to intercept before WebView2 eats Ctrl+V
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [selectedPaths, tabId]);
+  }, [selectedPaths, tabId, panelId, sortedEntries, entries, peekChildren, virtualizable, rowHeightPx]);
 
   // Instant filter: start typing to filter files, Escape to clear
   useEffect(() => {
@@ -1237,6 +1381,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       setTooltip(null);
       // Mark this tab as active on interaction
       store.getState().setActiveTab(tabId);
+      focusedIndex.current = index;
       if (e.shiftKey && lastClickedIndex.current >= 0) {
         const start = Math.min(lastClickedIndex.current, index);
         const end = Math.max(lastClickedIndex.current, index);
@@ -1289,8 +1434,11 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   };
 
   const handleSort = (field: SortField) => {
-    if (sortField === field) setSortAsc(!sortAsc);
-    else { setSortField(field); setSortAsc(true); }
+    const asc = sortField === field ? !sortAsc : true;
+    setSortField(field);
+    setSortAsc(asc);
+    // Remember this folder's sort (Explorer-style per-folder memory)
+    saveFolderView(currentPath, { sort_by: field, sort_asc: asc });
   };
 
   const handleHover = (entry: FileEntry, x: number, y: number) => {
@@ -1306,10 +1454,21 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
 
   const handleRenameDone = async (newName: string | null) => {
     if (newName && renamingPath) {
-      await renameFile(renamingPath, newName).catch(() => {});
+      try {
+        const newPath = await renameFile(renamingPath, newName);
+        setSelected(new Set([newPath]));
+        setFsVersion((v) => v + 1);
+      } catch {}
       await refresh();
     }
     setRenamingPath(null);
+  };
+
+  // Windows Explorer semantics: right-click selects the target unless it's
+  // already part of the selection (so multi-select context actions still work).
+  const openCtxMenu = (e: { clientX: number; clientY: number }, entry: FileEntry) => {
+    if (!selectedPaths.has(entry.path)) setSelected(new Set([entry.path]));
+    setCtxMenu({ x: e.clientX, y: e.clientY, entry });
   };
 
   // Register this tab as a drop zone
@@ -1362,7 +1521,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     updateSettings({ file_tags: tags });
   };
 
-  const handleCopyPath = (path: string) => navigator.clipboard.writeText(path).catch(() => {});
+  const handleCopyPath = (path: string) => navigator.clipboard.writeText(`"${path}"`).catch(() => {});
   const handlePinToggle = (path: string) => {
     const current = pinnedPaths || [];
     if (current.includes(path)) {
@@ -1403,7 +1562,16 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   // Conflict dialog state
   const [pendingConflicts, setPendingConflicts] = useState<{ conflicts: any[]; files: string[]; isCut: boolean } | null>(null);
 
+  // Ctrl+V arrives twice: once via the capture keydown handler and once via the
+  // WebView2 'paste' ClipboardEvent (preventDefault on keydown does not suppress
+  // it). Collapse triggers from the same user action or the second paste races
+  // the first and throws a bogus replace-conflict dialog.
+  const lastPasteAt = useRef(0);
+
   const handlePasteWithConflicts = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastPasteAt.current < 500) return;
+    lastPasteAt.current = now;
     let files: string[] = [];
     let isCut = false;
     try {
@@ -1489,6 +1657,50 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     display: 'flex', alignItems: 'center', gap: 4, position: 'relative',
   });
 
+  const rowDomId = (path: string) => `fr-${tabId}-${encodeURIComponent(path)}`;
+  // Only reference a row id that is actually mounted: virtualization unmounts
+  // off-window rows, and a dangling aria-activedescendant is worse than none.
+  const firstSelectedPath = selectedPaths.size > 0 ? selectedPaths.values().next().value : undefined;
+  const activeDescendantId = firstSelectedPath &&
+    (!virtualizable || flatList.slice(virt.startIndex, virt.endIndex).some((it) => it.entry.path === firstSelectedPath))
+    ? rowDomId(firstSelectedPath) : undefined;
+
+  const renderFileRow = (item: FlatItem, i: number) => (
+    <FileRow
+      key={item.entry.path}
+      domId={rowDomId(item.entry.path)}
+      entry={item.entry}
+      selected={selectedPaths.has(item.entry.path)}
+      even={i % 2 === 0}
+      renaming={renamingPath === item.entry.path}
+      peekOpen={peekPaths.has(item.entry.path)}
+      peekEnabled={peekEnabled && item.entry.is_dir}
+      colWidths={colWidths}
+      columns={activeColumns}
+      gitStatus={gitStatusMap.get(item.entry.name)}
+      folderSize={item.entry.is_dir ? folderSizes[item.entry.path] : undefined}
+      onClick={(e) => handleRowClick(item.entry, item.sortedIndex ?? i, e)}
+      onDoubleClick={() => handleDoubleClick(item.entry)}
+      onContextMenu={(e) => { e.stopPropagation(); openCtxMenu(e, item.entry); }}
+      onRenameDone={handleRenameDone}
+      onHover={handleHover}
+      onHoverEnd={handleHoverEnd}
+      onPeekToggle={() => handlePeekToggle(item.entry)}
+      onPointerDragStart={(e) => handleFileDragStart(e, item.entry)}
+      onMiddleClick={(entry) => {
+        if (panelId) {
+          panelAddTab(panelId, {
+            id: crypto.randomUUID(),
+            type: 'explorer',
+            title: entry.name,
+            path: entry.path,
+            pinned: false,
+          });
+        }
+      }}
+    />
+  );
+
   return (
     <div
       ref={rootRef}
@@ -1524,9 +1736,11 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
 
       {/* Column headers with resize handles + right-click to configure */}
       <div
+        ref={headerRef}
         style={{
           display: 'grid', gridTemplateColumns: colWidths,
           borderBottom: '1px solid var(--border)', background: 'var(--base)',
+          overflowX: 'hidden',
         }}
         onContextMenu={(e) => e.preventDefault()}
         onMouseDown={(e) => {
@@ -1606,10 +1820,24 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       {currentPath !== 'this-pc' && currentPath !== 'recycle-bin' && error && <div style={{ padding: 24, color: 'var(--red)', textAlign: 'center', flex: 1 }}>{error}</div>}
       {currentPath !== 'this-pc' && currentPath !== 'recycle-bin' && !loading && !error && viewMode === 'list' && (
         <div
-          ref={containerRef}
-          style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}
+          ref={virt.containerRef}
+          role="listbox"
+          aria-label="Files"
+          tabIndex={0}
+          aria-activedescendant={activeDescendantId}
+          onScroll={(e) => {
+            if (virtualizable) virt.onScroll(e);
+            if (headerRef.current) headerRef.current.scrollLeft = e.currentTarget.scrollLeft;
+          }}
+          style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}
         >
-          {(() => {
+          {virtualizable ? (
+            <div style={{ height: virt.totalHeight, position: 'relative' }}>
+              <div style={{ transform: `translateY(${virt.offsetY}px)` }}>
+                {flatList.slice(virt.startIndex, virt.endIndex).map((item, vi) => renderFileRow(item, virt.startIndex + vi))}
+              </div>
+            </div>
+          ) : (() => {
             const elements: React.ReactNode[] = [];
             let i = 0;
             while (i < flatList.length) {
@@ -1630,40 +1858,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
                 continue;
               }
               if (!item.isPeek) {
-                elements.push(
-                  <FileRow
-                    key={item.entry.path}
-                    entry={item.entry}
-                    selected={selectedPaths.has(item.entry.path)}
-                    even={i % 2 === 0}
-                    renaming={renamingPath === item.entry.path}
-                    peekOpen={peekPaths.has(item.entry.path)}
-                    peekEnabled={peekEnabled && item.entry.is_dir}
-                    colWidths={colWidths}
-                    columns={activeColumns}
-                    gitStatus={gitStatusMap.get(item.entry.name)}
-                    folderSize={item.entry.is_dir ? folderSizes[item.entry.path] : undefined}
-                    onClick={(e) => handleRowClick(item.entry, item.sortedIndex ?? i, e)}
-                    onDoubleClick={() => handleDoubleClick(item.entry)}
-                    onContextMenu={(e) => { e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, entry: item.entry }); }}
-                    onRenameDone={handleRenameDone}
-                    onHover={handleHover}
-                    onHoverEnd={handleHoverEnd}
-                    onPeekToggle={() => handlePeekToggle(item.entry)}
-                    onPointerDragStart={(e) => handleFileDragStart(e, item.entry)}
-                    onMiddleClick={(entry) => {
-                      if (panelId) {
-                        panelAddTab(panelId, {
-                          id: crypto.randomUUID(),
-                          type: 'explorer',
-                          title: entry.name,
-                          path: entry.path,
-                          pinned: false,
-                        });
-                      }
-                    }}
-                  />
-                );
+                elements.push(renderFileRow(item, i));
                 i++;
               } else {
                 // Collect consecutive peek rows for this parent into a container
@@ -1719,8 +1914,10 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           selectedPaths={selectedPaths}
           onRowClick={handleRowClick}
           onDoubleClick={handleDoubleClick}
-          onContextMenu={(e, entry) => { setCtxMenu({ x: e.clientX, y: e.clientY, entry }); }}
+          onContextMenu={(e, entry) => openCtxMenu(e, entry)}
           onPointerDragStart={handleFileDragStart}
+          renamingPath={renamingPath}
+          onRenameDone={handleRenameDone}
           onMiddleClick={(entry) => {
             if (panelId) {
               panelAddTab(panelId, {
@@ -1741,7 +1938,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           initialPath={currentPath}
           onNavigate={navigate}
           onOpenFile={handleDoubleClick}
-          onContextMenu={(e, entry) => { setCtxMenu({ x: e.clientX, y: e.clientY, entry }); }}
+          onContextMenu={(e, entry) => openCtxMenu(e, entry)}
         />
       )}
 
@@ -1752,7 +1949,9 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           selectedPaths={selectedPaths}
           onRowClick={handleRowClick}
           onDoubleClick={handleDoubleClick}
-          onContextMenu={(e, entry) => { setCtxMenu({ x: e.clientX, y: e.clientY, entry }); }}
+          onContextMenu={(e, entry) => openCtxMenu(e, entry)}
+          renamingPath={renamingPath}
+          onRenameDone={handleRenameDone}
         />
       )}
 
@@ -1763,7 +1962,9 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           selectedPaths={selectedPaths}
           onRowClick={handleRowClick}
           onDoubleClick={handleDoubleClick}
-          onContextMenu={(e, entry) => { setCtxMenu({ x: e.clientX, y: e.clientY, entry }); }}
+          onContextMenu={(e, entry) => openCtxMenu(e, entry)}
+          renamingPath={renamingPath}
+          onRenameDone={handleRenameDone}
         />
       )}
 
@@ -1772,7 +1973,10 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         <FlatView
           rootPath={currentPath}
           onDoubleClick={handleDoubleClick}
-          onContextMenu={(e, entry) => { setCtxMenu({ x: e.clientX, y: e.clientY, entry }); }}
+          onContextMenu={(e, entry) => openCtxMenu(e, entry)}
+          renamingPath={renamingPath}
+          onRenameDone={handleRenameDone}
+          refreshToken={fsVersion}
         />
       )}
 
@@ -1782,7 +1986,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
           rootPath={currentPath}
           onNavigate={navigate}
           onOpenFile={handleDoubleClick}
-          onContextMenu={(e, entry) => { setCtxMenu({ x: e.clientX, y: e.clientY, entry }); }}
+          onContextMenu={(e, entry) => openCtxMenu(e, entry)}
         />
       )}
 
@@ -1790,7 +1994,13 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       {tooltip && <HoverTooltip entry={tooltip.entry} x={tooltip.x} y={tooltip.y} />}
 
       {/* Quick Preview */}
-      {previewEntry && <QuickPreview entry={previewEntry} onClose={() => setPreviewEntry(null)} />}
+      {previewEntry && (
+        <QuickPreview
+          entry={previewEntry}
+          onClose={() => setPreviewEntry(null)}
+          onContextMenu={(e) => openCtxMenu(e, previewEntry)}
+        />
+      )}
 
       {/* Batch Rename */}
       {batchRenameOpen && (

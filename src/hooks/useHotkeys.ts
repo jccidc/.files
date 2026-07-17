@@ -5,6 +5,9 @@ interface HotkeyBinding {
   ctrl?: boolean;
   shift?: boolean;
   alt?: boolean;
+  /** Skip this binding (and keep the browser default) while text is highlighted,
+      so e.g. Ctrl+C copies the selection instead of files. */
+  unlessTextSelected?: boolean;
   handler: (e: KeyboardEvent) => void;
 }
 
@@ -22,6 +25,10 @@ export function useHotkeys(bindings: HotkeyBinding[]) {
         const keyMatch = e.key.toLowerCase() === b.key.toLowerCase();
 
         if (ctrlMatch && shiftMatch && altMatch && keyMatch) {
+          if (b.unlessTextSelected) {
+            const sel = window.getSelection();
+            if (sel && !sel.isCollapsed) return;
+          }
           e.preventDefault();
           b.handler(e);
           return;

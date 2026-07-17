@@ -3,6 +3,7 @@ import type { FileEntry } from '../types';
 import { readDir } from '../api/filesystem';
 import { copyFiles, moveFiles } from '../api/shell';
 import { useSettingsStore } from './settings';
+import { resolveFolderView, saveFolderView } from './folderViews';
 
 export type ViewMode = 'list' | 'grid' | 'columns' | 'gallery' | 'tiles' | 'flat' | 'treemap';
 
@@ -32,9 +33,15 @@ const DEFAULT_TAB_STATE: TabExplorerState = {
   canGoForward: false,
 };
 
+// Per-folder remembered view (or subtree pref from an ancestor), else the global default
+function viewModeFor(path: string): ViewMode {
+  const settings = useSettingsStore.getState().settings;
+  return (resolveFolderView(path)?.view ?? settings.default_view ?? 'list') as ViewMode;
+}
+
 function createTabState(initialPath?: string): TabExplorerState {
   const path = initialPath || 'C:\\';
-  return { ...DEFAULT_TAB_STATE, currentPath: path, history: [path], selectedPaths: new Set() };
+  return { ...DEFAULT_TAB_STATE, currentPath: path, history: [path], selectedPaths: new Set(), viewMode: viewModeFor(path) };
 }
 
 interface ExplorerStore {
@@ -92,7 +99,7 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => {
       return;
     }
     const showHidden = useSettingsStore.getState().settings.show_hidden;
-    updateTab(tabId, { loading: true, error: null });
+    updateTab(tabId, { loading: true, error: null, viewMode: viewModeFor(path) });
     try {
       const listing = await readDir(path, showHidden);
       updateTab(tabId, {
@@ -218,7 +225,11 @@ export const useExplorerStore = create<ExplorerStore>((set, get) => {
 
     clearSelection: (tabId) => updateTab(tabId, { selectedPaths: new Set() }),
 
-    setViewMode: (tabId, mode) => updateTab(tabId, { viewMode: mode }),
+    setViewMode: (tabId, mode) => {
+      updateTab(tabId, { viewMode: mode });
+      // Remember this folder's view (Explorer-style per-folder memory)
+      saveFolderView(getTabState(tabId).currentPath, { view: mode });
+    },
 
     copyPaths: (paths) => set({ clipboardPaths: paths, clipboardMode: 'copy' }),
     cutPaths: (paths) => set({ clipboardPaths: paths, clipboardMode: 'cut' }),

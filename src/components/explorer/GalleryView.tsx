@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { FileIcon } from '../common/FileIcon';
+import { InlineRename } from './InlineRename';
 import type { FileEntry } from '../../types';
 
 interface GalleryViewProps {
@@ -8,6 +9,8 @@ interface GalleryViewProps {
   onRowClick: (entry: FileEntry, idx: number, e: React.MouseEvent) => void;
   onDoubleClick: (entry: FileEntry) => void;
   onContextMenu: (e: React.MouseEvent, entry: FileEntry) => void;
+  renamingPath?: string | null;
+  onRenameDone?: (newName: string | null) => void;
 }
 
 function formatSize(bytes: number): string {
@@ -19,9 +22,10 @@ function formatSize(bytes: number): string {
 
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'];
 
-export function GalleryView({ entries, selectedPaths: _selectedPaths, onRowClick, onDoubleClick, onContextMenu }: GalleryViewProps) {
+export function GalleryView({ entries, selectedPaths: _selectedPaths, onRowClick, onDoubleClick, onContextMenu, renamingPath, onRenameDone }: GalleryViewProps) {
   const [focusedIdx, setFocusedIdx] = useState(0);
   const focused = entries[focusedIdx];
+  const renamingEntry = renamingPath ? entries.find((en) => en.path === renamingPath) : undefined;
 
   if (entries.length === 0) {
     return <div style={{ padding: 24, color: 'var(--t3)', textAlign: 'center', flex: 1 }}>Empty directory</div>;
@@ -38,12 +42,16 @@ export function GalleryView({ entries, selectedPaths: _selectedPaths, onRowClick
         minHeight: 200,
       }}>
         {focused && (
-          <div style={{ textAlign: 'center', padding: 20 }}>
+          <div style={{
+            textAlign: 'center', padding: 20,
+            width: '100%', height: '100%', minHeight: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
             {isImage ? (
               <img
                 src={`https://asset.localhost/${encodeURIComponent(focused.path)}`}
                 alt={focused.name}
-                style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 250px)', objectFit: 'contain', borderRadius: 4 }}
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 4 }}
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
             ) : (
@@ -56,6 +64,17 @@ export function GalleryView({ entries, selectedPaths: _selectedPaths, onRowClick
                 </div>
               </div>
             )}
+          </div>
+        )}
+        {renamingEntry && onRenameDone && (
+          <div style={{
+            position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px',
+            background: 'var(--raised)', border: '1px solid var(--border)', borderRadius: 6,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)', width: 'min(360px, 80%)',
+          }}>
+            <FileIcon entry={renamingEntry} size={16} />
+            <InlineRename entry={renamingEntry} onDone={onRenameDone} />
           </div>
         )}
       </div>
@@ -80,7 +99,7 @@ export function GalleryView({ entries, selectedPaths: _selectedPaths, onRowClick
               key={entry.path}
               onClick={(e) => { setFocusedIdx(idx); onRowClick(entry, idx, e); }}
               onDoubleClick={() => onDoubleClick(entry)}
-              onContextMenu={(e) => { e.preventDefault(); onContextMenu(e, entry); }}
+              onContextMenu={(e) => { e.preventDefault(); setFocusedIdx(idx); onContextMenu(e, entry); }}
               style={{
                 width: 60, height: 60, flexShrink: 0,
                 borderRadius: 4, overflow: 'hidden',
@@ -94,6 +113,8 @@ export function GalleryView({ entries, selectedPaths: _selectedPaths, onRowClick
                 <img
                   src={`https://asset.localhost/${encodeURIComponent(entry.path)}`}
                   alt=""
+                  loading="lazy"
+                  decoding="async"
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />

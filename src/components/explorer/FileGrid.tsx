@@ -1,5 +1,7 @@
 import type { FileEntry } from '../../types';
 import { FileIcon } from '../common/FileIcon';
+import { InlineRename } from './InlineRename';
+import { useSettingsStore } from '../../stores/settings';
 
 function gridDisplayName(entry: FileEntry): string {
   if ((entry.extension || '').toLowerCase() === 'lnk') {
@@ -23,6 +25,8 @@ interface FileGridProps {
   onContextMenu: (e: React.MouseEvent, entry: FileEntry) => void;
   onPointerDragStart: (e: React.PointerEvent, entry: FileEntry) => void;
   onMiddleClick?: (entry: FileEntry) => void;
+  renamingPath?: string | null;
+  onRenameDone?: (newName: string | null) => void;
 }
 
 function GridCard({
@@ -34,6 +38,9 @@ function GridCard({
   onContextMenu,
   onPointerDragStart,
   onMiddleClick,
+  renaming,
+  onRenameDone,
+  scale,
 }: {
   entry: FileEntry;
   idx: number;
@@ -43,7 +50,11 @@ function GridCard({
   onContextMenu: (e: React.MouseEvent) => void;
   onPointerDragStart: (e: React.PointerEvent) => void;
   onMiddleClick?: (entry: FileEntry) => void;
+  renaming?: boolean;
+  onRenameDone?: (newName: string | null) => void;
+  scale?: number;
 }) {
+  const s = scale ?? 1;
   return (
     <div
       data-drop-folder={entry.is_dir ? entry.path : undefined}
@@ -57,7 +68,7 @@ function GridCard({
       }}
       onPointerDown={(e) => { if (e.button === 0) onPointerDragStart(e); }}
       style={{
-        width: 100,
+        width: Math.round(100 * s),
         padding: '10px 6px 8px',
         display: 'flex',
         flexDirection: 'column',
@@ -67,7 +78,9 @@ function GridCard({
         cursor: 'pointer', userSelect: 'none',
         background: selected ? 'var(--active)' : 'transparent',
         border: selected ? '1px solid var(--accent)' : '1px solid transparent',
-      }}
+        contentVisibility: 'auto',
+        containIntrinsicSize: `auto ${Math.round(100 * s)}px auto ${Math.round(104 * s)}px`,
+      } as React.CSSProperties}
       onMouseEnter={(e) => {
         if (!selected) e.currentTarget.style.background = 'var(--hover)';
       }}
@@ -76,18 +89,26 @@ function GridCard({
       }}
     >
       {/* Icon */}
-      <div style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <FileIcon entry={entry} size={entry.is_dir ? 40 : 36} />
+      <div style={{ width: Math.round(48 * s), height: Math.round(48 * s), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <FileIcon entry={entry} size={Math.round((entry.is_dir ? 40 : 36) * s)} />
       </div>
 
       {/* Name */}
-      <div style={{
-        width: '100%', textAlign: 'center', fontSize: 11,
-        color: entry.is_hidden ? 'var(--t3)' : 'var(--t1)',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>
-        {gridDisplayName(entry)}
-      </div>
+      {renaming && onRenameDone ? (
+        <InlineRename
+          entry={entry}
+          onDone={onRenameDone}
+          style={{ flex: 'none', width: '100%', fontSize: 11, textAlign: 'center', fontFamily: 'inherit' }}
+        />
+      ) : (
+        <div style={{
+          width: '100%', textAlign: 'center', fontSize: 11,
+          color: entry.is_hidden ? 'var(--t3)' : 'var(--t1)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {gridDisplayName(entry)}
+        </div>
+      )}
 
       {/* Size */}
       {!entry.is_dir && (
@@ -99,7 +120,8 @@ function GridCard({
   );
 }
 
-export function FileGrid({ entries, selectedPaths, onRowClick, onDoubleClick, onContextMenu, onPointerDragStart, onMiddleClick }: FileGridProps) {
+export function FileGrid({ entries, selectedPaths, onRowClick, onDoubleClick, onContextMenu, onPointerDragStart, onMiddleClick, renamingPath, onRenameDone }: FileGridProps) {
+  const iconScale = (useSettingsStore((st) => st.settings.icon_scale) || 100) / 100;
   return (
     <div style={{
       display: 'flex', flexWrap: 'wrap', gap: 4, padding: '8px 12px',
@@ -116,6 +138,9 @@ export function FileGrid({ entries, selectedPaths, onRowClick, onDoubleClick, on
           onContextMenu={(e) => { e.stopPropagation(); onContextMenu(e, entry); }}
           onPointerDragStart={(e) => onPointerDragStart(e, entry)}
           onMiddleClick={onMiddleClick}
+          renaming={renamingPath === entry.path}
+          onRenameDone={onRenameDone}
+          scale={iconScale}
         />
       ))}
       {entries.length === 0 && (
