@@ -106,7 +106,20 @@ pub fn move_files(sources: Vec<String>, dest: String) -> Result<(), String> {
             .ok_or_else(|| format!("Invalid source path: {}", src))?;
         let target = dest_path.join(file_name);
 
-        std::fs::rename(src_path, &target).map_err(|e| e.to_string())?;
+        match std::fs::rename(src_path, &target) {
+            Ok(()) => {}
+            // ERROR_NOT_SAME_DEVICE (17): rename can't cross volumes — copy, then delete source
+            Err(e) if e.raw_os_error() == Some(17) => {
+                if src_path.is_dir() {
+                    copy_dir_recursive(src_path, &target)?;
+                    std::fs::remove_dir_all(src_path).map_err(|e| e.to_string())?;
+                } else {
+                    std::fs::copy(src_path, &target).map_err(|e| e.to_string())?;
+                    std::fs::remove_file(src_path).map_err(|e| e.to_string())?;
+                }
+            }
+            Err(e) => return Err(e.to_string()),
+        }
     }
 
     Ok(())

@@ -61,3 +61,18 @@ export async function onFileOpProgress(
     callback(event.payload);
   });
 }
+
+/** Terminal event — fires on success, error, AND cancel, unlike progress events */
+export interface FileOpDone {
+  op_id: string;
+  error: string | null;
+  cancelled: boolean;
+}
+
+export async function onFileOpDone(
+  callback: (done: FileOpDone) => void,
+): Promise<() => void> {
+  return listen<FileOpDone>('file-op-done', (event) => {
+    callback(event.payload);
+  });
+}

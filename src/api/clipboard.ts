@@ -19,3 +19,8 @@ export async function clipboardReadFiles(): Promise<[string[], boolean]> {
 export async function clipboardHasFiles(): Promise<boolean> {
   return invoke('clipboard_has_files');
 }
+
+/** Clear the system clipboard (after a cut-paste completes, like Explorer) */
+export async function clipboardClear(): Promise<void> {
+  return invoke('clipboard_clear');
+}

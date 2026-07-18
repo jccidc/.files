@@ -189,6 +189,28 @@ fn check_drop_effect_ps() -> bool {
         .unwrap_or(false)
 }
 
+/// Clear the system clipboard. Called after a cut-paste completes so a repeat
+/// Ctrl+V doesn't re-read the stale cut list and throw a bogus conflict dialog
+/// (Explorer clears the clipboard after a cut-paste the same way).
+#[tauri::command]
+pub fn clipboard_clear() -> Result<(), String> {
+    let script = r#"
+    Add-Type -AssemblyName System.Windows.Forms
+    [System.Windows.Forms.Clipboard]::Clear()
+    "#;
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-STA", "-Command", script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Clipboard clear failed: {}", stderr));
+    }
+    Ok(())
+}
+
 /// Check if the system clipboard contains files (CF_HDROP)
 #[tauri::command]
 pub fn clipboard_has_files() -> Result<bool, String> {

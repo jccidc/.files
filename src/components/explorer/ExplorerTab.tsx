@@ -1560,7 +1560,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   }, [currentPath, entries, refresh, setSelected]);
 
   // Conflict dialog state
-  const [pendingConflicts, setPendingConflicts] = useState<{ conflicts: any[]; files: string[]; isCut: boolean } | null>(null);
+  const [pendingConflicts, setPendingConflicts] = useState<{ conflicts: any[]; files: string[]; isCut: boolean; fromSys: boolean } | null>(null);
 
   // Ctrl+V arrives twice: once via the capture keydown handler and once via the
   // WebView2 'paste' ClipboardEvent (preventDefault on keydown does not suppress
@@ -1574,12 +1574,14 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     lastPasteAt.current = now;
     let files: string[] = [];
     let isCut = false;
+    let fromSys = false;
     try {
       const { clipboardReadFiles } = await import('../../api/clipboard');
       const [clipFiles, clipIsCut] = await clipboardReadFiles();
       if (clipFiles.length > 0) {
         files = clipFiles;
         isCut = clipIsCut;
+        fromSys = true;
       }
     } catch {}
 
@@ -1599,16 +1601,16 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       const { checkConflicts } = await import('../../api/fileOps');
       const conflicts = await checkConflicts(files, currentPath);
       if (conflicts.length > 0) {
-        setPendingConflicts({ conflicts, files, isCut });
+        setPendingConflicts({ conflicts, files, isCut, fromSys });
         return; // Wait for user to resolve via ConflictDialog
       }
     } catch {}
 
     // No conflicts — proceed directly with progress
-    executePaste(files, isCut, 'replace_all');
+    executePaste(files, isCut, 'replace_all', fromSys);
   }, [currentPath]);
 
-  const executePaste = useCallback(async (files: string[], isCut: boolean, resolution: string) => {
+  const executePaste = useCallback(async (files: string[], isCut: boolean, resolution: string, fromSys: boolean) => {
     const opId = crypto.randomUUID();
     try {
       const { copyFilesWithProgress, moveFilesWithProgress } = await import('../../api/fileOps');
@@ -1628,13 +1630,21 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         timestamp: Date.now(),
       });
 
-      // Clear internal clipboard if it was a cut
+      // Clear the clipboard after a cut-paste (like Explorer) — the sources no
+      // longer exist, so a repeat paste would only throw bogus conflict dialogs
       if (isCut) {
         store.getState().copyPaths([]);
+        if (fromSys) {
+          const { clipboardClear } = await import('../../api/clipboard');
+          clipboardClear().catch(() => {});
+        }
       }
-      refresh();
     } catch (e) {
+      // ProgressPanel shows the failure via the file-op-done event
       console.error('Paste failed:', e);
+    } finally {
+      // Refresh either way — a failed move may still have moved some items
+      refresh();
     }
   }, [currentPath, refresh]);
 
@@ -2110,9 +2120,9 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         <ConflictDialog
           conflicts={pendingConflicts.conflicts}
           onResolve={(resolution) => {
-            const { files, isCut } = pendingConflicts;
+            const { files, isCut, fromSys } = pendingConflicts;
             setPendingConflicts(null);
-            executePaste(files, isCut, resolution);
+            executePaste(files, isCut, resolution, fromSys);
           }}
           onCancel={() => setPendingConflicts(null)}
         />

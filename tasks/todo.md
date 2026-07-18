@@ -44,6 +44,12 @@ Review complete: all confirmed findings fixed, tsc + build green. Manual smoke t
 
 # .files -- Next Session TODO
 
+## Fixed 2026-07-18 (needs rebuild + smoke test)
+- [x] Cut/paste across drives failed (fs::rename can't cross volumes, os err 17) -> copy+delete fallback in move_files_with_progress AND sync move_files
+- [x] Progress toast stuck forever on error/cancel -> new `file-op-done` terminal event emitted on every exit path; ProgressPanel shows Failed state 8s then clears
+- [x] Bogus replace-conflict dialog on repeat Ctrl+V after cut-paste -> system clipboard now cleared after successful cut-paste (new clipboard_clear command)
+- [ ] Smoke test: cut folder C: -> other drive; cancel mid-move; Ctrl+V twice after cut-paste
+
 ## Bugs to Fix
 - [ ] **Shift+click range select** -- was fixed (sortedIndex tracking) but needs testing to confirm full row highlighting works across group headers and peek rows
 - [ ] **Gradient accent `--active` as gradient string** -- `applyTheme()` sets `--active` to a `linear-gradient()` when gradient_accent is on, but some components use `var(--active)` in non-background contexts (e.g. border-color). May cause visual glitches. Fix: use separate `--active-bg` variable for gradient, keep `--active` as solid color

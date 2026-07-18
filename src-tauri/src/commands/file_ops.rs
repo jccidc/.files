@@ -37,6 +37,15 @@ pub struct FileOpResult {
     pub skipped: Vec<String>,
 }
 
+/// Terminal event emitted on every exit path (success, error, cancel) so the
+/// progress UI can always settle — progress events alone can't signal failure.
+#[derive(Debug, Clone, Serialize)]
+pub struct FileOpDone {
+    pub op_id: String,
+    pub error: Option<String>,
+    pub cancelled: bool,
+}
+
 /// Count total files and bytes for progress tracking
 fn count_files_recursive(path: &Path) -> (u64, u64) {
     if path.is_file() {
@@ -100,74 +109,66 @@ pub async fn copy_files_with_progress(
     let mut created_paths = Vec::new();
     let mut skipped = Vec::new();
 
-    for src in &sources {
-        if cancel.load(Ordering::Relaxed) {
-            break;
-        }
-        let src_path = Path::new(src);
-        let file_name = src_path.file_name().ok_or_else(|| format!("Invalid path: {}", src))?;
-        let mut target = dest_path.join(file_name);
+    let result: Result<(), String> = (|| {
+        for src in &sources {
+            if cancel.load(Ordering::Relaxed) {
+                break;
+            }
+            let src_path = Path::new(src);
+            let file_name = src_path.file_name().ok_or_else(|| format!("Invalid path: {}", src))?;
+            let mut target = dest_path.join(file_name);
 
-        // Check for conflict
-        if target.exists() {
-            match conflict_resolution.as_str() {
-                "skip_all" => {
-                    skipped.push(src.clone());
-                    // Still count the files for progress
-                    let (f, b) = count_files_recursive(src_path);
-                    files_done += f;
-                    bytes_done += b;
-                    continue;
-                }
-                "rename_all" => {
-                    target = find_unique_name(&target);
-                }
-                "replace_all" => {
-                    // Will overwrite — continue as normal
-                }
-                _ => {
-                    // "ask" — return the conflict info so frontend can prompt
-                    // For now, default to rename to avoid data loss
-                    target = find_unique_name(&target);
+            // Check for conflict
+            if target.exists() {
+                match conflict_resolution.as_str() {
+                    "skip_all" => {
+                        skipped.push(src.clone());
+                        // Still count the files for progress
+                        let (f, b) = count_files_recursive(src_path);
+                        files_done += f;
+                        bytes_done += b;
+                        continue;
+                    }
+                    "rename_all" => {
+                        target = find_unique_name(&target);
+                    }
+                    "replace_all" => {
+                        // Will overwrite — continue as normal
+                    }
+                    _ => {
+                        // "ask" — return the conflict info so frontend can prompt
+                        // For now, default to rename to avoid data loss
+                        target = find_unique_name(&target);
+                    }
                 }
             }
+
+            if src_path.is_dir() {
+                copy_dir_with_progress(
+                    src_path, &target, &app, &op_id,
+                    &mut files_done, &mut bytes_done, total_files, total_bytes,
+                    &cancel, &conflict_resolution, &mut skipped,
+                )?;
+            } else {
+                let size = src_path.metadata().map(|m| m.len()).unwrap_or(0);
+                let _ = app.emit("file-op-progress", FileOpProgress {
+                    op_id: op_id.clone(),
+                    current_file: src_path.file_name().unwrap_or_default().to_string_lossy().to_string(),
+                    files_done,
+                    files_total: total_files,
+                    bytes_done,
+                    bytes_total: total_bytes,
+                });
+                std::fs::copy(src_path, &target).map_err(|e| e.to_string())?;
+                files_done += 1;
+                bytes_done += size;
+            }
+            created_paths.push(target.to_string_lossy().to_string());
         }
+        Ok(())
+    })();
 
-        if src_path.is_dir() {
-            copy_dir_with_progress(
-                src_path, &target, &app, &op_id,
-                &mut files_done, &mut bytes_done, total_files, total_bytes,
-                &cancel, &conflict_resolution, &mut skipped,
-            )?;
-        } else {
-            let size = src_path.metadata().map(|m| m.len()).unwrap_or(0);
-            let _ = app.emit("file-op-progress", FileOpProgress {
-                op_id: op_id.clone(),
-                current_file: src_path.file_name().unwrap_or_default().to_string_lossy().to_string(),
-                files_done,
-                files_total: total_files,
-                bytes_done,
-                bytes_total: total_bytes,
-            });
-            std::fs::copy(src_path, &target).map_err(|e| e.to_string())?;
-            files_done += 1;
-            bytes_done += size;
-        }
-        created_paths.push(target.to_string_lossy().to_string());
-    }
-
-    // Final progress event
-    let _ = app.emit("file-op-progress", FileOpProgress {
-        op_id: op_id.clone(),
-        current_file: String::new(),
-        files_done,
-        files_total: total_files,
-        bytes_done,
-        bytes_total: total_bytes,
-    });
-
-    // Clean up cancel flag
-    CANCEL_FLAGS.lock().unwrap().remove(&op_id);
+    finish_op(&app, &op_id, &cancel, files_done, bytes_done, total_files, total_bytes, result)?;
 
     Ok(FileOpResult {
         op_id,
@@ -193,54 +194,100 @@ pub async fn move_files_with_progress(
         return Err(format!("Destination is not a directory: {}", dest));
     }
 
-    let total_files = sources.len() as u64;
+    // Real file/byte totals so the cross-volume copy fallback reports progress
+    let mut total_files = 0u64;
+    let mut total_bytes = 0u64;
+    for src in &sources {
+        let (f, b) = count_files_recursive(Path::new(src));
+        total_files += f;
+        total_bytes += b;
+    }
+
     let cancel = CANCEL_FLAGS.lock().unwrap()
         .entry(op_id.clone())
         .or_insert_with(|| Arc::new(AtomicBool::new(false)))
         .clone();
 
     let mut files_done = 0u64;
+    let mut bytes_done = 0u64;
     let mut created_paths = Vec::new();
     let mut skipped = Vec::new();
 
-    for src in &sources {
-        if cancel.load(Ordering::Relaxed) {
-            break;
-        }
-        let src_path = Path::new(src);
-        let file_name = src_path.file_name().ok_or_else(|| format!("Invalid path: {}", src))?;
-        let mut target = dest_path.join(file_name);
+    let result: Result<(), String> = (|| {
+        for src in &sources {
+            if cancel.load(Ordering::Relaxed) {
+                break;
+            }
+            let src_path = Path::new(src);
+            let file_name = src_path.file_name().ok_or_else(|| format!("Invalid path: {}", src))?;
+            let mut target = dest_path.join(file_name);
 
-        if target.exists() {
-            match conflict_resolution.as_str() {
-                "skip_all" => { skipped.push(src.clone()); files_done += 1; continue; }
-                "rename_all" => { target = find_unique_name(&target); }
-                "replace_all" => {
-                    if target.is_dir() {
-                        std::fs::remove_dir_all(&target).map_err(|e| e.to_string())?;
+            if target.exists() {
+                match conflict_resolution.as_str() {
+                    "skip_all" => {
+                        skipped.push(src.clone());
+                        let (f, b) = count_files_recursive(src_path);
+                        files_done += f;
+                        bytes_done += b;
+                        continue;
+                    }
+                    "rename_all" => { target = find_unique_name(&target); }
+                    "replace_all" => {
+                        if target.is_dir() {
+                            std::fs::remove_dir_all(&target).map_err(|e| e.to_string())?;
+                        } else {
+                            std::fs::remove_file(&target).map_err(|e| e.to_string())?;
+                        }
+                    }
+                    _ => { target = find_unique_name(&target); }
+                }
+            }
+
+            let _ = app.emit("file-op-progress", FileOpProgress {
+                op_id: op_id.clone(),
+                current_file: file_name.to_string_lossy().to_string(),
+                files_done,
+                files_total: total_files,
+                bytes_done,
+                bytes_total: total_bytes,
+            });
+
+            match std::fs::rename(src_path, &target) {
+                Ok(()) => {
+                    let (f, b) = count_files_recursive(&target);
+                    files_done += f;
+                    bytes_done += b;
+                }
+                // ERROR_NOT_SAME_DEVICE (17): rename can't cross volumes — copy, then delete source
+                Err(e) if e.raw_os_error() == Some(17) => {
+                    if src_path.is_dir() {
+                        copy_dir_with_progress(
+                            src_path, &target, &app, &op_id,
+                            &mut files_done, &mut bytes_done, total_files, total_bytes,
+                            &cancel, &conflict_resolution, &mut skipped,
+                        )?;
+                        if cancel.load(Ordering::Relaxed) {
+                            // Cancelled mid-copy: drop the partial target, keep the source intact
+                            let _ = std::fs::remove_dir_all(&target);
+                            break;
+                        }
+                        std::fs::remove_dir_all(src_path).map_err(|e| e.to_string())?;
                     } else {
-                        std::fs::remove_file(&target).map_err(|e| e.to_string())?;
+                        let size = src_path.metadata().map(|m| m.len()).unwrap_or(0);
+                        std::fs::copy(src_path, &target).map_err(|e| e.to_string())?;
+                        std::fs::remove_file(src_path).map_err(|e| e.to_string())?;
+                        files_done += 1;
+                        bytes_done += size;
                     }
                 }
-                _ => { target = find_unique_name(&target); }
+                Err(e) => return Err(e.to_string()),
             }
+            created_paths.push(target.to_string_lossy().to_string());
         }
+        Ok(())
+    })();
 
-        let _ = app.emit("file-op-progress", FileOpProgress {
-            op_id: op_id.clone(),
-            current_file: file_name.to_string_lossy().to_string(),
-            files_done,
-            files_total: total_files,
-            bytes_done: 0,
-            bytes_total: 0,
-        });
-
-        std::fs::rename(src_path, &target).map_err(|e| e.to_string())?;
-        created_paths.push(target.to_string_lossy().to_string());
-        files_done += 1;
-    }
-
-    CANCEL_FLAGS.lock().unwrap().remove(&op_id);
+    finish_op(&app, &op_id, &cancel, files_done, bytes_done, total_files, total_bytes, result)?;
 
     Ok(FileOpResult {
         op_id,
@@ -250,6 +297,37 @@ pub async fn move_files_with_progress(
         created_paths,
         skipped,
     })
+}
+
+/// Emit terminal progress + done events and drop the cancel flag on EVERY exit
+/// path. Without this, an error mid-operation leaves the progress toast stuck
+/// forever (it only clears when it sees a terminal signal).
+#[allow(clippy::too_many_arguments)]
+fn finish_op(
+    app: &AppHandle,
+    op_id: &str,
+    cancel: &Arc<AtomicBool>,
+    files_done: u64,
+    bytes_done: u64,
+    total_files: u64,
+    total_bytes: u64,
+    result: Result<(), String>,
+) -> Result<(), String> {
+    let _ = app.emit("file-op-progress", FileOpProgress {
+        op_id: op_id.to_string(),
+        current_file: String::new(),
+        files_done,
+        files_total: total_files,
+        bytes_done,
+        bytes_total: total_bytes,
+    });
+    let _ = app.emit("file-op-done", FileOpDone {
+        op_id: op_id.to_string(),
+        error: result.as_ref().err().cloned(),
+        cancelled: cancel.load(Ordering::Relaxed),
+    });
+    CANCEL_FLAGS.lock().unwrap().remove(op_id);
+    result
 }
 
 /// Cancel an in-progress file operation

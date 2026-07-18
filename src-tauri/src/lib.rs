@@ -121,6 +121,7 @@ pub fn run() {
             clipboard::clipboard_cut_files,
             clipboard::clipboard_read_files,
             clipboard::clipboard_has_files,
+            clipboard::clipboard_clear,
             file_ops::copy_files_with_progress,
             file_ops::move_files_with_progress,
             file_ops::cancel_file_op,
