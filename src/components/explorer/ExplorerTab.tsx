@@ -510,6 +510,12 @@ function ColResizeHandle({ onResize }: { onResize: (delta: number) => void }) {
   );
 }
 
+// Ctrl+V arrives twice: once via the capture keydown handler and once via the
+// WebView2 'paste' ClipboardEvent (preventDefault on keydown does not suppress
+// it). Module-level so the guard also collapses triggers landing in DIFFERENT
+// mounted panels — a per-instance ref lets each panel paste once.
+let lastPasteAt = 0;
+
 // ---- Shared drag state (module-level, works across all ExplorerTab instances) ----
 // Using pointer events instead of HTML5 drag-drop because WebView2 intercepts
 // native drag events and prevents cross-pane drops within the app.
@@ -1130,6 +1136,19 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
+      // Shortcuts target the focused panel's active tab ONLY (panels store is
+      // the focus authority in split layouts; explorer's activeTabId can go
+      // stale -- see Sidebar.tsx). This handler is window-level and one copy
+      // runs per mounted panel: without this gate a single Ctrl+V pastes into
+      // EVERY panel (the loser then throws a bogus conflict dialog), and
+      // Delete/Ctrl+X act on the unfocused panel's selection too.
+      if (panelId) {
+        const ps = usePanelsStore.getState();
+        if (ps.focusedPanelId !== panelId || ps.panels[panelId]?.activeTabId !== tabId) return;
+      } else if (store.getState().activeTabId !== tabId) {
+        return;
+      }
+
       // Ctrl+A — select all
       if (e.ctrlKey && !e.shiftKey && e.key === 'a') {
         e.preventDefault();
@@ -1249,21 +1268,8 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         setRenamingPath([...selectedPaths][0]);
       }
 
-      // Keyboard nav targets the focused panel's active tab (panels store is the
-      // focus authority in split layouts; explorer's activeTabId can go stale --
-      // see Sidebar.tsx which works around the same thing).
-      const isKeyboardTarget = () => {
-        if (panelId) {
-          const ps = usePanelsStore.getState();
-          return ps.focusedPanelId === panelId && ps.panels[panelId]?.activeTabId === tabId;
-        }
-        return store.getState().activeTabId === tabId;
-      };
-
       // ArrowUp/ArrowDown -- move selection through the list (active tab only; Shift extends)
-      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        if (!isKeyboardTarget()) return;
-        if (sortedEntries.length === 0) return;
+      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.ctrlKey && !e.altKey && !e.metaKey) {        if (sortedEntries.length === 0) return;
         e.preventDefault();
         const delta = e.key === 'ArrowDown' ? 1 : -1;
         let cur = focusedIndex.current;
@@ -1301,9 +1307,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       }
 
       // Enter -- open the selected item (active tab only)
-      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
-        if (!isKeyboardTarget()) return;
-        if (selectedPaths.size !== 1) return;
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {        if (selectedPaths.size !== 1) return;
         const path = [...selectedPaths][0];
         const entry = entries.find((en) => en.path === path)
           ?? Object.values(peekChildren).flat().find((en) => en.path === path);
@@ -1315,9 +1319,7 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       }
 
       // Shift+F10 / ContextMenu key -- open context menu at the selected row
-      if ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
-        if (!isKeyboardTarget()) return;
-        if (selectedPaths.size === 0) return;
+      if ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {        if (selectedPaths.size === 0) return;
         e.preventDefault();
         const path = [...selectedPaths][0];
         const entry = entries.find((en) => en.path === path)
@@ -1562,16 +1564,10 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   // Conflict dialog state
   const [pendingConflicts, setPendingConflicts] = useState<{ conflicts: any[]; files: string[]; isCut: boolean; fromSys: boolean } | null>(null);
 
-  // Ctrl+V arrives twice: once via the capture keydown handler and once via the
-  // WebView2 'paste' ClipboardEvent (preventDefault on keydown does not suppress
-  // it). Collapse triggers from the same user action or the second paste races
-  // the first and throws a bogus replace-conflict dialog.
-  const lastPasteAt = useRef(0);
-
   const handlePasteWithConflicts = useCallback(async () => {
     const now = Date.now();
-    if (now - lastPasteAt.current < 500) return;
-    lastPasteAt.current = now;
+    if (now - lastPasteAt < 500) return;
+    lastPasteAt = now;
     let files: string[] = [];
     let isCut = false;
     let fromSys = false;
@@ -1653,12 +1649,20 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     const pasteHandler = (e: ClipboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      // Document-level listener, one copy per mounted panel — only the focused
+      // panel's active tab may act, or one keystroke pastes into every panel
+      if (panelId) {
+        const ps = usePanelsStore.getState();
+        if (ps.focusedPanelId !== panelId || ps.panels[panelId]?.activeTabId !== tabId) return;
+      } else if (store.getState().activeTabId !== tabId) {
+        return;
+      }
       e.preventDefault();
       handlePasteWithConflicts();
     };
     document.addEventListener('paste', pasteHandler, true);
     return () => document.removeEventListener('paste', pasteHandler, true);
-  }, [handlePasteWithConflicts]);
+  }, [handlePasteWithConflicts, panelId, tabId]);
 
   const colHeaderStyle = (field?: SortField): React.CSSProperties => ({
     padding: 'var(--density-pad-y) var(--density-pad-x)', fontSize: 'var(--file-font-size-sm)', fontWeight: 500,
