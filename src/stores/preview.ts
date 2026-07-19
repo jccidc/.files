@@ -52,10 +52,11 @@ export const usePreviewStore = create<PreviewState>()(
     }),
     {
       name: 'dotfiles-preview',
+      // pinned deliberately NOT persisted — a pin surviving restart silently
+      // freezes followSelection and reads as "preview randomly stops updating"
       partialize: (state) => ({
         panelVisible: state.panelVisible,
         panelWidth: state.panelWidth,
-        pinned: state.pinned,
       }),
     },
   ),

@@ -4,9 +4,12 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 interface Props {
   path: string;
   name: string;
+  /** File mtime (or any change token) — busts WebView2's asset cache so a
+      re-saved file at the same path shows fresh bytes, not the cached old ones */
+  version?: string;
 }
 
-export function ImagePreview({ path, name }: Props) {
+export function ImagePreview({ path, name, version }: Props) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -15,7 +18,7 @@ export function ImagePreview({ path, name }: Props) {
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const assetUrl = convertFileSrc(path);
+  const assetUrl = convertFileSrc(path) + (version ? `?v=${encodeURIComponent(version)}` : '');
 
   const resetView = useCallback(() => {
     setZoom(1);

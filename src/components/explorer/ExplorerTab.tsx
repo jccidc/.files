@@ -95,7 +95,29 @@ function formatDateFull(iso: string): string {
 
 // ---- Hover Tooltip ----
 
+const TOOLTIP_IMG_EXTS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'ico', 'svg', 'avif', 'tiff', 'tif']);
+
+function TooltipThumb({ entry }: { entry: FileEntry }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [entry.path]);
+  if (failed) return null;
+  // ?v=mtime busts WebView2's asset cache when the file is re-saved in place
+  const src = `https://asset.localhost/${encodeURIComponent(entry.path)}?v=${encodeURIComponent(entry.modified)}`;
+  return (
+    <img
+      src={src}
+      alt=""
+      onError={() => setFailed(true)}
+      style={{
+        display: 'block', maxWidth: 296, maxHeight: 160, objectFit: 'contain',
+        borderRadius: 4, marginBottom: 6, background: 'var(--deep)',
+      }}
+    />
+  );
+}
+
 function HoverTooltip({ entry, x, y }: { entry: FileEntry; x: number; y: number }) {
+  const showThumb = !entry.is_dir && TOOLTIP_IMG_EXTS.has((entry.extension || '').toLowerCase());
   return (
     <div style={{
       position: 'fixed', left: x + 16, top: y - 8, zIndex: 900,
@@ -103,6 +125,7 @@ function HoverTooltip({ entry, x, y }: { entry: FileEntry; x: number; y: number 
       padding: '8px 12px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
       pointerEvents: 'none', maxWidth: 320, fontSize: 11,
     }}>
+      {showThumb && <TooltipThumb entry={entry} />}
       <div style={{ fontWeight: 500, color: 'var(--t1)', marginBottom: 4, wordBreak: 'break-all' }}>{displayName(entry)}</div>
       <div style={{ color: 'var(--t3)', lineHeight: 1.6 }}>
         {entry.is_dir ? 'Folder' : `${(entry.extension || '').toUpperCase()} File`}
@@ -1120,14 +1143,22 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     return () => window.removeEventListener('keydown', handler);
   }, [selectedPaths, entries, previewEntry]);
 
-  // Auto-follow: update preview panel when selection changes
+  // Auto-follow: update preview panel when selection changes. Focused panel
+  // only — this effect runs in every mounted panel, and an unfocused panel
+  // re-running on a refresh would clobber the preview with ITS old selection.
   useEffect(() => {
+    if (panelId) {
+      const ps = usePanelsStore.getState();
+      if (ps.focusedPanelId !== panelId || ps.panels[panelId]?.activeTabId !== tabId) return;
+    } else if (store.getState().activeTabId !== tabId) {
+      return;
+    }
     if (selectedPaths.size === 1) {
       const path = [...selectedPaths][0];
       const entry = entries.find((e) => e.path === path);
       if (entry) followSelection(entry);
     }
-  }, [selectedPaths, entries, followSelection]);
+  }, [selectedPaths, entries, followSelection, panelId, tabId]);
 
   // Keyboard shortcuts: Delete, F2, Ctrl+A, Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+Shift+N, Shift+Delete
   useEffect(() => {

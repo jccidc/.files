@@ -29,7 +29,7 @@ export function PreviewRenderer({ entry }: Props) {
     case 'code':
       return <CodePreview path={entry.path} language={fileType.language} />;
     case 'image':
-      return <ImagePreview path={entry.path} name={entry.name} />;
+      return <ImagePreview path={entry.path} name={entry.name} version={entry.modified} />;
     case 'svg':
       return <SvgPreview path={entry.path} name={entry.name} />;
     case 'markdown':
