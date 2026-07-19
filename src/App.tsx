@@ -214,38 +214,11 @@ function App() {
           if (tid) useExplorerStore.getState().goHome(tid);
         },
       },
-      {
-        key: 'c',
-        ctrl: true,
-        unlessTextSelected: true,
-        handler: () => {
-          const s = useExplorerStore.getState();
-          const tid = s.activeTabId;
-          if (!tid) return;
-          const sel = s.getTab(tid).selectedPaths;
-          if (sel.size > 0) s.copyPaths([...sel]);
-        },
-      },
-      {
-        key: 'x',
-        ctrl: true,
-        unlessTextSelected: true,
-        handler: () => {
-          const s = useExplorerStore.getState();
-          const tid = s.activeTabId;
-          if (!tid) return;
-          const sel = s.getTab(tid).selectedPaths;
-          if (sel.size > 0) s.cutPaths([...sel]);
-        },
-      },
-      {
-        key: 'v',
-        ctrl: true,
-        handler: () => {
-          const tid = useExplorerStore.getState().activeTabId;
-          if (tid) useExplorerStore.getState().paste(tid);
-        },
-      },
+      // NO Ctrl+C/X/V here — ExplorerTab owns file-clipboard shortcuts (system
+      // clipboard + conflict detection + progress). A second global binding
+      // here pastes instantly via the legacy store path, and the conflict-
+      // checking path then finds the just-pasted file and throws a bogus
+      // replace dialog on every paste.
     ],
     [toggleSidebar, refresh, splitPanel, togglePreviewPanel, activeTabId],
   );
