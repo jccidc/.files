@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { useVirtualScroll } from '../../hooks/useVirtualScroll';
 import { useExplorerStore } from '../../stores/explorer';
 import { useSettingsStore } from '../../stores/settings';
@@ -101,8 +102,10 @@ function TooltipThumb({ entry }: { entry: FileEntry }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [entry.path]);
   if (failed) return null;
-  // ?v=mtime busts WebView2's asset cache when the file is re-saved in place
-  const src = `https://asset.localhost/${encodeURIComponent(entry.path)}?v=${encodeURIComponent(entry.modified)}`;
+  // convertFileSrc, NOT a hand-built https://asset.localhost URL — on Windows
+  // the asset protocol only answers on http://asset.localhost (verified live).
+  // ?v=mtime busts WebView2's asset cache when the file is re-saved in place.
+  const src = `${convertFileSrc(entry.path)}?v=${encodeURIComponent(entry.modified)}`;
   return (
     <img
       src={src}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { FileIcon } from '../common/FileIcon';
 import { InlineRename } from './InlineRename';
 import type { FileEntry } from '../../types';
@@ -49,7 +50,7 @@ export function GalleryView({ entries, selectedPaths: _selectedPaths, onRowClick
           }}>
             {isImage ? (
               <img
-                src={`https://asset.localhost/${encodeURIComponent(focused.path)}`}
+                src={`${convertFileSrc(focused.path)}?v=${encodeURIComponent(focused.modified)}`}
                 alt={focused.name}
                 style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 4 }}
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
@@ -111,7 +112,7 @@ export function GalleryView({ entries, selectedPaths: _selectedPaths, onRowClick
             >
               {isImg ? (
                 <img
-                  src={`https://asset.localhost/${encodeURIComponent(entry.path)}`}
+                  src={`${convertFileSrc(entry.path)}?v=${encodeURIComponent(entry.modified)}`}
                   alt=""
                   loading="lazy"
                   decoding="async"
