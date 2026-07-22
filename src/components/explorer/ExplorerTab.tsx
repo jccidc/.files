@@ -760,6 +760,8 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const previewEntry = usePreviewStore((s) => s.overlayEntry);
   const setPreviewEntry = usePreviewStore((s) => s.setOverlayEntry);
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  // Transient message shown when a rename fails, so it no longer just reverts silently
+  const [renameError, setRenameError] = useState<string | null>(null);
   // Bumped after a rename so views that fetch their own listing (FlatView) reload
   const [fsVersion, setFsVersion] = useState(0);
   const [peekPaths, setPeekPaths] = useState<Set<string>>(new Set());
@@ -1146,6 +1148,13 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
     return () => window.removeEventListener('keydown', handler);
   }, [selectedPaths, entries, previewEntry]);
 
+  // Auto-clear the rename error toast after 5s
+  useEffect(() => {
+    if (!renameError) return;
+    const t = setTimeout(() => setRenameError(null), 5000);
+    return () => clearTimeout(t);
+  }, [renameError]);
+
   // Auto-follow: update preview panel when selection changes. Focused panel
   // only — this effect runs in every mounted panel, and an unfocused panel
   // re-running on a refresh would clobber the preview with ITS old selection.
@@ -1494,8 +1503,12 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         const newPath = await renameFile(renamingPath, newName);
         setSelected(new Set([newPath]));
         setFsVersion((v) => v + 1);
-      } catch {}
-      await refresh();
+        await refresh();
+      } catch (e) {
+        // Surface the failure instead of silently reverting to the old name.
+        // Strip Rust's leading "…Error: " noise for a cleaner message.
+        setRenameError(String(e).replace(/^(Os \{[^}]*\}|.*Error):?\s*/i, '').trim() || String(e));
+      }
     }
     setRenamingPath(null);
   };
@@ -2040,6 +2053,23 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
 
       {/* Tooltip */}
       {tooltip && <HoverTooltip entry={tooltip.entry} x={tooltip.x} y={tooltip.y} />}
+
+      {/* Rename error toast — click to dismiss, auto-clears after 5s */}
+      {renameError && (
+        <div
+          role="alert"
+          onClick={() => setRenameError(null)}
+          style={{
+            position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 1600, maxWidth: 420, cursor: 'pointer',
+            background: 'var(--surface)', border: '1px solid var(--red, #f87171)',
+            borderRadius: 8, padding: '10px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            color: 'var(--red, #f87171)', fontSize: 12, lineHeight: 1.4,
+          }}
+        >
+          Rename failed: {renameError}
+        </div>
+      )}
 
       {/* Quick Preview */}
       {previewEntry && (

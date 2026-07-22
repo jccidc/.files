@@ -131,8 +131,27 @@ pub fn rename_file(path: String, new_name: String) -> Result<String, String> {
     if !src.exists() {
         return Err(format!("Path does not exist: {}", path));
     }
+    let trimmed = new_name.trim();
+    if trimmed.is_empty() {
+        return Err("Name cannot be empty".to_string());
+    }
+    // Reject characters Windows forbids in file names up front, so the user gets
+    // a clear message instead of an opaque OS error (and a silent revert).
+    if let Some(bad) = trimmed.chars().find(|c| matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')) {
+        return Err(format!("A name can't contain the character {}", bad));
+    }
     let parent = src.parent().ok_or("No parent directory")?;
-    let target = parent.join(&new_name);
+    let target = parent.join(trimmed);
+    // Block clobbering a DIFFERENT existing item (std::fs::rename silently
+    // overwrites/destroys it on Windows). Allow a case-only rename of the same
+    // item (e.g. "Foo" -> "foo"), where target resolves to the same path.
+    if target.exists() {
+        let same = matches!((src.canonicalize(), target.canonicalize()), (Ok(a), Ok(b)) if a == b);
+        if !same {
+            let kind = if target.is_dir() { "folder" } else { "file" };
+            return Err(format!("A {} named \"{}\" already exists here", kind, trimmed));
+        }
+    }
     std::fs::rename(src, &target).map_err(|e| e.to_string())?;
     Ok(target.to_string_lossy().to_string())
 }
