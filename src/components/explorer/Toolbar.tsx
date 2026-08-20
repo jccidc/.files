@@ -359,14 +359,16 @@ function BreadcrumbDropdown({ x, y, items, currentFolder, onSelect, onClose }: {
   }, [onClose]);
 
   useEffect(() => {
+    // Capture phase + stopPropagation so the file list's window-level handler
+    // does not also move selection / open the selected file on the same key.
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightIdx(i => Math.min(i + 1, items.length - 1)); }
-      if (e.key === 'ArrowUp') { e.preventDefault(); setHighlightIdx(i => Math.max(i - 1, 0)); }
-      if (e.key === 'Enter' && highlightIdx >= 0) { onSelect(items[highlightIdx].path); }
-      if (e.key === 'Escape') { onClose(); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); e.stopPropagation(); setHighlightIdx(i => Math.min(i + 1, items.length - 1)); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); setHighlightIdx(i => Math.max(i - 1, 0)); }
+      if (e.key === 'Enter' && highlightIdx >= 0) { e.preventDefault(); e.stopPropagation(); onSelect(items[highlightIdx].path); }
+      if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    document.addEventListener('keydown', handler, true);
+    return () => document.removeEventListener('keydown', handler, true);
   }, [highlightIdx, items, onSelect, onClose]);
 
   return (

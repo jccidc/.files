@@ -62,22 +62,27 @@ pub fn empty_recycle_bin() -> Result<(), String> {
 
 /// Restore a file from the Recycle Bin
 #[tauri::command]
-pub fn restore_from_bin(item_name: String) -> Result<(), String> {
-    let escaped = item_name.replace('\'', "''");
+pub fn restore_from_bin(item_path: String) -> Result<(), String> {
+    let escaped = item_path.replace('\'', "''");
     let script = format!(
         r#"
         $shell = New-Object -ComObject Shell.Application
         $bin = $shell.Namespace(10)
-        $item = $bin.Items() | Where-Object {{ $_.Name -eq '{}' }} | Select-Object -First 1
-        if ($item) {{ $item.InvokeVerb('undelete') }}
+        $item = $bin.Items() | Where-Object {{ $_.Path -eq '{}' }} | Select-Object -First 1
+        if (-not $item) {{ Write-Error 'Item not found in Recycle Bin'; exit 2 }}
+        $item.InvokeVerb('undelete')
         "#,
         escaped
     );
-    std::process::Command::new("powershell")
+    let out = std::process::Command::new("powershell")
         .args(["-NoProfile", "-Command", &script])
         .creation_flags(CREATE_NO_WINDOW)
         .output()
         .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        return Err(if err.is_empty() { "Restore failed".into() } else { err });
+    }
     Ok(())
 }
 

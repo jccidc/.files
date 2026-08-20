@@ -221,6 +221,9 @@ pub async fn move_files_with_progress(
             let src_path = Path::new(src);
             let file_name = src_path.file_name().ok_or_else(|| format!("Invalid path: {}", src))?;
             let mut target = dest_path.join(file_name);
+            // replace_all on a directory: park the existing target under a sibling name
+            // instead of deleting it up front, so a failed move never leaves neither copy.
+            let mut replaced_backup: Option<std::path::PathBuf> = None;
 
             if target.exists() {
                 match conflict_resolution.as_str() {
@@ -234,10 +237,13 @@ pub async fn move_files_with_progress(
                     "rename_all" => { target = find_unique_name(&target); }
                     "replace_all" => {
                         if target.is_dir() {
-                            std::fs::remove_dir_all(&target).map_err(|e| e.to_string())?;
-                        } else {
-                            std::fs::remove_file(&target).map_err(|e| e.to_string())?;
+                            let backup = find_unique_name(&target.with_file_name(
+                                format!("{}.replaced", file_name.to_string_lossy()),
+                            ));
+                            std::fs::rename(&target, &backup).map_err(|e| e.to_string())?;
+                            replaced_backup = Some(backup);
                         }
+                        // files: fs::rename / fs::copy overwrite the target atomically, no pre-delete
                     }
                     _ => { target = find_unique_name(&target); }
                 }
@@ -281,6 +287,9 @@ pub async fn move_files_with_progress(
                     }
                 }
                 Err(e) => return Err(e.to_string()),
+            }
+            if let Some(backup) = replaced_backup.take() {
+                let _ = std::fs::remove_dir_all(&backup);
             }
             created_paths.push(target.to_string_lossy().to_string());
         }

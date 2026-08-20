@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { readFileBytes } from '../../api/filesystem';
 import mammoth from 'mammoth';
+import DOMPurify from 'dompurify';
 
 interface Props {
   path: string;
@@ -65,7 +66,7 @@ export function DocxPreview({ path }: Props) {
           color: 'var(--t1)', fontFamily: "var(--font-family)", fontSize: 14,
           lineHeight: 1.7,
         }}
-        dangerouslySetInnerHTML={{ __html: html || '' }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html || '') }}
         className="docx-preview"
       />
       <style>{`

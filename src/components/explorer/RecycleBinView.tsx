@@ -17,6 +17,7 @@ export function RecycleBinView({ onNavigate: _onNavigate }: { onNavigate: (path:
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; name: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = () => {
     setLoading(true);
@@ -34,20 +35,25 @@ export function RecycleBinView({ onNavigate: _onNavigate }: { onNavigate: (path:
     refresh();
   };
 
-  const handleRestore = async (name: string) => {
-    await restoreFromBin(name);
+  // Rows are keyed by the unique Recycle Bin path, not the display name:
+  // two deleted files can share a name.
+  const handleRestore = async (path: string) => {
+    try {
+      await restoreFromBin(path);
+    } catch (e) {
+      setError(`Restore failed: ${String(e)}`);
+    }
     refresh();
   };
 
   const handleRestoreSelected = async () => {
-    try {
-      for (const name of selected) {
-        await restoreFromBin(name);
-      }
-    } finally {
-      setSelected(new Set());
-      refresh();
+    const failed: string[] = [];
+    for (const path of selected) {
+      try { await restoreFromBin(path); } catch (e) { failed.push(String(e)); }
     }
+    if (failed.length) setError(`Restore failed for ${failed.length} item(s): ${failed[0]}`);
+    setSelected(new Set());
+    refresh();
   };
 
   const handleRowClick = (name: string, e: React.MouseEvent) => {
@@ -72,6 +78,12 @@ export function RecycleBinView({ onNavigate: _onNavigate }: { onNavigate: (path:
   };
 
   const totalSize = items.reduce((sum, i) => sum + i.size, 0);
+
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(null), 6000);
+    return () => clearTimeout(t);
+  }, [error]);
 
   const { startIndex, endIndex, totalHeight, offsetY, containerRef, onScroll } =
     useVirtualScroll(items.length, ROW_HEIGHT);
@@ -148,17 +160,17 @@ export function RecycleBinView({ onNavigate: _onNavigate }: { onNavigate: (path:
             <div style={{ transform: `translateY(${offsetY}px)` }}>
               {items.slice(startIndex, endIndex).map((item) => (
                 <div key={item.path}
-                  onClick={(e) => handleRowClick(item.name, e)}
-                  onMouseDown={(e) => handleRowMouseDown(item.name, e)}
+                  onClick={(e) => handleRowClick(item.path, e)}
+                  onMouseDown={(e) => handleRowMouseDown(item.path, e)}
                   style={{
                     display: 'grid', gridTemplateColumns: '1fr 100px', alignItems: 'center',
                     height: ROW_HEIGHT, borderBottom: '1px solid var(--border)',
                     cursor: 'pointer', userSelect: 'none', fontSize: 12,
-                    background: selected.has(item.name) ? 'var(--active)' : 'transparent',
+                    background: selected.has(item.path) ? 'var(--active)' : 'transparent',
                     borderRadius: 3,
                   }}
-                  onMouseEnter={(e) => { if (!selected.has(item.name)) e.currentTarget.style.background = 'var(--hover)'; }}
-                  onMouseLeave={(e) => { if (!selected.has(item.name)) e.currentTarget.style.background = 'transparent'; }}
+                  onMouseEnter={(e) => { if (!selected.has(item.path)) e.currentTarget.style.background = 'var(--hover)'; }}
+                  onMouseLeave={(e) => { if (!selected.has(item.path)) e.currentTarget.style.background = 'transparent'; }}
                 >
                   <span style={{ color: 'var(--t1)', paddingLeft: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {item.name}
@@ -172,6 +184,13 @@ export function RecycleBinView({ onNavigate: _onNavigate }: { onNavigate: (path:
       </div>
 
       {/* Right-click context menu */}
+      {error && (
+        <div role="alert" onClick={() => setError(null)} style={{
+          position: 'fixed', bottom: 32, left: '50%', transform: 'translateX(-50%)', zIndex: 1600,
+          maxWidth: 420, cursor: 'pointer', background: 'var(--surface)', border: '1px solid var(--red, #f87171)',
+          borderRadius: 8, padding: '10px 14px', color: 'var(--red, #f87171)', fontSize: 12,
+        }}>{error}</div>
+      )}
       {ctxMenu && (
         <div style={{
           position: 'fixed', left: ctxMenu.x, top: ctxMenu.y, zIndex: 9999,

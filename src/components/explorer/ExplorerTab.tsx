@@ -684,9 +684,9 @@ function _ensureGlobalListeners() {
 
     const { moveFiles, copyFiles } = await import('./../../api/shell');
     if (e.ctrlKey) {
-      await copyFiles(validPaths, destDir).catch(() => {});
+      await copyFiles(validPaths, destDir).catch((err) => window.dispatchEvent(new CustomEvent('dotfiles:op-error', { detail: `Copy failed: ${String(err)}` })));
     } else {
-      await moveFiles(validPaths, destDir).catch(() => {});
+      await moveFiles(validPaths, destDir).catch((err) => window.dispatchEvent(new CustomEvent('dotfiles:op-error', { detail: `Move failed: ${String(err)}` })));
     }
 
     // Refresh both source and destination zones
@@ -762,6 +762,18 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   // Transient message shown when a rename fails, so it no longer just reverts silently
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [opError, setOpError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!opError) return;
+    const t = setTimeout(() => setOpError(null), 6000);
+    return () => clearTimeout(t);
+  }, [opError]);
+  // Drop zones outside this component report failures through a window event.
+  useEffect(() => {
+    const h = (e: Event) => setOpError(String((e as CustomEvent).detail));
+    window.addEventListener('dotfiles:op-error', h);
+    return () => window.removeEventListener('dotfiles:op-error', h);
+  }, []);
   // Bumped after a rename so views that fetch their own listing (FlatView) reload
   const [fsVersion, setFsVersion] = useState(0);
   const [peekPaths, setPeekPaths] = useState<Set<string>>(new Set());
@@ -1282,8 +1294,10 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
         if (selectedPaths.size > 0) {
           e.preventDefault();
           const paths = [...selectedPaths];
+          // Permanent delete bypasses the Recycle Bin: confirm like RecycleBinView.handleEmpty does.
+          if (!confirm(`Permanently delete ${paths.length} item(s)? This cannot be undone.`)) return;
           import('../../api/extras').then(({ permanentDelete }) => {
-            permanentDelete(paths).then(() => refresh()).catch(() => {});
+            permanentDelete(paths).then(() => refresh()).catch((err) => setOpError(`Delete failed: ${String(err)}`));
           });
         }
         return;
@@ -2054,6 +2068,14 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
       {/* Tooltip */}
       {tooltip && <HoverTooltip entry={tooltip.entry} x={tooltip.x} y={tooltip.y} />}
 
+      {opError && (
+        <div role="alert" onClick={() => setOpError(null)} style={{
+          position: 'fixed', bottom: 72, left: '50%', transform: 'translateX(-50%)', zIndex: 1600,
+          maxWidth: 420, cursor: 'pointer', background: 'var(--surface)', border: '1px solid var(--red, #f87171)',
+          borderRadius: 8, padding: '10px 14px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          color: 'var(--red, #f87171)', fontSize: 12, lineHeight: 1.4,
+        }}>{opError}</div>
+      )}
       {/* Rename error toast — click to dismiss, auto-clears after 5s */}
       {renameError && (
         <div
@@ -2151,15 +2173,29 @@ export function ExplorerTab({ tab, panelId }: { tab: Tab; panelId?: string }) {
             const firstName = paths[0].replace(/.*[\\/]/, '').replace(/\.[^.]+$/, '');
             const baseName = paths.length > 1 ? 'Archive' : firstName;
             const ext = format === '7z' ? '.7z' : format === 'tar.gz' ? '.tar.gz' : '.zip';
-            const destPath = currentPath.replace(/[\\/]?$/, '\\') + baseName + ext;
-            await compressArchive(paths, destPath, format);
+            try {
+              // never overwrite an existing archive: probe for a free name
+              let name = baseName + ext;
+              let i = 2;
+              while (entries.some((en) => en.name.toLowerCase() === name.toLowerCase())) {
+                name = `${baseName} (${i++})${ext}`;
+              }
+              const uniqueDest = currentPath.replace(/[\\/]?$/, '\\') + name;
+              await compressArchive(paths, uniqueDest, format);
+            } catch (e) {
+              setOpError(`Compress failed: ${String(e)}`);
+            }
             refresh();
           }}
           onExtract={async (path, dest) => {
             const { extractArchive } = await import('../../api/archive');
             // '__current__' means extract into the current directory
             const extractDest = dest === '__current__' ? currentPath : undefined;
-            await extractArchive(path, extractDest);
+            try {
+              await extractArchive(path, extractDest);
+            } catch (e) {
+              setOpError(`Extract failed: ${String(e)}`);
+            }
             refresh();
           }}
           onCreateShortcut={async (path) => {

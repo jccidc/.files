@@ -8,8 +8,8 @@ export async function emptyRecycleBin(): Promise<void> {
   return invoke('empty_recycle_bin');
 }
 
-export async function restoreFromBin(itemName: string): Promise<void> {
-  return invoke('restore_from_bin', { itemName });
+export async function restoreFromBin(itemPath: string): Promise<void> {
+  return invoke('restore_from_bin', { itemPath });
 }
 
 export async function createSymlink(target: string, linkPath: string): Promise<void> {

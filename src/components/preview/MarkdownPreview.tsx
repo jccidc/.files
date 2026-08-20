@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { readTextFile } from '../../api/filesystem';
 
 interface Props {
@@ -22,7 +23,7 @@ export function MarkdownPreview({ path }: Props) {
       .then(async (content) => {
         if (cancelled) return;
         const result = await md.parse(content);
-        setHtml(result);
+        setHtml(DOMPurify.sanitize(result));
       })
       .catch((e) => { if (!cancelled) setError(String(e)); })
       .finally(() => { if (!cancelled) setLoading(false); });

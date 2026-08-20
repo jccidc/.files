@@ -82,6 +82,10 @@ pub fn copy_files(sources: Vec<String>, dest: String) -> Result<(), String> {
             .ok_or_else(|| format!("Invalid source path: {}", src))?;
         let target = dest_path.join(file_name);
 
+        if target.exists() {
+            return Err(format!("'{}' already exists in the destination. Nothing was overwritten.", file_name.to_string_lossy()));
+        }
+
         if src_path.is_dir() {
             copy_dir_recursive(src_path, &target)?;
         } else {
@@ -105,6 +109,10 @@ pub fn move_files(sources: Vec<String>, dest: String) -> Result<(), String> {
             .file_name()
             .ok_or_else(|| format!("Invalid source path: {}", src))?;
         let target = dest_path.join(file_name);
+
+        if target.exists() {
+            return Err(format!("'{}' already exists in the destination. Nothing was overwritten.", file_name.to_string_lossy()));
+        }
 
         match std::fs::rename(src_path, &target) {
             Ok(()) => {}
